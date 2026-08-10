@@ -366,6 +366,6 @@ tests and linters pass before submitting.
 
 ## License
 
-Copyright &copy; 2026 Machani Robotics.
+Copyright &copy; 2026 The Protobuf Project.
 
 Licensed under the Apache License, Version 2.0. See [LICENSE](LICENSE) for details.

@@ -308,7 +308,7 @@ func (b *Builder) Build() (*Telemetry, error) {
 	return p, nil
 }
 
-// isLocalHost checks if the host is a local address (localhost, 127.x.x.x, or private IP).
+// isLocalHost reports whether host is empty, localhost, a loopback address, or a private IP address.
 func isLocalHost(host string) bool {
 	host = strings.ToLower(host)
 	if host == "localhost" || host == "" {
@@ -335,7 +335,7 @@ func isLocalHost(host string) bool {
 }
 
 // autoConfigureOTLP enables OTLP and applies transport defaults based on the configured endpoint or host.
-// Remote hosts using ports 443 or 4318 enable TLS and HTTP; port 4317 retains its configured security setting.
+// autoConfigureOTLP enables OTLP when an endpoint or host is configured and applies TLS and HTTP defaults for remote hosts on ports 443 and 4318.
 func autoConfigureOTLP(otlp *options.OTLPOptions) {
 	// Auto-enable OTLP when an endpoint is configured
 	if !otlp.Enabled && otlp.Endpoint != "" {
@@ -369,6 +369,7 @@ func autoConfigureOTLP(otlp *options.OTLPOptions) {
 }
 
 // NewLegacy creates a new Telemetry instance using the legacy API (for backward compatibility).
+// NewLegacy creates telemetry clients from an explicit context and configuration.
 // NewLegacy creates telemetry clients from an explicit context and configuration.
 // Deprecated: Use New().WithConfig().Build() instead.
 func NewLegacy(ctx context.Context, serviceOpts options.ServiceOptions, opts options.TelemetryOptions) (*Telemetry, error) {

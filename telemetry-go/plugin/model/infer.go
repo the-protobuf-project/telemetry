@@ -43,7 +43,11 @@ type LabelDecision struct {
 // InferLabel determines whether a field should be projected as a metric label and
 // whether forcing it as a label warrants a warning. Explicit overrides take
 // precedence; without an override, only boolean and enum fields that are not
-// resource references are treated as labels.
+// InferLabel determines whether a field is projected as a metric label.
+// An explicit override takes precedence; without one, only boolean and enum
+// fields are included, and resource references are excluded. It reports a
+// warning when a forced label is neither boolean nor enum or is a resource
+// reference.
 func InferLabel(override *bool, fieldType schema.FieldType, isResourceRef bool) LabelDecision {
 	isBoolOrEnum := fieldType == schema.TypeBool || fieldType == schema.TypeEnum
 
@@ -92,7 +96,7 @@ func IsDurationLike(fieldName string) bool {
 // auto-detected: a single scalar field can't safely be assumed monotonic from
 // its type or name alone, so those two kinds are only reachable via an
 // InferKind determines the metric instrument kind from an explicit override or field name.
-// It preserves specified kinds and infers histogram for duration-like names and gauge otherwise.
+// It returns the specified kind when provided, otherwise infers a histogram for duration-like names and a gauge for all other names.
 func InferKind(override MetricKind, fieldName string) MetricKind {
 	if override != KindUnspecified {
 		return override

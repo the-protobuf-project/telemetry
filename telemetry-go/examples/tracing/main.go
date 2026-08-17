@@ -204,6 +204,7 @@ func runMaleniaConversationPipeline() {
 }
 
 // processMaleniaConversation orchestrates the seven-stage conversation pipeline and records its traced execution.
+// processMaleniaConversation runs the seven-stage Malenia conversation pipeline.
 // It returns an error when any pipeline component fails.
 func processMaleniaConversation(ctx context.Context, k *telemetry.Telemetry, req ConversationRequest) error {
 	// Create root span for the entire conversation pipeline
@@ -331,7 +332,8 @@ func processMaleniaConversation(ctx context.Context, k *telemetry.Telemetry, req
 }
 
 // processInput validates and prepares raw conversation input, detecting its language and token count.
-// It returns the processed input details and any processing error.
+// processInput validates and derives metadata for a conversation input.
+// It returns the processed input details and a nil error.
 func processInput(ctx context.Context, k *telemetry.Telemetry, req InputProcessingRequest) (*InputProcessingResponse, error) {
 	_, span := k.Tracing.Start(ctx, "InputProcessing", req)
 	defer span.End()
@@ -364,6 +366,7 @@ func processInput(ctx context.Context, k *telemetry.Telemetry, req InputProcessi
 }
 
 // retrieveContext gathers conversation history and user preferences for a request.
+// retrieveContext gathers conversation history, user preferences, and cached context for a request.
 // It returns the aggregated context details and retrieval metadata.
 func retrieveContext(ctx context.Context, k *telemetry.Telemetry, req ContextRetrievalRequest) (*ContextRetrievalResponse, error) {
 	_, span := k.Tracing.Start(ctx, "ContextRetrieval", req)
@@ -397,6 +400,7 @@ func retrieveContext(ctx context.Context, k *telemetry.Telemetry, req ContextRet
 }
 
 // classifyIntent classifies a conversation request and extracts recognized entities.
+// classifyIntent classifies a conversation request and extracts its recognized entities.
 // It returns the classified intent, confidence score, and entities.
 func classifyIntent(ctx context.Context, k *telemetry.Telemetry, req IntentClassificationRequest) (*IntentClassificationResponse, error) {
 	_, span := k.Tracing.Start(ctx, "IntentClassification", req)
@@ -430,7 +434,8 @@ func classifyIntent(ctx context.Context, k *telemetry.Telemetry, req IntentClass
 }
 
 // searchKnowledge searches the knowledge base for documents relevant to the request.
-// It returns the search results and their average relevance score.
+// searchKnowledge retrieves relevant documents for a knowledge search request and reports their average relevance.
+// It returns the search results and average relevance score.
 func searchKnowledge(ctx context.Context, k *telemetry.Telemetry, req KnowledgeSearchRequest) (*KnowledgeSearchResponse, error) {
 	_, span := k.Tracing.Start(ctx, "KnowledgeSearch", req)
 	defer span.End()
@@ -463,7 +468,7 @@ func searchKnowledge(ctx context.Context, k *telemetry.Telemetry, req KnowledgeS
 }
 
 // generateResponse generates an AI response for the supplied conversation request.
-// It returns the generated response and its token usage and processing metadata.
+// generateResponse generates an LLM response for the supplied request and records its token usage and processing metadata.
 func generateResponse(ctx context.Context, k *telemetry.Telemetry, req ResponseGenerationRequest) (*ResponseGenerationResponse, error) {
 	_, span := k.Tracing.Start(ctx, "ResponseGeneration", req)
 	defer span.End()
@@ -500,7 +505,7 @@ func generateResponse(ctx context.Context, k *telemetry.Telemetry, req ResponseG
 }
 
 // validateResponse checks a generated response for safety, personally identifiable information, toxicity, and format validity.
-// It returns the validation results for the original request.
+// validateResponse validates response safety, privacy, toxicity, and format, returning the validation results.
 func validateResponse(ctx context.Context, k *telemetry.Telemetry, req ResponseValidationRequest) (*ResponseValidationResponse, error) {
 	_, span := k.Tracing.Start(ctx, "ResponseValidation", req)
 	defer span.End()
@@ -533,7 +538,8 @@ func validateResponse(ctx context.Context, k *telemetry.Telemetry, req ResponseV
 }
 
 // formatOutput applies Markdown formatting and final attribution to a generated response. 
-// It returns the formatted response metadata.
+// formatOutput formats the generated response and records output metadata.
+// It returns the formatted content, output length, Markdown status, and processing time.
 func formatOutput(ctx context.Context, k *telemetry.Telemetry, req OutputFormattingRequest) (*OutputFormattingResponse, error) {
 	_, span := k.Tracing.Start(ctx, "OutputFormatting", req)
 	defer span.End()

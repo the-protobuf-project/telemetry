@@ -14,17 +14,20 @@ struct ChatMessage {
 
 /// Starts the chat service, initializes telemetry, logs a sample message, and waits briefly before exiting.
 ///
+/// # Errors
+///
+/// Returns an error if telemetry initialization fails.
+///
 /// # Examples
 ///
 /// ```
 /// # #[tokio::main]
-/// # async fn main() -> anyhow::Result<()> {
-/// main().await?;
-/// # Ok(())
+/// # async fn run() -> anyhow::Result<()> {
+/// #     // Start the service in an application entry point.
+/// #     chat_service::main().await?;
+/// #     Ok(())
 /// # }
 /// ```
-///
-/// Returns an error if telemetry initialization fails.
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
     let _telemetry = telemetry::telemetry_local_otel!()

@@ -61,11 +61,7 @@ class TelemetryBuilder:
         return self
 
     def with_service(self, name: str, version: str) -> "TelemetryBuilder":
-        """Set service name and version.
-
-        When this is called, it indicates the user wants to configure service via code,
-        so we'll clear any service-level configuration from the config file to avoid collisions.
-        """
+        """Set the service name and version, using code-defined service settings during the build."""
         self._name = name
         self._version = version
         # Mark that service should be configured via code only
@@ -73,7 +69,14 @@ class TelemetryBuilder:
         return self
 
     def description(self, desc: str) -> "TelemetryBuilder":
-        """Set service description."""
+        """Set the service description.
+        
+        Parameters:
+        	desc (str): Description of the service.
+        
+        Returns:
+        	TelemetryBuilder: This builder instance.
+        """
         self._description = desc
         return self
 
@@ -88,7 +91,14 @@ class TelemetryBuilder:
         return self
 
     def with_labels(self, labels: Dict[str, str]) -> "TelemetryBuilder":
-        """Add multiple custom labels to all telemetry."""
+        """Add or update custom service labels.
+        
+        Parameters:
+        	labels (Dict[str, str]): Label names and values to merge into the service configuration.
+        
+        Returns:
+        	TelemetryBuilder: This builder instance.
+        """
         self._labels.update(labels)
         return self
 
@@ -131,10 +141,13 @@ class TelemetryBuilder:
 
     def with_log_level(self, level: LogLevel) -> "TelemetryBuilder":
         """
-        Set the log level for the telemetry service.
+        Set the logging level for the service module.
+        
+        Parameters:
+        	level (LogLevel): The logging level to apply.
         
         Returns:
-            TelemetryBuilder: The builder with the specified log level configured.
+        	TelemetryBuilder: The builder with the logging level configured.
         """
         self._log_level = level
         return self
@@ -146,7 +159,7 @@ class TelemetryBuilder:
 
     def build(self) -> "Telemetry":
         """
-        Build a Telemetry instance from configuration and builder overrides.
+        Build a configured `Telemetry` instance from loaded configuration and builder overrides.
         
         Returns:
         	Telemetry: The configured telemetry instance.
@@ -299,7 +312,7 @@ class Telemetry:
         Exit the telemetry context and release its resources.
         
         Returns:
-        	bool: `False` so exceptions raised within the context propagate.
+        	bool: `False`, allowing exceptions raised within the context to propagate.
         """
         reset_current_telemetry_metrics(self._metrics_token)
         reset_current_telemetry(self._telemetry_token)
@@ -307,7 +320,7 @@ class Telemetry:
         return False
 
     def close(self):
-        """Close all Telemetry components and flush pending data"""
+        """Close all telemetry components and flush pending data."""
         # Close components in order
         self.tracing.close()
         self.metrics.close()

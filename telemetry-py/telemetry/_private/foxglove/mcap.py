@@ -97,14 +97,14 @@ class UnifiedMcapWriter:
         service_environment: str = "",
     ):
         """
-        Write a timestamped log entry to the MCAP file.
+        Write a timestamped structured log entry to the MCAP file.
         
         Parameters:
             level (str): Textual log level, such as ``DEBUG``, ``INFO``, ``WARNING``, ``ERROR``, or ``FATAL``.
             message (str): Log message.
             data (Dict[str, Any]): Additional structured log data.
             timestamp (Optional[int]): Timestamp in nanoseconds since the Unix epoch. Uses the current time when omitted.
-            name (str): Logger name. Uses the service name when omitted.
+            name (str): Logger name. Uses the service name when empty.
             file (str): Source file associated with the log entry.
             line (int): Source line associated with the log entry.
             service_version (str): Version of the service that produced the entry.
@@ -161,8 +161,9 @@ class UnifiedMcapWriter:
         Parameters:
             name (str): Metric name.
             value (float): Metric value.
+            metric_type (str): Metric type, accepted for interface compatibility.
+            labels (Optional[Dict[str, Any]]): Metric labels, accepted for interface compatibility.
             timestamp (Optional[int]): Timestamp in nanoseconds since the Unix epoch. Uses the current time when omitted.
-        
         """
         if self._closed:
             return
@@ -229,7 +230,12 @@ class UnifiedMcapWriter:
         )
 
     def is_closed(self) -> bool:
-        """Check if writer is closed"""
+        """
+        Determine whether the writer has been closed.
+        
+        Returns:
+        	bool: `True` if the writer is closed, `False` otherwise.
+        """
         return self._closed
 
     def close(self):

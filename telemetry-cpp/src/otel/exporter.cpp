@@ -105,6 +105,12 @@ opentelemetry::nostd::shared_ptr<logs_api::Logger> OtelExporter::get_logger() {
     return logger_provider_->GetLogger(service_name_, service_version_);
 }
 
+/**
+ * @brief Retrieves the metrics meter for this service.
+ *
+ * @return A shared pointer to the service meter, or an empty pointer if the
+ *         meter provider is unavailable.
+ */
 opentelemetry::nostd::shared_ptr<metrics_api::Meter> OtelExporter::get_meter() {
     if (!meter_provider_) return opentelemetry::nostd::shared_ptr<metrics_api::Meter>();
     return meter_provider_->GetMeter(service_name_, service_version_);

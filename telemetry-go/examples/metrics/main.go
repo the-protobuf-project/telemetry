@@ -23,6 +23,7 @@ type TranscriptionMetrics struct {
 	WordCount     int64   `telemetry:"metric:counter:transcription.words.count"`
 }
 
+// main initializes telemetry, records simulated LLM and transcription metrics, and reports the output locations for visualization.
 func main() {
 	// Uses telemetry.toml config for service info and OTLP endpoint
 	p, err := telemetry.New().Build()

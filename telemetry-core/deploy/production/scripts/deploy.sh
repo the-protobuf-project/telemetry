@@ -61,6 +61,7 @@ wait_for_ssh() {
     echo -e "${RED}SSH timeout${NC}"; return 1
 }
 
+# install_docker installs and enables Docker and Docker Compose on the remote EC2 instance if they are unavailable.
 install_docker() {
     local ip=$1
     echo "Installing Docker..."
@@ -116,7 +117,7 @@ SSH: ssh -i $SSH_KEY ec2-user@$ip
 "
 }
 
-# Commands
+# cmd_provision provisions the telemetry services on the specified host and displays the deployment summary.
 cmd_provision() {
     local ip=$1
     [ -z "$ip" ] && { usage; exit 1; }
@@ -141,6 +142,7 @@ cmd_deploy() {
     ssh -i "$SSH_KEY" "ec2-user@$ip" "sudo docker ps --format 'table {{.Names}}\t{{.Status}}'"
 }
 
+# cmd_status displays the status of running telemetry containers on the specified host.
 cmd_status() {
     local ip=$1
     [ -z "$ip" ] && { usage; exit 1; }

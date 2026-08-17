@@ -136,23 +136,14 @@ class TelemetryTracing:
     def start_span(
         self, name: str, attributes: Optional[Dict[str, Any]] = None
     ) -> SpanContext:
-        """Manually start a span using a context manager.
-
-        This method provides manual control over span creation and lifecycle,
-        as opposed to the automatic decorator-based approach.
-
+        """Create a span for manually managed tracing operations.
+        
         Args:
-            name: Name of the span/operation.
-            attributes: Optional dictionary of span attributes.
-
+            name (str): Name of the span.
+            attributes (Optional[Dict[str, Any]]): Initial attributes for the span.
+        
         Returns:
-            A SpanContext that can be used as a context manager.
-
-        Example:
-            with telemetry.tracing.start_span("operation", {"key": "value"}) as span:
-                # Do work
-                span.add_event("checkpoint")
-                span.set_attribute("result", "success")
+            SpanContext: A context manager for managing the span lifecycle.
         """
         return SpanContext(self, name, attributes)
 

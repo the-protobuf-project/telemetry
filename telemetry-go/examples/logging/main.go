@@ -52,7 +52,8 @@ type LLMRequestEvent struct {
 }
 
 // main demonstrates multilingual chat telemetry logging with structured messages,
-// transcription events, and LLM request events.
+// main demonstrates multilingual chat telemetry logging, including chat messages,
+// speech transcriptions, LLM requests, and Grafana query examples.
 func main() {
 	// Uses telemetry.toml config for service info and OTLP endpoint
 	p, err := telemetry.New().Build()

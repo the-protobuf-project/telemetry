@@ -24,6 +24,22 @@ struct ChatMessage {
 /// ```
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
+/// Initializes telemetry and runs the chat service logging demonstration.
+///
+/// Creates localized chat messages, emits service activity and processing statistics,
+/// and propagates telemetry initialization errors.
+///
+/// # Errors
+///
+/// Returns an error if telemetry initialization fails.
+///
+/// # Examples
+///
+/// Run the service with:
+///
+/// ```text
+/// cargo run
+/// ```
 async fn main() -> anyhow::Result<()> {
     // Auto-discovers telemetry.toml config file
     let _telemetry = Telemetry::new()

@@ -32,13 +32,20 @@ class ProcessingResponse(BaseModel):
 
 @telemetry.trace("processing", auto_events=True)
 def random_function():
-    """Example function with @telemetry.trace decorator"""
+    """
+    Simulate a processing operation.
+    
+    Returns:
+    	str: The string `"processed"`.
+    """
     time.sleep(0.1)
     return "processed"
 
 
 def main():
-    """Run tracing example with decorators"""
+    """
+    Run the tracing examples for decorated functions and nested operations.
+    """
     # Uses telemetry.toml config for OTLP endpoint and service info
     with Telemetry.new().build() as p:
         p.logger.info("=== Decorator-Based Tracing Example ===")

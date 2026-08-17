@@ -365,8 +365,12 @@ def from_config(
 
 # Keep from_env as alias for backward compatibility
 def from_env() -> tuple[ServiceOptions, TelemetryOptions]:
-    """Load Telemetry configuration from environment variables (deprecated).
-
-    Use from_config() instead which supports both config files and env vars.
+    """
+    Load Telemetry configuration using the default configuration source.
+    
+    Deprecated: use `from_config()` instead.
+    
+    Returns:
+        A tuple containing service and telemetry options.
     """
     return from_config()

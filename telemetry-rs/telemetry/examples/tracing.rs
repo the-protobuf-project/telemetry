@@ -3,7 +3,7 @@
 use telemetry::tracing::instrument;
 use telemetry::{Environment, Telemetry};
 
-/// Creates a tracing span for a simulated database connection.
+/// Simulates connecting to a database.
 ///
 /// # Examples
 ///
@@ -28,35 +28,37 @@ fn query_database() {
     std::thread::sleep(std::time::Duration::from_millis(80));
 }
 
-/// Processes a unit of data.
+/// Processes a data-processing step in the pipeline.
 ///
 /// # Examples
 ///
 /// ```
 /// process_data();
 /// ```
-///
-/// #[instrument]
 fn process_data() {
     telemetry::logger::info!("child span: process_data");
     std::thread::sleep(std::time::Duration::from_millis(80));
 }
 
-/// Saves data while recording a child tracing span.
+/// Saves data and records a tracing span.
 ///
 /// # Examples
 ///
 /// ```
 /// save_data();
 /// ```
-#[instrument]
 fn save_data() {
     telemetry::logger::info!("child span: save_data");
     std::thread::sleep(std::time::Duration::from_millis(80));
 }
 
-/// **Continue the trace:** one root span; inner `#[instrument]` fns become children.
-#[instrument(name = "sync_pipeline")]
+/// Runs the synchronous data-processing pipeline in sequence.
+///
+/// # Examples
+///
+/// ```
+/// run_sync_pipeline();
+/// ```
 fn run_sync_pipeline() {
     connect_to_db();
     query_database();
@@ -64,41 +66,61 @@ fn run_sync_pipeline() {
     save_data();
 }
 
-/// Executes a named asynchronous pipeline step, completing after a short delay.
+/// Executes a named asynchronous pipeline step.
 ///
 /// # Examples
 ///
 /// ```
-/// # async fn example() {
-/// async_step("fetch").await;
-/// # }
+/// #[tokio::test]
+/// async fn runs_step() {
+///     async_step("fetch").await;
+/// }
 /// ```
 async fn async_step(name: &'static str) {
     telemetry::logger::info!("async child step={}", name);
     tokio::time::sleep(tokio::time::Duration::from_millis(60)).await;
 }
 
+/// Runs the asynchronous pipeline steps in sequence.
+///
+/// # Examples
+///
+/// ```
+/// # tokio::runtime::Runtime::new().unwrap().block_on(async {
+/// run_async_pipeline().await;
+/// # });
+/// ```
 #[instrument]
 async fn run_async_pipeline() {
     async_step("first").await;
     async_step("second").await;
 }
 
-/// Single root → one trace id in Tempo (full Gantt: sync + async children).
-#[instrument]
+/// Runs the synchronous and asynchronous pipelines within a single root operation.
+///
+/// # Examples
+///
+/// ```
+/// tokio::runtime::Runtime::new()
+///     .unwrap()
+///     .block_on(full_demo());
+/// ```
 async fn full_demo() {
     run_sync_pipeline();
     run_async_pipeline().await;
 }
 
-/// Initializes telemetry, runs the complete tracing demo, flushes exported data, and shuts down telemetry.
+/// Initializes telemetry, runs the complete tracing demo, exports the collected data, and shuts down telemetry.
 ///
 /// # Examples
 ///
 /// ```no_run
 /// // Run the binary to execute the demo and export its trace.
 /// ```
-#[tokio::main]
+///
+/// # Errors
+///
+/// Returns an error if telemetry initialization, flushing, or shutdown fails.
 async fn main() -> anyhow::Result<()> {
     let mut telemetry = Telemetry::new()
         .with_service("simple-trace-test", "1.0.0")

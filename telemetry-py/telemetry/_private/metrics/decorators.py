@@ -130,17 +130,14 @@ def metric(
     
     Parameters:
         name (Optional[str]): Metric name; defaults to the decorated function's name.
-        metric_type (str): Metric type: ``"counter"``, ``"histogram"``, or ``"gauge"``.
-        labels (Optional[Dict[str, Any]]): Labels to attach to recorded metrics.
-        record_duration (bool): Whether to record execution duration as a histogram.
+        metric_type (str): Metric type to record: ``"counter"``, ``"histogram"``, or
+            ``"gauge"``.
+        labels (Optional[Dict[str, Any]]): Labels attached to recorded metrics.
+        record_duration (bool): Whether to record execution duration in milliseconds.
     
     Returns:
-        Callable: A decorator that records the configured metrics and preserves the
-        decorated function's return value.
-    
-    Raises:
-        Exception: Re-raises exceptions from the decorated function after recording
-            an error metric.
+        Callable: A decorator that wraps a function and records configured metrics
+            while preserving its return value and raised exceptions.
     """
 
     def decorator(func: Callable) -> Callable:
@@ -158,13 +155,13 @@ def metric(
         @functools.wraps(func)
         def wrapper(*args, **kwargs):
             """
-            Execute the wrapped function and record configured telemetry metrics.
+            Execute the wrapped function and record its configured telemetry metrics.
             
             Returns:
                 The wrapped function's result.
             
             Raises:
-                Exception: Re-raises exceptions from the wrapped function after recording an error metric.
+                Exception: An exception raised by the wrapped function, after an error metric is recorded.
             """
             # Get Telemetry instance from context
             telemetry_instance = _current_telemetry_metrics.get()
@@ -332,19 +329,15 @@ def Histogram(
 
 
 def Gauge(name: Optional[str] = None, description: str = "") -> Any:
-    """Gauge field helper with automatic name inference.
-
-    Args:
-        name: Optional metric name. If not provided, uses field name.
-        description: Human-readable description of the metric.
-
+    """
+    Create a gauge metric field with optional name inference.
+    
+    Parameters:
+    	name (Optional[str]): Explicit metric name; when omitted, the field name is inferred.
+    	description (str): Human-readable description of the metric.
+    
     Returns:
-        A Pydantic Field with gauge metric metadata.
-
-    Example:
-        @telemetry.MetricModel
-        class MyMetrics(BaseModel):
-            memory_mb: float = Gauge(description="Memory used in MB")
+    	A Pydantic field configured with gauge metric metadata.
     """
     return Field(
         default=0.0,

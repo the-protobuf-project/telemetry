@@ -57,10 +57,10 @@ def trace(
         @functools.wraps(func)
         def wrapper(*args, **kwargs):
             """
-            Executes the wrapped function within a telemetry span when tracing is enabled.
+            Execute the wrapped function within a telemetry span when tracing is enabled.
             
             Returns:
-            	result (Any): The wrapped function's result.
+            	result (Any): The value returned by the wrapped function.
             """
             # Get Telemetry instance from context
             telemetry_instance = _current_telemetry.get()
@@ -104,10 +104,10 @@ def traced(
     """
     Create a tracing decorator using the legacy `traced` name.
     
-    Args:
-        name: Optional span name; defaults to the decorated function's name.
-        attributes: Optional span attributes.
-        auto_events: Whether to record start and completion events automatically.
+    Parameters:
+        name (Optional[str]): Span name; defaults to the decorated function's name.
+        attributes (Optional[Dict[str, Any]]): Span attributes to record.
+        auto_events (bool): Whether to record start and completion events automatically.
     
     Returns:
         A decorator that traces the decorated function.
@@ -130,27 +130,33 @@ def set_current_telemetry(telemetry_instance):
 
 
 def reset_current_telemetry(token):
-    """Reset the current Telemetry instance.
-
-    Args:
-        token: Token returned from set_current_telemetry.
+    """
+    Restore the previous current Telemetry instance.
+    
+    Parameters:
+    	token: Token returned by set_current_telemetry.
     """
     _current_telemetry.reset(token)
 
 
 def trace_step(event_name: str):
     """
-    Mark a function as a traced step within a larger operation.
+    Mark a function as a named step within a traced operation.
     
     Args:
-        event_name: Name assigned to the traced step.
+        event_name: Name associated with the traced step.
     
     Returns:
-        A decorator that preserves the wrapped function's behavior and records the step name as metadata.
+        A decorator that attaches the step name to the wrapped function.
     """
 
     def decorator(func: Callable) -> Callable:
-        """Decorator that wraps a function as a traced step."""
+        """
+        Decorate a function with a trace event name while preserving its behavior.
+        
+        Returns:
+            Callable: The wrapped function with the trace event name attached as metadata.
+        """
 
         @functools.wraps(func)
         def wrapper(*args, **kwargs):
@@ -194,12 +200,12 @@ class TracedOperation:
         name: str,
         attributes: Optional[Dict[str, Any]] = None,
     ):
-        """Initialize the traced operation.
-
+        """Initialize a manually managed traced operation.
+        
         Args:
-            tracing: TelemetryTracing instance.
+            tracing: Telemetry tracing instance.
             name: Name of the operation.
-            attributes: Optional span attributes.
+            attributes: Optional attributes to attach to the span.
         """
         self.tracing = tracing
         self.name = name

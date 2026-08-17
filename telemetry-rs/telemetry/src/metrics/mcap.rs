@@ -87,7 +87,7 @@ impl MetricMcapWriter {
     ///
     /// # Examples
     ///
-    /// ```
+    /// ```no_run
     /// # let mut metrics: MetricMcapWriter = todo!();
     /// metrics.write_gauge("temperature", 21.5)?;
     /// # Ok::<(), anyhow::Error>(())

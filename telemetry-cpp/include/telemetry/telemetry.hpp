@@ -25,7 +25,10 @@ public:
     Telemetry(const ServiceOptions& service_opts, const TelemetryOptions& telemetry_opts);
     ~Telemetry();
 
-    Telemetry(const Telemetry&) = delete;
+    /**
+ * @brief Prevents copying a telemetry instance.
+ */
+Telemetry(const Telemetry&) = delete;
     Telemetry& operator=(const Telemetry&) = delete;
     Telemetry(Telemetry&&) noexcept;
     Telemetry& operator=(Telemetry&&) noexcept;
@@ -50,9 +53,9 @@ metrics::Metrics& metrics() { return *metrics_; }
 tracing::Tracer& tracer() { return *tracer_; }
 
     /**
- * @brief Returns the MCAP writer owned by the telemetry instance.
+ * @brief Provides access to the configured MCAP writer.
  *
- * @return std::shared_ptr<mcap::McapWriter> The configured MCAP writer, or an empty pointer if MCAP writing is unavailable.
+ * @return std::shared_ptr<mcap::McapWriter> The MCAP writer, or an empty pointer when MCAP writing is unavailable.
  */
 std::shared_ptr<mcap::McapWriter> mcap_writer() { return mcap_writer_; }
 

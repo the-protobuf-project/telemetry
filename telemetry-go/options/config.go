@@ -36,7 +36,8 @@ var defaultConfigPaths = []string{
 // discoverConfigPath finds a config file automatically.
 // discoverConfigPath finds the first available configuration file, prioritizing
 // TELEMETRY_CONFIG_PATH over the default search paths. It returns an empty
-// string when no configuration file is found.
+// discoverConfigPath finds the configured file from TELEMETRY_CONFIG_PATH or the default search paths.
+// It returns an empty string when no configuration file is found.
 func discoverConfigPath() string {
 	// Check TELEMETRY_CONFIG_PATH environment variable first
 	if envPath := os.Getenv("TELEMETRY_CONFIG_PATH"); envPath != "" {
@@ -78,7 +79,9 @@ func getParser(configPath string) (koanf.Parser, error) {
 // Environment variables override values loaded from the configuration file.
 //
 // configPath specifies the configuration file to load; an empty string skips file loading.
-// It returns the loaded telemetry options, service options, and any loading or unmarshalling error.
+// LoadConfig loads telemetry and service options from an optional configuration file and
+// TELEMETRY_-prefixed environment variables. Environment variables override file values.
+// It returns the loaded options and any loading or unmarshalling error.
 func LoadConfig(configPath string) (*TelemetryOptions, *ServiceOptions, error) {
 	// Load from config file if provided
 	if configPath != "" {
@@ -123,7 +126,10 @@ func LoadConfig(configPath string) (*TelemetryOptions, *ServiceOptions, error) {
 //
 // LoadConfigWithDefaults loads telemetry and service options using defaults, an optional
 // configuration file, and TELEMETRY_-prefixed environment variables, in that precedence
-// order. If configPath is empty, it discovers a configuration file automatically.
+// LoadConfigWithDefaults loads telemetry and service configuration over default values.
+// If configPath is empty, it discovers a configuration file automatically. Environment
+// variables with the TELEMETRY_ prefix override values loaded from the configuration file.
+// It returns the merged telemetry options, service options, and any loading or unmarshalling error.
 func LoadConfigWithDefaults(configPath string) (*TelemetryOptions, *ServiceOptions, error) {
 	// Start with defaults
 	telemetryOpts := Default()
@@ -171,7 +177,8 @@ func LoadConfigWithDefaults(configPath string) (*TelemetryOptions, *ServiceOptio
 }
 
 // MustLoadConfig loads configuration with defaults and panics if loading fails.
-// It returns the telemetry and service configuration options.
+// MustLoadConfig loads telemetry and service configuration options with defaults.
+// It panics if the configuration cannot be loaded.
 func MustLoadConfig(configPath string) (*TelemetryOptions, *ServiceOptions) {
 	telemetryOpts, serviceOpts, err := LoadConfigWithDefaults(configPath)
 	if err != nil {

@@ -22,6 +22,14 @@ pub struct TelemetryFormatter {
 }
 
 impl std::fmt::Debug for TelemetryFormatter {
+    /// Formats the formatter using its type name.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// let formatter = TelemetryFormatter::new();
+    /// assert_eq!(format!("{formatter:?}"), "TelemetryFormatter");
+    /// ```
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("TelemetryFormatter").finish()
     }
@@ -84,7 +92,7 @@ impl TelemetryFormatter {
 }
 
 impl Encode for TelemetryFormatter {
-    /// Formats a log record with timestamp, severity, source location, service metadata, and message.
+    /// Formats a log record with its timestamp, severity, source location, service metadata, and message.
     ///
     /// # Examples
     ///
@@ -94,7 +102,6 @@ impl Encode for TelemetryFormatter {
     ///
     /// let formatter = TelemetryFormatter::new();
     /// let mut output = Vec::new();
-    ///
     /// let record = log::Record::builder()
     ///     .level(log::Level::Info)
     ///     .file(Some("src/main.rs"))
@@ -110,8 +117,6 @@ impl Encode for TelemetryFormatter {
     /// # Errors
     ///
     /// Returns an error if writing the formatted record fails.
-    ///
-    /// @returns `Ok(())` after the record is written, or the underlying write error.
     fn encode(&self, w: &mut dyn Write, record: &Record) -> anyhow::Result<()> {
         let timestamp = Local::now().format("%Y-%m-%dT%H:%M::%S");
         let level = record.level();

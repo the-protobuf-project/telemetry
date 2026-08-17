@@ -12,6 +12,12 @@ namespace telemetry::mcap {
 
 namespace {
 
+/**
+ * @brief Converts a Unix timestamp in nanoseconds to a UTC ISO 8601 string.
+ *
+ * @param timestamp_ns Unix timestamp expressed in nanoseconds.
+ * @return std::string UTC timestamp with nine fractional-second digits.
+ */
 std::string timestamp_to_iso8601(uint64_t timestamp_ns) {
     auto time_s = timestamp_ns / 1000000000ULL;
     auto time_ns = timestamp_ns % 1000000000ULL;
@@ -73,7 +79,7 @@ void McapWriter::register_schemas() {
 }
 
 /**
- * @brief Obtains the MCAP schema ID for a registered schema.
+ * @brief Retrieves the ID for a registered schema, registering it with MCAP when needed.
  *
  * @param schema_name Name of the schema to retrieve or register.
  * @return uint16_t The schema ID, or 0 if the schema is unknown or schema support is unavailable.
@@ -135,6 +141,13 @@ uint16_t McapWriter::ensure_channel(const std::string& topic, const std::string&
 #endif
 }
 
+/**
+ * @brief Creates or retrieves a channel for a topic and schema.
+ *
+ * @param topic Topic associated with the channel.
+ * @param schema_name Name of the schema associated with the channel.
+ * @return uint16_t Channel identifier, or 0 if the channel cannot be created.
+ */
 uint16_t McapWriter::create_channel(const std::string& topic, const std::string& schema_name) {
     platform::ScopedLock lock(mutex_);
     return ensure_channel(topic, schema_name);

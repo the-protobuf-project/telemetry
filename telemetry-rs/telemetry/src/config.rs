@@ -303,16 +303,16 @@ impl TelemetryConfig {
         figment.merge(Env::prefixed("TELEMETRY_").split("_"))
     }
 
-    /// Loads the first available telemetry configuration file from the supported default paths.
+    /// Loads the first available telemetry configuration file from the default search paths.
     ///
-    /// Files are checked in order from the current directory, followed by the `.config`
+    /// Paths are checked in order from the current directory, followed by the `.config`
     /// directory. If no supported file exists, the original configuration is returned.
     ///
     /// # Examples
     ///
     /// ```
     /// let figment = Figment::new();
-    /// let configured = TelemetryConfig::auto_discover_config(figment);
+    /// let _configured = TelemetryConfig::auto_discover_config(figment);
     /// ```
     fn auto_discover_config(figment: Figment) -> Figment {
         let config_paths = [
@@ -349,8 +349,18 @@ impl TelemetryConfig {
         }
     }
 
-    /// Load configuration from auto-discovered sources.
-    #[allow(clippy::result_large_err)]
+    /// Loads telemetry configuration from auto-discovered files and environment variables.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// let result = TelemetryConfig::load();
+    /// assert!(result.is_ok() || result.is_err());
+    /// ```
+    ///
+    /// # Returns
+    ///
+    /// The loaded [`TelemetryConfig`] or a [`figment::Error`] if extraction fails.
     pub fn load() -> Result<Self, figment::Error> {
         Self::figment().extract()
     }
@@ -401,7 +411,9 @@ impl TelemetryConfig {
             .with_labels(self.service.labels.clone())
     }
 
-    /// Converts the configured telemetry, logging, Foxglove, profiling, and tracing settings into runtime options.
+    /// Converts telemetry, logging, Foxglove, profiling, and tracing configuration into runtime options.
+    ///
+    /// Foxglove recording is enabled only when it is configured with a non-empty file path.
     ///
     /// # Returns
     ///

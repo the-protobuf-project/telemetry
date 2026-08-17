@@ -92,7 +92,34 @@ impl GlobalLogger {
         }
     }
 
-    /// Creates OpenTelemetry attributes for a log entry.
+    /// Creates OpenTelemetry attributes containing service metadata and source location details.
+    ///
+    /// When structured data is provided, it is included as a serialized `data` attribute.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// let logger = GlobalLogger::new(
+    ///     "example-service".to_owned(),
+    ///     "1.0.0".to_owned(),
+    ///     "development".to_owned(),
+    ///     None,
+    ///     None,
+    /// );
+    /// let attributes = logger.otel_attributes(None, "src/main.rs", 42);
+    ///
+    /// assert_eq!(attributes.len(), 5);
+    /// ```
+    ///
+    /// # Parameters
+    ///
+    /// * `data` - Optional structured data to include in the attributes.
+    /// * `file` - Source file associated with the log entry.
+    /// * `line` - Source line associated with the log entry.
+    ///
+    /// # Returns
+    ///
+    /// A vector of OpenTelemetry key-value attributes for the log entry.
     fn otel_attributes(&self, data: Option<&Value>, file: &str, line: u32) -> Vec<KeyValue> {
         let mut attrs = vec![
             KeyValue::new("service.name", self.service_name.clone()),
@@ -113,8 +140,8 @@ impl GlobalLogger {
     ///
     /// # Arguments
     ///
-    /// * `level` - Severity of the message.
-    /// * `message` - Message text to log.
+    /// * `level` - Severity assigned to the message.
+    /// * `message` - Message text.
     /// * `data` - Optional structured data associated with the message.
     /// * `file` - Source file containing the log call.
     /// * `line` - Source line containing the log call.
@@ -123,7 +150,8 @@ impl GlobalLogger {
     ///
     /// ```
     /// # use telemetry::{GlobalLogger, Severity};
-    /// # let logger = GlobalLogger::new("example", "1.0.0", "development", None, None);
+    /// let logger = GlobalLogger::new("example", "1.0.0", "development", None, None);
+    ///
     /// logger.log_with_location(
     ///     Severity::Info,
     ///     "Service started".to_owned(),

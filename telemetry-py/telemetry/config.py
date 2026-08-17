@@ -65,11 +65,12 @@ def _find_config_files() -> list[str]:
 
 
 def _translate_single_underscore_env_vars(prefix: str, validators: list) -> None:
-    """Translate single-underscore TELEMETRY_ env vars to double-underscore form.
-
-    Dynaconf uses __ as nesting delimiter. This allows callers to set
-    TELEMETRY_TELEMETRY_OTLP_ENDPOINT instead of TELEMETRY_TELEMETRY__OTLP__ENDPOINT.
-    Operates only on validator-known keys so unknown vars are untouched.
+    """
+    Translate validator-known single-underscore environment variable names into Dynaconf's nested format.
+    
+    Parameters:
+        prefix (str): Environment variable prefix to preserve.
+        validators (list): Validators whose dotted names define supported nested settings.
     """
     for v in validators:
         for name in v.names:

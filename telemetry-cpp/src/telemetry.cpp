@@ -93,10 +93,10 @@ Telemetry::Telemetry(Telemetry&& other) noexcept
 }
 
 /**
- * @brief Replaces this telemetry instance with the contents of another instance.
+ * @brief Replaces this telemetry instance with resources and state moved from another instance.
  *
  * @param other Telemetry instance whose resources and state are transferred.
- * @return Telemetry& Reference to this instance.
+ * @return Reference to this instance.
  */
 Telemetry& Telemetry::operator=(Telemetry&& other) noexcept {
     if (this != &other) {
@@ -215,9 +215,9 @@ TelemetryBuilder& TelemetryBuilder::with_mcap(const std::string& path) {
 }
 
 /**
- * @brief Builds a telemetry instance from the configured service and exporter settings.
+ * @brief Creates a telemetry instance using the configured service metadata and exporters.
  *
- * @return Telemetry Configured telemetry instance.
+ * @return Configured telemetry instance.
  */
 Telemetry TelemetryBuilder::build() {
     ServiceOptions service_opts(name_, version_);

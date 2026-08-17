@@ -7,12 +7,13 @@ use anyhow::Result;
 use opentelemetry::KeyValue;
 use opentelemetry::trace::Status;
 
-/// Configures global `tracing` instrumentation with OpenTelemetry and console output.
+/// Configures global tracing with OpenTelemetry and console output.
 ///
-/// The supplied tracer receives application spans while infrastructure and exporter-related
-/// targets are excluded from OpenTelemetry output. Console filtering respects `RUST_LOG`;
-/// setting `ENABLE_TRACING_DEFAULT` enables trace-level output by default. If a global subscriber
-/// is already configured, a warning is logged and initialization still succeeds.
+/// Application spans are sent through the supplied tracer, while infrastructure,
+/// exporter, networking, and OpenTelemetry targets are excluded from OpenTelemetry
+/// output. Console filtering respects `RUST_LOG`; when it is unset,
+/// `ENABLE_TRACING_DEFAULT` enables trace-level output. If a global subscriber
+/// already exists, a warning is logged and initialization succeeds.
 ///
 /// # Examples
 ///

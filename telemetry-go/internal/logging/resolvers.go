@@ -13,7 +13,7 @@ import (
 	otellog "go.opentelemetry.io/otel/log"
 )
 
-// formatPrefix formats the prefix for the logger.
+// formatPrefix formats a logger prefix from the service name, version, and environment.
 func formatPrefix(serviceOpts options.ServiceOptions) string {
 	return fmt.Sprintf("%s (%s | %s)", serviceOpts.Name, serviceOpts.Version, serviceOpts.Environment)
 }
@@ -71,7 +71,9 @@ func resolveLogLevelFromEnv(env options.Environment) log.Level {
 //
 //	per-module override (from config) > global logging.level > environment-based default
 //
-// The serviceName is used to look up per-module overrides in logging.modules.<name>.
+// resolveLogLevel determines the effective log level for a service.
+// It applies the environment default, then the global level, and finally the
+// matching per-service module level, with later settings taking precedence.
 func resolveLogLevel(serviceName string, opts options.LoggingOptions, env options.Environment) log.Level {
 	// 1. Start with environment-based default (lowest priority)
 	level := resolveLogLevelFromEnv(env)
@@ -102,7 +104,9 @@ func resolveCallerOffset(opts options.LoggingOptions) int {
 
 // extractStructTagAttributes extracts OpenTelemetry attributes from exported fields
 // tagged with telemetry:"attribute:<name>", including fields in nested structs. It
-// also adds the extraction time and the name of the input struct.
+// extractStructTagAttributes extracts telemetry attributes from exported fields tagged with
+// "attribute:" and recursively processes nested structs. It also adds the extraction time
+// and the input struct's type name. Non-struct values produce no attributes.
 func extractStructTagAttributes(rv reflect.Value) []otellog.KeyValue {
 	if rv.Kind() != reflect.Struct {
 		return nil
@@ -154,7 +158,8 @@ func extractStructTagAttributes(rv reflect.Value) []otellog.KeyValue {
 
 // dataToOtelAttributes converts various data types to OpenTelemetry KeyValue attributes
 // dataToOtelAttributes converts a value into OpenTelemetry attributes, expanding map entries and preserving complex values under the "data" attribute. Struct values also contribute attributes from `telemetry:"attribute:<name>"` tags. 
-// The returned attributes represent the converted value.
+// dataToOtelAttributes converts a value into OpenTelemetry attributes.
+// Struct attributes tagged with telemetry are included; maps are expanded into individual attributes and retained as serialized data. Nil values produce no attributes.
 func dataToOtelAttributes(v any) []otellog.KeyValue {
 	if v == nil {
 		return nil

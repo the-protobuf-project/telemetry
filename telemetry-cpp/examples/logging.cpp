@@ -26,6 +26,12 @@ struct ChatMessage {
     std::string content;
     int64_t timestamp;
 
+    /**
+     * @brief Serializes the chat message fields to a JSON object string.
+     *
+     * @return std::string JSON object containing the message identifiers, language,
+     * content, and timestamp. String values are inserted without JSON escaping.
+     */
     std::string to_json() const {
         return "{\"message_id\":\"" + message_id + "\","
                "\"room_id\":\"" + room_id + "\","

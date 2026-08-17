@@ -178,6 +178,13 @@ void Logger::error(const char* message, const char* file, uint32_t line) {
     log(Level::Error, message, file, line);
 }
 
+/**
+ * @brief Logs a fatal-severity message.
+ *
+ * @param message Message to log.
+ * @param file Source file associated with the message.
+ * @param line Source line associated with the message.
+ */
 void Logger::fatal(const char* message, const char* file, uint32_t line) {
     log(Level::Fatal, message, file, line);
 }
@@ -290,6 +297,11 @@ void GlobalLogger::init(std::unique_ptr<Logger> logger) {
     instance_ = std::move(logger);
 }
 
+/**
+ * @brief Retrieves the global logger instance.
+ *
+ * @return Logger* Pointer to the global logger, or `nullptr` if none is initialized.
+ */
 Logger* GlobalLogger::get() {
     return instance_.get();
 }

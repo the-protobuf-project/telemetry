@@ -6,7 +6,8 @@ import (
 )
 
 // Default constructs telemetry options with profiling, logging, Foxglove, and OpenTelemetry defaults.
-// Environment variables override the profiling and Foxglove settings where supported.
+// Default constructs telemetry options with profiling, logging, Foxglove MCAP, and OpenTelemetry defaults.
+// Profiling and Foxglove MCAP settings can be overridden through their respective environment variables.
 func Default() TelemetryOptions {
 	return TelemetryOptions{
 		Profiling: ProfilingOptions{
@@ -46,7 +47,8 @@ func Default() TelemetryOptions {
 
 // DefaultTelemetry returns default telemetry options with all features enabled
 // DefaultTelemetry provides enabled logging, metrics, and tracing with local OTLP export defaults.
-// OTLP host, port, and enablement are sourced from environment variables, defaulting to localhost:4317 and disabled export.
+// DefaultTelemetry configures enabled logging, metrics, and tracing with metrics exported every 10 seconds.
+// It configures the OTLP host, port, and export enablement from environment variables, defaulting to localhost:4317 with export disabled.
 func DefaultTelemetry() OpenTelemetryOptions {
 	return OpenTelemetryOptions{
 		Logging: LoggingTelemetryOptions{

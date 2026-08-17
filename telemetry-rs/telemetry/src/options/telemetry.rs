@@ -67,13 +67,13 @@ impl TelemetryOptions {
         self
     }
 
-    /// Replaces the telemetry configuration.
+    /// Replaces the OpenTelemetry configuration.
     ///
     /// # Examples
     ///
     /// ```
     /// let telemetry = OpenTelemetryOptions::default();
-    /// let options = TelemetryOptions::new().with_telemetry(telemetry);
+    /// let _options = TelemetryOptions::new().with_telemetry(telemetry);
     /// ```
     pub fn with_telemetry(mut self, telemetry: OpenTelemetryOptions) -> Self {
         self.telemetry = telemetry;

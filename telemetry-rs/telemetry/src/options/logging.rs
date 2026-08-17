@@ -29,10 +29,10 @@ pub enum LogLevel {
 }
 
 impl LogLevel {
-    /// Converts a serialized numeric level to its corresponding logging level.
+    /// Converts a numeric configuration value to its corresponding logging level.
     ///
-    /// Values `1` through `3` map to explicit module levels; all other values map to
-    /// [`LogLevel::Unset`].
+    /// Values from `1` through `3` map to explicit module levels; all other values
+    /// map to [`LogLevel::Unset`].
     ///
     /// # Examples
     ///
@@ -40,14 +40,6 @@ impl LogLevel {
     /// assert_eq!(LogLevel::from_u8(3), LogLevel::ModuleLevel_3);
     /// assert_eq!(LogLevel::from_u8(0), LogLevel::Unset);
     /// ```
-    ///
-    /// # Parameters
-    ///
-    /// * `v` - Numeric level value from serialized configuration.
-    ///
-    /// # Returns
-    ///
-    /// The corresponding [`LogLevel`].
     pub fn from_u8(v: u8) -> Self {
         match v {
             1 => LogLevel::ModuleLevel_1,
@@ -141,14 +133,13 @@ pub struct LogOptions {
     pub caller_offset: i32,
 }
 
-/// Provides a default enabled value.
+/// Provides the default enabled state.
 ///
 /// # Examples
 ///
 /// ```
 /// assert!(default_true());
 /// ```
-///
 fn default_true() -> bool {
     true
 }

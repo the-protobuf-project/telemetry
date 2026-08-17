@@ -201,7 +201,9 @@ func (t *Tracing) TraceFunc(ctx context.Context, spanName string, fn func(contex
 
 // extractAttributes collects OpenTelemetry attributes from exported fields tagged with
 // `telemetry:"trace:<name>"`, including fields in nested structs and struct pointers.
-// It returns no attributes for nil, non-struct, or nil pointer input.
+// extractAttributes extracts OpenTelemetry attributes from fields tagged with
+// "telemetry:\"trace:<name>\"" in a struct and its nested structs or struct
+// pointers. It returns no attributes for nil, non-struct, or nil-pointer input.
 func extractAttributes(data interface{}) []attribute.KeyValue {
 	if data == nil {
 		return nil

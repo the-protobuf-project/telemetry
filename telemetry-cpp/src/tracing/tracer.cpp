@@ -124,6 +124,11 @@ void Span::end() {
     }
 }
 
+/**
+ * @brief Creates a tracer configured with the specified service options.
+ *
+ * @param service_opts Service name, version, and environment configuration.
+ */
 Tracer::Tracer(const ServiceOptions& service_opts)
     : service_name_(service_opts.name)
     , service_version_(service_opts.version)
@@ -188,6 +193,9 @@ Tracer::Tracer(const ServiceOptions& service_opts,
     rng_.seed(rd());
 }
 
+/**
+ * @brief Releases resources owned by the tracer.
+ */
 Tracer::~Tracer() {
     platform::destroy_mutex(mutex_);
 }
@@ -263,6 +271,12 @@ std::string Tracer::generate_span_id() {
     return oss.str();
 }
 
+/**
+ * @brief Starts a span that ends automatically when the scoped object is destroyed.
+ *
+ * @param tracer Tracer used to create the span.
+ * @param name Name assigned to the span.
+ */
 ScopedSpan::ScopedSpan(Tracer& tracer, const std::string& name)
     : span_(tracer.start_span(name)) {
 }

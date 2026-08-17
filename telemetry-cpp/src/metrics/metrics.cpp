@@ -69,6 +69,11 @@ void Gauge::decrement(double value) {
     value_ -= value;
 }
 
+/**
+ * @brief Creates a metrics registry for a service.
+ *
+ * @param service_opts Service configuration containing the service name.
+ */
 Metrics::Metrics(const ServiceOptions& service_opts)
     : service_name_(service_opts.name)
     , mutex_(platform::create_mutex()) {
@@ -95,6 +100,9 @@ Metrics::Metrics(const ServiceOptions& service_opts,
     , mutex_(platform::create_mutex()) {
 }
 
+/**
+ * @brief Releases resources held by the metrics registry.
+ */
 Metrics::~Metrics() {
     platform::destroy_mutex(mutex_);
 }
@@ -211,6 +219,13 @@ Gauge& Metrics::get_gauge(const std::string& name, const std::string& descriptio
     return *it->second;
 }
 
+/**
+ * @brief Records a value in the metric identified by its name and type.
+ *
+ * @param name Name of the metric to update.
+ * @param type Metric type that determines how the value is recorded.
+ * @param value Value to record.
+ */
 void Metrics::record_dynamic(const std::string& name, MetricType type, double value) {
     switch (type) {
         case MetricType::Counter:

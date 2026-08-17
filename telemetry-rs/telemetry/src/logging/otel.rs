@@ -39,6 +39,8 @@ impl OtelLogger {
 
     /// Emits a message at the specified severity with its associated attributes.
     ///
+    /// Attribute values are converted to strings before being attached to the log record.
+    ///
     /// # Arguments
     ///
     /// * `severity` - Severity level assigned to the log record.
@@ -95,6 +97,29 @@ impl OtelLogger {
     /// logger.info("Application started", vec![]);
     /// ```
     pub fn info...
+    /// Emits an informational log record with the specified message and attributes.
+    
+    ///
+    
+    /// # Arguments
+    
+    ///
+    
+    /// * `message` - The message to record.
+    
+    /// * `attributes` - Structured attributes attached to the record.
+    
+    ///
+    
+    /// # Examples
+    
+    ///
+    
+    /// ```ignore
+    
+    /// logger.info("Service started", vec![]);
+    
+    /// ```
     pub fn info(&self, message: &str, attributes: Vec<KeyValue>) {
         self.log(Severity::Info, message, attributes);
     }
@@ -110,6 +135,15 @@ impl OtelLogger {
     ///
     /// `attributes` provides additional key-value context for the log record.
     pub fn warn...
+    /// Records a warning message with associated attributes.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # fn example(logger: &OtelLogger) {
+    /// logger.warn("Cache miss", vec![]);
+    /// # }
+    /// ```
     pub fn warn(&self, message: &str, attributes: Vec<KeyValue>) {
         self.log(Severity::Warn, message, attributes);
     }

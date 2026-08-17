@@ -14,16 +14,17 @@ use proc_macro::TokenStream;
 use quote::quote;
 use syn::{Data, DeriveInput, Expr, ExprLit, Fields, ItemFn, Lit, parse_macro_input};
 
-/// Derives `RecordMetrics` for a struct with named fields annotated using `#[metric(...)]`.
+/// Derives `RecordMetrics` for a struct with named fields annotated with `#[metric(...)]`.
 ///
-/// Each annotated field must specify a metric `name` and exactly one metric type:
-/// `counter`, `histogram`, or `gauge`. An optional `description` may also be provided.
-/// Fields without a valid name or metric type are excluded.
+/// Each annotated field must provide a `name` and one supported metric type: `counter`,
+/// `histogram`, or `gauge`. An optional `description` can also be provided. Fields without
+/// a valid name or metric type are excluded.
 ///
 /// # Examples
 ///
 /// ```ignore
 /// use telemetry::derive::Metrics;
+/// use telemetry::metrics::RecordMetrics;
 ///
 /// #[derive(Metrics)]
 /// struct MyMetrics {
@@ -138,18 +139,14 @@ pub fn derive_metrics(input: TokenStream) -> TokenStream {
 ///
 /// # Examples
 ///
-/// ```ignore
+/// ```
 /// use telemetry::derive::instrument;
 ///
 /// #[instrument]
-/// fn process_request() {
-///     // Function body
-/// }
+/// fn process_request() {}
 ///
 /// #[instrument]
-/// async fn fetch_data() {
-///     // Function body
-/// }
+/// async fn fetch_data() {}
 /// ```
 pub fn instrument(_attr: TokenStream, item: TokenStream) -> TokenStream {
     let input = parse_macro_input!(item as ItemFn);

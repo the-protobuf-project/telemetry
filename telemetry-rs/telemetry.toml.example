@@ -1,0 +1,79 @@
+# Telemetry Configuration File
+# ========================
+# Auto-discovered by Telemetry::new() from:
+#   1. TELEMETRY_CONFIG_PATH environment variable
+#   2. telemetry.toml in current directory
+#   3. .config/telemetry.toml
+#
+# Environment variables override config file values.
+# Use TELEMETRY_ prefix with underscores for nesting:
+#   TELEMETRY_TELEMETRY_OTLP_ENDPOINT=localhost:4317
+#   TELEMETRY_TELEMETRY_OTLP_AUTH_TOKEN=your-token
+
+# =============================================================================
+# Service Configuration
+# =============================================================================
+[service]
+name = "my-service"           # Your service name
+version = "1.0.0"             # Service version
+environment = "development"   # development | staging | production
+description = "My awesome service"
+
+# Global labels added to ALL telemetry (logs, metrics, traces)
+# Useful for robot IDs, device IDs, fleet IDs, etc.
+[service.labels]
+# robot_id = "robot-001"
+# fleet_id = "fleet-alpha"
+# region = "us-west-2"
+
+# =============================================================================
+# Telemetry Configuration (OpenTelemetry)
+# =============================================================================
+[telemetry]
+enabled = true  # Master switch: enables logging, metrics, and tracing
+
+# OTLP Exporter Configuration
+# Sends telemetry to any OpenTelemetry-compatible backend:
+#   - Grafana Cloud, Datadog, Honeycomb, Jaeger, etc.
+[telemetry.otlp]
+enabled = true
+endpoint = "localhost:4317"   # OTLP endpoint (port auto-detected if omitted)
+# auth_token = ""             # Bearer token for authentication (optional)
+# secure = false              # Use TLS (auto-detected for non-localhost)
+# use_http = false            # Use HTTP instead of gRPC (default: gRPC)
+
+# Metrics export interval
+[telemetry.metrics]
+export_interval_seconds = 10
+
+# =============================================================================
+# Logging Configuration
+# =============================================================================
+[logging.log]
+report_caller = true          # Include file:line in logs
+report_timestamp = true       # Include timestamp in logs
+caller_offset = 3             # Stack frame offset for caller info
+
+# =============================================================================
+# Foxglove MCAP Recording (Optional)
+# =============================================================================
+# Record logs/metrics to MCAP files for Foxglove Studio playback
+[foxglove]
+enabled = false
+file_path = ""                # e.g., "./recordings/session.mcap"
+
+# =============================================================================
+# Continuous Profiling (Optional)
+# =============================================================================
+# Send CPU/memory profiles to Pyroscope or Grafana Cloud
+[profiling]
+enabled = false
+server_address = "http://localhost:4040"
+# basic_auth_user = ""        # For Grafana Cloud
+# basic_auth_password = ""
+
+# =============================================================================
+# Distributed Tracing
+# =============================================================================
+[tracing]
+enabled = true

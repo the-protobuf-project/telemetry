@@ -1,0 +1,38 @@
+# ===========================================
+# Telemetry Telemetry - Terraform Variables
+# ===========================================
+# Copy this file to terraform.tfvars and fill in your values
+# DO NOT commit terraform.tfvars to version control!
+
+# ----- Required -----
+
+# Your SSH public key (get with: cat ~/.ssh/id_ed25519.pub)
+ssh_public_key_content = "ssh-ed25519 AAAA... your-email@example.com"
+
+# ----- Optional (defaults shown) -----
+
+# AWS Region
+# aws_region = "us-east-1"
+
+# EC2 Instance type (t3.medium = 2 vCPU, 4GB RAM)
+# instance_type = "t3.medium"
+
+# Your domain name for the telemetry dashboard
+# domain_name = "telemetry.example.com"
+
+# Your domain name for OTLP ingestion endpoint
+# otel_domain_name = "otel.example.com"
+
+# VPC and Subnet (leave empty to use default VPC)
+# vpc_id    = ""
+# subnet_id = ""
+
+# Grafana admin password
+# grafana_password = "changeme"
+
+# ----- AWS Certificate Manager (Optional) -----
+# Set route53_zone_id to enable automatic ACM certificate generation
+# and DNS record creation. Leave empty to use Let's Encrypt manually.
+
+# Route53 Hosted Zone ID (find in AWS Console -> Route53 -> Hosted zones)
+# route53_zone_id = "Z1234567890ABC"

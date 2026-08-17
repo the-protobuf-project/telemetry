@@ -2,7 +2,7 @@
 set -e
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-IMAGE_NAME="${IMAGE_NAME:-ghcr.io/the-protobuf-project/opentelementry}"
+IMAGE_NAME="${IMAGE_NAME:-ghcr.io/the-protobuf-project/telemetry}"
 
 VERSION="${IMAGE_TAG:-1.0.0}"
 
@@ -15,7 +15,7 @@ usage() {
     echo "  local            Build locally for testing"
     echo ""
     echo "Environment variables:"
-    echo "  IMAGE_NAME       Override image name (default: ghcr.io/the-protobuf-project/opentelementry)"
+    echo "  IMAGE_NAME       Override image name (default: ghcr.io/the-protobuf-project/telemetry)"
     echo "  IMAGE_TAG        Override version tag (default: 1.0.0)"
     echo ""
     echo "Note: 'docker login ghcr.io' before pushing (amd64/arm64/manifest)."

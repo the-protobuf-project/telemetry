@@ -7,7 +7,7 @@ import "google/api/annotations.proto";
 import "google/api/client.proto";
 import "grafana/v1/dashboard.proto";
 
-option go_package = "github.com/the-protobuf-project/opentelementry-go/protobuf/grafana/v1/grafanapbv1;grafanapbv1";
+option go_package = "github.com/the-protobuf-project/telemetry/telemetry-go/protobuf/grafana/v1/grafanapbv1;grafanapbv1";
 option java_multiple_files = true;
 option java_outer_classname = "DashboardServiceProto";
 option java_package = "com.grafana.v1";

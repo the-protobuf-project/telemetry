@@ -1,20 +1,16 @@
 <!-- markdownlint-disable MD041 -->
-<p align="center">
-  <img src=".assets/logo.png" alt="Opentelementry" width="240" height="240">
-</p>
-
-<h1 align="center">Opentelementry</h1>
+<h1 align="center">Telemetry</h1>
 
 <p align="center">
-  <strong>One framework, every signal.</strong> Opentelementry is a unified,
+  <strong>One framework, every signal.</strong> Telemetry is a unified,
   config-first observability framework for Go, Python, Rust, and C++ — structured
   logging, metrics, distributed tracing, and continuous profiling, built on
   OpenTelemetry standards and shipped with a batteries-included Grafana stack.
 </p>
 
 <p align="center">
-  <a href="https://github.com/the-protobuf-project/opentelementry/actions/workflows/ci.yaml"><img src="https://github.com/the-protobuf-project/opentelementry/actions/workflows/ci.yaml/badge.svg" alt="CI"></a>
-  <a href="https://github.com/the-protobuf-project/opentelementry/actions/workflows/linter.yaml"><img src="https://github.com/the-protobuf-project/opentelementry/actions/workflows/linter.yaml/badge.svg" alt="Lint"></a>
+  <a href="https://github.com/the-protobuf-project/telemetry/actions/workflows/ci.yaml"><img src="https://github.com/the-protobuf-project/telemetry/actions/workflows/ci.yaml/badge.svg" alt="CI"></a>
+  <a href="https://github.com/the-protobuf-project/telemetry/actions/workflows/linter.yaml"><img src="https://github.com/the-protobuf-project/telemetry/actions/workflows/linter.yaml/badge.svg" alt="Lint"></a>
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-Apache%202.0-blue.svg" alt="License: Apache 2.0"></a>
   <img src="https://img.shields.io/badge/Go-1.25%2B-00ADD8?logo=go&logoColor=white" alt="Go">
   <img src="https://img.shields.io/badge/Python-3.12%2B-3776AB?logo=python&logoColor=white" alt="Python">
@@ -28,7 +24,7 @@
 - [Features](#features)
 - [Architecture](#architecture)
 - [Language support](#language-support)
-- [Configuration — `opentelementry.toml`](#configuration--opentelementrytoml)
+- [Configuration — `telemetry.toml`](#configuration--telemetrytoml)
 - [Environment variables](#environment-variables)
 - [Telemetry signals](#telemetry-signals)
 - [Observability stack](#observability-stack)
@@ -40,15 +36,15 @@
 
 ## Overview
 
-Opentelementry is a comprehensive observability framework that provides unified
+Telemetry is a comprehensive observability framework that provides unified
 telemetry across languages. Instrument your code once with a single fluent API and
 get structured logging, distributed tracing, metrics collection, and continuous
 profiling — exported over standard OTLP and, optionally, recorded to MCAP for
 offline analysis in Foxglove Studio.
 
-Every SDK shares the same mental model: build an `Opentelementry` instance from a
+Every SDK shares the same mental model: build an `Telemetry` instance from a
 config file or code, then use the logger, metrics, and tracer it exposes. The same
-`opentelementry.toml` drives all four languages.
+`telemetry.toml` drives all four languages.
 
 ## Features
 
@@ -58,7 +54,7 @@ config file or code, then use the logger, metrics, and tracer it exposes. The sa
 - **Distributed tracing** — end-to-end request tracking across service boundaries.
 - **Continuous profiling** — production performance analysis with Pyroscope.
 - **MCAP recording** — a single file for offline analysis in Foxglove Studio.
-- **Config-first** — auto-discovers `opentelementry.toml`; TOML, YAML, JSON, and
+- **Config-first** — auto-discovers `telemetry.toml`; TOML, YAML, JSON, and
   environment-variable overrides are all supported.
 - **Zero-config defaults** — sensible defaults get you running with no setup.
 - **OpenTelemetry native** — standard OTLP protocols for maximum compatibility.
@@ -68,7 +64,7 @@ config file or code, then use the logger, metrics, and tracer it exposes. The sa
 ```mermaid
 graph TB
     App[Your Application]
-    SDK[Opentelementry SDK]
+    SDK[Telemetry SDK]
 
     subgraph Signals["Telemetry Signals"]
         Logs[Logs]
@@ -125,26 +121,26 @@ language for installation and a quick start.
 
 | Language | Status | Minimum version | Documentation |
 | -------- | ------ | --------------- | ------------- |
-| Go       | Stable | 1.25            | [opentelementry-go](opentelementry-go/README.md) |
-| Python   | Stable | 3.12            | [opentelementry-py](opentelementry-py/README.md) |
-| Rust     | Stable | 1.91            | [opentelementry-rs](opentelementry-rs/README.md) |
-| C++      | Beta   | C++17           | [opentelementry-cpp](opentelementry-cpp) |
+| Go       | Stable | 1.25            | [telemetry-go](telemetry-go/README.md) |
+| Python   | Stable | 3.12            | [telemetry-py](telemetry-py/README.md) |
+| Rust     | Stable | 1.91            | [telemetry-rs](telemetry-rs/README.md) |
+| C++      | Beta   | C++17           | [telemetry-cpp](telemetry-cpp) |
 
 <details>
 <summary><strong>Go</strong></summary>
 
 ```bash
-go get github.com/the-protobuf-project/opentelementry/opentelementry-go
+go get github.com/the-protobuf-project/telemetry/telemetry-go
 ```
 
 ```go
 package main
 
-import "github.com/the-protobuf-project/opentelementry/opentelementry-go"
+import "github.com/the-protobuf-project/telemetry/telemetry-go"
 
 func main() {
-    // Auto-discovers opentelementry.toml or uses defaults.
-    p, err := opentelementry.New().
+    // Auto-discovers telemetry.toml or uses defaults.
+    p, err := telemetry.New().
         WithService("my-service", "1.0.0").
         Build()
     if err != nil {
@@ -156,7 +152,7 @@ func main() {
 }
 ```
 
-See the [Go SDK documentation](opentelementry-go/README.md).
+See the [Go SDK documentation](telemetry-go/README.md).
 
 </details>
 
@@ -164,19 +160,19 @@ See the [Go SDK documentation](opentelementry-go/README.md).
 <summary><strong>Python</strong></summary>
 
 ```bash
-pip install "git+https://github.com/the-protobuf-project/opentelementry.git#subdirectory=opentelementry-py"
+pip install "git+https://github.com/the-protobuf-project/telemetry.git#subdirectory=telemetry-py"
 ```
 
 ```python
-from opentelementry import Opentelementry
+from telemetry import Telemetry
 
-# Auto-discovers opentelementry.toml config.
-with Opentelementry.new().build() as o:
+# Auto-discovers telemetry.toml config.
+with Telemetry.new().build() as o:
     o.logger.info("Service started")
     o.logger.warning("Rate limit approaching", {"percent": 85})
 ```
 
-See the [Python SDK documentation](opentelementry-py/README.md).
+See the [Python SDK documentation](telemetry-py/README.md).
 
 </details>
 
@@ -185,18 +181,18 @@ See the [Python SDK documentation](opentelementry-py/README.md).
 
 ```toml
 [dependencies]
-opentelementry = { git = "https://github.com/the-protobuf-project/opentelementry.git" }
+telemetry = { git = "https://github.com/the-protobuf-project/telemetry.git" }
 tokio = { version = "1", features = ["macros", "rt-multi-thread"] }
 anyhow = "1.0"
 ```
 
 ```rust
-use opentelementry::{Opentelementry, Environment, logger};
+use telemetry::{Telemetry, Environment, logger};
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
-    // Auto-discovers opentelementry.toml config.
-    let _opentelementry = Opentelementry::new()
+    // Auto-discovers telemetry.toml config.
+    let _telemetry = Telemetry::new()
         .with_service("my-service", "1.0.0")
         .environment(Environment::Production)
         .build()?;
@@ -206,7 +202,7 @@ async fn main() -> anyhow::Result<()> {
 }
 ```
 
-See the [Rust SDK documentation](opentelementry-rs/README.md).
+See the [Rust SDK documentation](telemetry-rs/README.md).
 
 </details>
 
@@ -216,18 +212,18 @@ See the [Rust SDK documentation](opentelementry-rs/README.md).
 Add the module dependency in your `MODULE.bazel`:
 
 ```starlark
-bazel_dep(name = "opentelementry.cpp", version = "1.0.0")
+bazel_dep(name = "telemetry.cpp", version = "1.0.0")
 ```
 
 ```cpp
-#include <opentelementry/opentelementry.hpp>
+#include <telemetry/telemetry.hpp>
 
 int main() {
-    auto o = opentelementry::Opentelementry::builder("my-service", "1.0.0")
-        .environment(opentelementry::Environment::Development)
+    auto o = telemetry::Telemetry::builder("my-service", "1.0.0")
+        .environment(telemetry::Environment::Development)
         .build();
 
-    OPENTELEMENTRY_LOG_INFO("Service started");
+    TELEMETRY_LOG_INFO("Service started");
     o.metrics().counter("requests_total", 1.0);
 
     auto span = o.tracer().start_span("process_request");
@@ -236,13 +232,13 @@ int main() {
 }
 ```
 
-See the [C++ SDK sources and examples](opentelementry-cpp).
+See the [C++ SDK sources and examples](telemetry-cpp).
 
 </details>
 
-## Configuration — `opentelementry.toml`
+## Configuration — `telemetry.toml`
 
-All SDKs auto-discover `opentelementry.toml` from your project root:
+All SDKs auto-discover `telemetry.toml` from your project root:
 
 ```toml
 [service]
@@ -261,26 +257,26 @@ level = 2                        # Global log level (1=Error, 2=Info, 3=Debug)
 level = 1                        # Override: Error only for this module
 ```
 
-**Precedence** (lowest to highest): Defaults → `opentelementry.toml` → `.env` /
-`OPENTELEMENTRY_*` environment variables → code.
+**Precedence** (lowest to highest): Defaults → `telemetry.toml` → `.env` /
+`TELEMETRY_*` environment variables → code.
 
 See the full [Configuration Guide](docs/configuration.md).
 
 ## Environment variables
 
-Every config key can be overridden with an `OPENTELEMENTRY_`-prefixed environment
+Every config key can be overridden with an `TELEMETRY_`-prefixed environment
 variable. Nesting is expressed with a single underscore in Go, Rust, and C++, and a
 double underscore in Python.
 
 | Language        | Prefix            | Nesting            | Example |
 | --------------- | ----------------- | ------------------ | ------- |
-| Go / Rust / C++ | `OPENTELEMENTRY_` | `_` (single)       | `OPENTELEMENTRY_TELEMETRY_OTLP_ENDPOINT` |
-| Python          | `OPENTELEMENTRY_` | `__` (double)      | `OPENTELEMENTRY_TELEMETRY__OTLP__ENDPOINT` |
+| Go / Rust / C++ | `TELEMETRY_` | `_` (single)       | `TELEMETRY_TELEMETRY_OTLP_ENDPOINT` |
+| Python          | `TELEMETRY_` | `__` (double)      | `TELEMETRY_TELEMETRY__OTLP__ENDPOINT` |
 
 ```bash
-export OPENTELEMENTRY_SERVICE_NAME=my-service
-export OPENTELEMENTRY_TELEMETRY_OTLP_ENDPOINT=otel.example.com:4317
-export OPENTELEMENTRY_LOGGING_MODULES_VISION_LEVEL=3
+export TELEMETRY_SERVICE_NAME=my-service
+export TELEMETRY_TELEMETRY_OTLP_ENDPOINT=otel.example.com:4317
+export TELEMETRY_LOGGING_MODULES_VISION_LEVEL=3
 ```
 
 ## Telemetry signals
@@ -295,8 +291,8 @@ export OPENTELEMENTRY_LOGGING_MODULES_VISION_LEVEL=3
 
 ## Observability stack
 
-Opentelementry ships a complete, pre-configured stack in
-[`opentelementry-core`](opentelementry-core/README.md), powered by
+Telemetry ships a complete, pre-configured stack in
+[`telemetry-core`](telemetry-core/README.md), powered by
 industry-standard tools:
 
 - **Loki** — log aggregation
@@ -307,25 +303,25 @@ industry-standard tools:
 - **OpenTelemetry Collector** — telemetry pipeline
 
 ```bash
-cd opentelementry-core
+cd telemetry-core
 docker compose up -d
 ```
 
 Grafana is then available at `http://localhost:3000` with all datasources
 pre-configured.
 
-**[Observability stack →](opentelementry-core/README.md)** ·
-**[Production deployment →](opentelementry-core/deploy/production/README.md)**
+**[Observability stack →](telemetry-core/README.md)** ·
+**[Production deployment →](telemetry-core/deploy/production/README.md)**
 
 ## Repository layout
 
 | Path | Description |
 | ---- | ----------- |
-| [`opentelementry-go`](opentelementry-go)     | Go SDK |
-| [`opentelementry-py`](opentelementry-py)     | Python SDK |
-| [`opentelementry-rs`](opentelementry-rs)     | Rust SDK (workspace: `opentelementry`, `opentelementry-derive`, `opentelementry-examples`) |
-| [`opentelementry-cpp`](opentelementry-cpp)   | C++ SDK (CMake and Bazel) |
-| [`opentelementry-core`](opentelementry-core) | Observability stack and production deployment |
+| [`telemetry-go`](telemetry-go)     | Go SDK |
+| [`telemetry-py`](telemetry-py)     | Python SDK |
+| [`telemetry-rs`](telemetry-rs)     | Rust SDK (workspace: `telemetry`, `telemetry-derive`, `telemetry-examples`) |
+| [`telemetry-cpp`](telemetry-cpp)   | C++ SDK (CMake and Bazel) |
+| [`telemetry-core`](telemetry-core) | Observability stack and production deployment |
 | [`docs`](docs)                               | Configuration and usage guides |
 
 ## Development
@@ -334,16 +330,16 @@ Each SDK is self-contained and can be built and tested independently.
 
 ```bash
 # Go
-cd opentelementry-go && go build ./... && go test ./...
+cd telemetry-go && go build ./... && go test ./...
 
 # Rust
-cd opentelementry-rs && cargo build --all-targets && cargo test
+cd telemetry-rs && cargo build --all-targets && cargo test
 
 # Python
-cd opentelementry-py && pip install . && ruff check .
+cd telemetry-py && pip install . && ruff check .
 
 # C++ (Bazel)
-cd opentelementry-cpp && bazel build //...
+cd telemetry-cpp && bazel build //...
 ```
 
 Continuous integration builds and tests all four SDKs and validates the

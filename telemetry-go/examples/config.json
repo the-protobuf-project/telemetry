@@ -1,0 +1,45 @@
+{
+  "_comment": "Telemetry Configuration File - see telemetry.toml for detailed documentation",
+
+  "service": {
+    "name": "my-service",
+    "version": "1.0.0",
+    "environment": "development",
+    "description": "My awesome service",
+    "labels": {
+    }
+  },
+
+  "telemetry": {
+    "enabled": true,
+    "otlp": {
+      "enabled": true,
+      "endpoint": "localhost:4317"
+    },
+    "metrics": {
+      "export_interval_seconds": 10
+    }
+  },
+
+  "logging": {
+    "log": {
+      "report_caller": true,
+      "report_timestamp": true,
+      "caller_offset": 3
+    }
+  },
+
+  "foxglove": {
+    "enabled": false,
+    "file_path": ""
+  },
+
+  "profiling": {
+    "enabled": false,
+    "server_address": "http://localhost:4040"
+  },
+
+  "tracing": {
+    "enabled": true
+  }
+}

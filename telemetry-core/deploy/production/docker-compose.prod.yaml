@@ -1,0 +1,182 @@
+name: telemetry-prod
+services:
+  # Envoy Proxy - Single entry point with auth
+  envoy:
+    image: envoyproxy/envoy:v1.31-latest
+    volumes:
+      - ./envoy/envoy.yaml:/etc/envoy/envoy.yaml:ro
+      - ./certs:/etc/envoy/certs:ro
+    ports:
+      - "80:80"
+      - "443:443"
+      - "4317:4317"   # OTLP gRPC
+      - "4318:4318"   # OTLP HTTP
+    depends_on:
+      grafana:
+        condition: service_healthy
+    networks:
+      - telemetry-network
+    restart: unless-stopped
+
+  init:
+    image: alpine:latest
+    volumes:
+      - loki-data:/data
+    command: chown -R 10001:10001 /data
+    networks:
+      - telemetry-network
+
+  loki:
+    image: grafana/loki:3.2.1
+    command:
+      - -config.file
+      - /mnt/loki-config.yaml
+    volumes:
+      - ./config/loki.yaml:/mnt/loki-config.yaml:ro
+      - loki-data:/data
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:3100/ready"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+      start_period: 10s
+    depends_on:
+      init:
+        condition: service_completed_successfully
+    networks:
+      - telemetry-network
+    restart: unless-stopped
+
+  otelcol:
+    image: otel/opentelemetry-collector-contrib:0.114.0
+    deploy:
+      resources:
+        limits:
+          memory: 200M
+    restart: unless-stopped
+    command: ["--config=/etc/otelcol/config.yaml"]
+    volumes:
+      - ./config/otel-collector.yaml:/etc/otelcol/config.yaml:ro
+    environment:
+      - OTLP_AUTH_TOKEN=${OTLP_API_AUTH_TOKEN:-changeme}
+    depends_on:
+      loki:
+        condition: service_healthy
+      tempo:
+        condition: service_healthy
+      prometheus:
+        condition: service_healthy
+    networks:
+      - telemetry-network
+
+  tempo:
+    image: grafana/tempo:2.6.1
+    command: ["-config.file=/etc/tempo.yaml"]
+    volumes:
+      - ./config/tempo.yaml:/etc/tempo.yaml:ro
+      - tempo-data:/var/tempo
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:3200/ready"]
+      interval: 10s
+      timeout: 5s
+      retries: 20
+      start_period: 30s
+    networks:
+      - telemetry-network
+    restart: unless-stopped
+
+  prometheus:
+    image: prom/prometheus:v2.54.1
+    command:
+      - --config.file=/etc/prometheus.yaml
+      - --web.enable-remote-write-receiver
+      - --enable-feature=exemplar-storage
+      - --storage.tsdb.retention.time=15d
+    volumes:
+      - ./config/prometheus.yaml:/etc/prometheus.yaml:ro
+      - ./config/alerting-rules.yaml:/etc/prometheus/alerting-rules.yaml:ro
+      - prometheus-data:/prometheus
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:9090/-/healthy"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+      start_period: 5s
+    networks:
+      - telemetry-network
+    restart: unless-stopped
+
+  alertmanager:
+    image: prom/alertmanager:v0.27.0
+    command:
+      - --config.file=/etc/alertmanager/alertmanager.yaml
+      - --storage.path=/alertmanager
+    volumes:
+      - ./config/alertmanager.yaml:/etc/alertmanager/alertmanager.yaml:ro
+      - alertmanager-data:/alertmanager
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:9093/-/healthy"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+      start_period: 5s
+    networks:
+      - telemetry-network
+    restart: unless-stopped
+
+  pyroscope:
+    image: grafana/pyroscope:1.10.0
+    volumes:
+      - pyroscope-data:/data
+    environment:
+      - PYROSCOPE_STORAGE_PATH=/data
+    networks:
+      - telemetry-network
+    restart: unless-stopped
+
+  grafana:
+    image: grafana/grafana-enterprise:12.3.2
+    volumes:
+      - ./config/grafana-datasources.yaml:/etc/grafana/provisioning/datasources/datasources.yaml:ro
+      - ./config/grafana-dashboards.yaml:/etc/grafana/provisioning/dashboards/dashboards.yaml:ro
+      - ./dashboards:/etc/grafana/provisioning/dashboards/json:ro
+      - grafana-data:/var/lib/grafana
+    environment:
+      - GF_SERVER_ROOT_URL=https://${GRAFANA_DASHBOARD_DOMAIN:-telemetry.example.com}
+      - GF_SERVER_DOMAIN=${GRAFANA_DASHBOARD_DOMAIN:-telemetry.example.com}
+      - GF_AUTH_ANONYMOUS_ENABLED=false
+      - GF_AUTH_BASIC_ENABLED=true
+      - GF_SECURITY_ADMIN_USER=${GRAFANA_ADMIN_USER:-admin}
+      - GF_SECURITY_ADMIN_PASSWORD=${GRAFANA_ADMIN_PASSWORD:-changeme}
+      - GF_FEATURE_TOGGLES_ENABLE=traceqlEditor
+      - GF_INSTALL_PLUGINS=grafana-pyroscope-app
+      - GF_ALERTING_ENABLED=true
+      - GF_UNIFIED_ALERTING_ENABLED=true
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:3000/api/health"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+      start_period: 10s
+    depends_on:
+      otelcol:
+        condition: service_started
+      pyroscope:
+        condition: service_started
+      alertmanager:
+        condition: service_healthy
+    networks:
+      - telemetry-network
+    restart: unless-stopped
+
+volumes:
+  loki-data:
+  tempo-data:
+  pyroscope-data:
+  prometheus-data:
+  alertmanager-data:
+  grafana-data:
+
+networks:
+  telemetry-network:
+    driver: bridge

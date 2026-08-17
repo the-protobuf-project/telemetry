@@ -2,7 +2,7 @@ syntax = "proto3";
 
 package telemetry.v1;
 
-option go_package = "github.com/the-protobuf-project/opentelementry-go/protobuf/telemetry/v1/telemetrypbv1;telemetrypbv1";
+option go_package = "github.com/the-protobuf-project/telemetry/telemetry-go/protobuf/telemetry/v1/telemetrypbv1;telemetrypbv1";
 option java_multiple_files = true;
 option java_outer_classname = "TracingProto";
 option java_package = "com.telemetry.v1";

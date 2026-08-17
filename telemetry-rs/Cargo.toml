@@ -1,0 +1,43 @@
+[workspace]
+members = ["telemetry", "telemetry-derive", "telemetry-examples"]
+resolver = "2"
+
+[workspace.package]
+version = "1.0.0"
+edition = "2024"
+
+[workspace.dependencies]
+telemetry-derive = { path = "telemetry-derive", version = "1.0.0" }
+anyhow = "1.0"
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+log = "0.4"
+protobuf = { version = "3.7.2", features = ["derive"] }
+bytes = { version = "1.11.1", features = ["alloc"] }
+log4rs = "1.4.0"
+mcap = "0.24.0"
+opentelemetry = { version = "0.32.0", features = ["logs", "metrics", "trace"] }
+opentelemetry_sdk = { version = "0.32.0", features = [
+    "logs",
+    "trace",
+    "rt-tokio",
+] }
+opentelemetry-otlp = { version = "0.32.0", features = [
+    "logs",
+    "trace",
+    "grpc-tonic",
+    "http-proto",
+    "reqwest-blocking-client",
+] }
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+tracing-opentelemetry = "0.33"
+opentelemetry-prometheus = "0.32.0"
+prometheus = "0.14"
+tokio = { version = "1", features = ["macros", "rt-multi-thread"] }
+chrono = "0.4"
+colored = "3.1"
+figment = { version = "0.10", features = ["toml", "yaml", "json", "env"] }
+syn = { version = "2", features = ["full"] }
+quote = "1"
+proc-macro2 = "1"

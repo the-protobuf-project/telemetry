@@ -1,8 +1,8 @@
-# Opentelementry Observability Framework - AI Agent Guidelines
+# Telemetry Observability Framework - AI Agent Guidelines
 
 ## Project Overview
 
-**Opentelementry** is a unified observability framework providing multi-language SDKs
+**Telemetry** is a unified observability framework providing multi-language SDKs
 (Go, Rust, Python) for OpenTelemetry-based logging, metrics, tracing, and
 profiling. Built by Machani Robotics for production robotics systems with
 MCAP recording for offline analysis.
@@ -13,12 +13,12 @@ MCAP recording for offline analysis.
 
 - **Primary SDK**: Go (`/go/`) - Complete implementation with all telemetry features
 - **Secondary SDKs**: Rust (`/rust/`) and Python (`/python/`) - Following same patterns
-- **Shared Stack**: OpenTelemetry observability stack (`/opentelementry/`)
+- **Shared Stack**: OpenTelemetry observability stack (`/telemetry/`)
 
 ### 2. Core Components Architecture
 
 ```text
-opentelementry.New() → Opentelementry struct with:
+telemetry.New() → Telemetry struct with:
 ├── Logger (*logging.Logger)           # Structured logging with trace correlation
 ├── Metrics (*metrics.Metrics)         # OTel metrics
 ├── Tracing (*tracing.Tracing)         # Distributed tracing spans
@@ -30,7 +30,7 @@ opentelementry.New() → Opentelementry struct with:
 ### 3. Configuration System
 
 - **ServiceOptions**: Service identity (name, version, environment)
-- **OpentelementryOptions**: Feature toggles and endpoint configuration
+- **TelemetryOptions**: Feature toggles and endpoint configuration
 - **Environment constants**: `Development`, `Staging`, `Production`, `Jetson`
 
 ## Development Workflows
@@ -44,7 +44,7 @@ go mod tidy
 go run examples/logging/main.go
 
 # Full observability stack
-cd opentelementry/
+cd telemetry/
 docker compose up -d
 # Access Grafana: http://localhost:3000
 ```
@@ -66,7 +66,7 @@ serviceOpts := options.ServiceOptions{
     Name: "service-name",
     Environment: options.Development,
 }
-p, err := opentelementry.New(ctx, serviceOpts, options.OpentelementryOptions{
+p, err := telemetry.New(ctx, serviceOpts, options.TelemetryOptions{
     Telemetry: options.DefaultTelemetry(),
 })
 defer p.Close(ctx)
@@ -74,14 +74,14 @@ defer p.Close(ctx)
 
 ### 2. Structured Logging with Attributes
 
-Use struct tags `opentelementry:"attribute:key.name"` for automatic OpenTelemetry
+Use struct tags `telemetry:"attribute:key.name"` for automatic OpenTelemetry
 attribute extraction:
 
 ```go
 type ChatMessage struct {
-    UserID   string `json:"user_id" opentelementry:"attribute:user.id"`
-    RoomID   string `json:"room_id" opentelementry:"attribute:room.id"`
-    Language string `json:"language" opentelementry:"attribute:message.language"`
+    UserID   string `json:"user_id" telemetry:"attribute:user.id"`
+    RoomID   string `json:"room_id" telemetry:"attribute:room.id"`
+    Language string `json:"language" telemetry:"attribute:message.language"`
 }
 ```
 
@@ -105,7 +105,7 @@ Default endpoints:
 
 - **gRPC**: `localhost:4317`
 - **HTTP**: `localhost:4318`
-- Production: Configure `options.TelemetryOptions.OTLP`
+- Production: Configure `options.OpenTelemetryOptions.OTLP`
 
 ### 3. Multi-Environment Support
 
@@ -116,7 +116,7 @@ Default endpoints:
 
 ### Go SDK Structure (`/go/`)
 
-- `opentelementry.go`: Main SDK interface
+- `telemetry.go`: Main SDK interface
 - `options/`: Configuration structs and defaults
 - `internal/`: Implementation packages (logging, metrics, tracing, telemetry,
   profiling, foxglove)
@@ -125,7 +125,7 @@ Default endpoints:
 ### Internal Package Boundaries
 
 - Never import `internal/` packages directly in user code
-- Use public interfaces through main `Opentelementry` struct
+- Use public interfaces through main `Telemetry` struct
 - Cross-cutting concerns handled in `internal/telemetry/`
 
 ## Environment-Specific Conventions
@@ -151,11 +151,11 @@ Default endpoints:
 
 ## Adding New Features
 
-When extending Opentelementry:
+When extending Telemetry:
 
 1. Add options in `options/` package first
 2. Implement in appropriate `internal/` package
-3. Expose through main `Opentelementry` struct
+3. Expose through main `Telemetry` struct
 4. Add example in `examples/`
 5. Update unified telemetry integration if needed
 

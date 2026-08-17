@@ -1,0 +1,12 @@
+load("@rules_cc//cc:defs.bzl", "cc_library")
+
+cc_library(
+    name = "otel",
+    srcs = ["exporter.cpp"],
+    implementation_deps = [
+        "//include/telemetry/otel",
+        "@opentelemetry-cpp//sdk:headers",
+    ],
+    strip_include_prefix = "/include",
+    visibility = ["//visibility:public"],
+)

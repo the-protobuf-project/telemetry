@@ -1,0 +1,14 @@
+module(
+    name = "telemetry-example",
+    version = "1.0.0",
+)
+
+bazel_dep(name = "rules_cc", version = "0.2.16")
+
+# Local dependency on telemetry.cpp
+local_path_override(
+    module_name = "telemetry.cpp",
+    path = "../telemetry-cpp",
+)
+
+bazel_dep(name = "telemetry.cpp", version = "1.0.0")

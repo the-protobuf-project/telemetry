@@ -1,0 +1,31 @@
+load("@rules_cc//cc:defs.bzl", "cc_binary")
+
+cc_binary(
+    name = "main",
+    srcs = ["main.cpp"],
+    deps = ["//src:telemetry"],
+)
+
+cc_binary(
+    name = "logging",
+    srcs = ["logging.cpp"],
+    deps = ["//src:telemetry"],
+)
+
+cc_binary(
+    name = "logging_mcap",
+    srcs = ["logging_mcap.cpp"],
+    deps = ["//src:telemetry"],
+)
+
+cc_binary(
+    name = "metrics",
+    srcs = ["metrics.cpp"],
+    deps = ["//src:telemetry"],
+)
+
+cc_binary(
+    name = "tracing",
+    srcs = ["tracing.cpp"],
+    deps = ["//src:telemetry"],
+)

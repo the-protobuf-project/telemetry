@@ -28,8 +28,8 @@ repos:
     rev: v1.62.2
     hooks:
       - id: golangci-lint
-        entry: bash -c 'cd opentelementry-go && golangci-lint run'
-        files: ^opentelementry-go/.*\.go$
+        entry: bash -c 'cd telemetry-go && golangci-lint run'
+        files: ^telemetry-go/.*\.go$
         pass_filenames: false
 
   # Rust formatting and linting
@@ -37,15 +37,15 @@ repos:
     hooks:
       - id: cargo-fmt
         name: cargo fmt
-        entry: bash -c 'cd opentelementry-rs && cargo fmt --all -- --check'
+        entry: bash -c 'cd telemetry-rs && cargo fmt --all -- --check'
         language: system
-        files: ^opentelementry-rs/.*\.rs$
+        files: ^telemetry-rs/.*\.rs$
         pass_filenames: false
       - id: cargo-clippy
         name: cargo clippy
-        entry: bash -c 'cd opentelementry-rs && cargo clippy --all-targets --all-features -- -D warnings'
+        entry: bash -c 'cd telemetry-rs && cargo clippy --all-targets --all-features -- -D warnings'
         language: system
-        files: ^opentelementry-rs/.*\.rs$
+        files: ^telemetry-rs/.*\.rs$
         pass_filenames: false
 
   # Python linting with Ruff
@@ -54,9 +54,9 @@ repos:
     hooks:
       - id: ruff
         args: ['--fix']
-        files: ^opentelementry-py/.*\.py$
+        files: ^telemetry-py/.*\.py$
       - id: ruff-format
-        files: ^opentelementry-py/.*\.py$
+        files: ^telemetry-py/.*\.py$
 
   # Trailing whitespace and end of file
   - repo: https://github.com/pre-commit/pre-commit-hooks

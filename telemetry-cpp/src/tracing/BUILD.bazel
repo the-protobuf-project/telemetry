@@ -1,0 +1,14 @@
+load("@rules_cc//cc:defs.bzl", "cc_library")
+
+cc_library(
+    name = "tracing",
+    srcs = ["tracer.cpp"],
+    implementation_deps = [
+        "//include/telemetry/mcap",
+        "//include/telemetry/otel",
+        "//include/telemetry/tracing",
+        "@opentelemetry-cpp//api",
+    ],
+    strip_include_prefix = "/include",
+    visibility = ["//visibility:public"],
+)

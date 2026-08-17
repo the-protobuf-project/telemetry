@@ -1,0 +1,36 @@
+# Telemetry Configuration File (TOML)
+# ================================
+# See telemetry.toml in the root directory for detailed documentation.
+# This is a minimal example configuration.
+
+[service]
+name = "my-service"
+version = "1.0.0"
+environment = "development"
+description = "My awesome service"
+
+[telemetry]
+enabled = true
+
+[telemetry.otlp]
+enabled = true
+endpoint = "localhost:4317"
+
+[telemetry.metrics]
+export_interval_seconds = 10
+
+[logging.log]
+report_caller = true
+report_timestamp = true
+caller_offset = 3
+
+[foxglove]
+enabled = false
+file_path = ""
+
+[profiling]
+enabled = false
+server_address = "http://localhost:4040"
+
+[tracing]
+enabled = true

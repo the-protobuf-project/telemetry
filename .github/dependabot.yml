@@ -3,7 +3,7 @@ version: 2
 
 updates:
   - package-ecosystem: gomod
-    directory: /opentelementry-go
+    directory: /telemetry-go
     schedule:
       interval: weekly
     open-pull-requests-limit: 10
@@ -13,13 +13,13 @@ updates:
           - "*"
 
   - package-ecosystem: gomod
-    directory: /opentelementry-core/deploy/production/local-webhook
+    directory: /telemetry-core/deploy/production/local-webhook
     schedule:
       interval: weekly
     open-pull-requests-limit: 5
 
   - package-ecosystem: cargo
-    directory: /opentelementry-rs
+    directory: /telemetry-rs
     schedule:
       interval: weekly
     open-pull-requests-limit: 10
@@ -29,7 +29,7 @@ updates:
           - "*"
 
   - package-ecosystem: pip
-    directory: /opentelementry-py
+    directory: /telemetry-py
     schedule:
       interval: weekly
     open-pull-requests-limit: 10
@@ -55,7 +55,7 @@ updates:
     open-pull-requests-limit: 5
 
   - package-ecosystem: docker
-    directory: /opentelementry-core/deploy/production
+    directory: /telemetry-core/deploy/production
     schedule:
       interval: monthly
     open-pull-requests-limit: 5

@@ -1,47 +1,32 @@
 version: v2
 
 # Generates the example schema (examples/proto/jobs/v1/job.proto) that drives
-# opentelementry-go/examples/telemetry: plain message stubs plus the
+# telemetry-go/examples/telemetry: plain message stubs plus the
 # protoc-gen-telemetry companion file, both landing in the same Go package so
 # the example's main.go can import one package and use both.
 #
 # Run:  buf generate --template buf.gen.example.yaml
-# Out:  opentelementry-go/examples/telemetry/gen/jobs/v1/jobsv1/{job.pb.go,job_telemetry.pb.go}
+# Out:  telemetry-go/examples/telemetry/gen/jobs/v1/jobsv1/{job.pb.go,job_telemetry.pb.go}
 #
 # protoc-gen-telemetry must be built first (bin/protoc-gen-telemetry — see
-# opentelementry-go/examples/telemetry/README or just `go build -o
-# opentelementry-go/bin/protoc-gen-telemetry ./opentelementry-go/plugin/cmd/protoc-gen-telemetry`
+# telemetry-go/examples/telemetry/README or just `go build -o
+# telemetry-go/bin/protoc-gen-telemetry ./telemetry-go/plugin/cmd/protoc-gen-telemetry`
 # from the repo root).
 # job.proto imports telemetry/v1/annotations.proto, so job.pb.go carries a
-# cross-file Go import for it. That file's own go_package
-# (github.com/the-protobuf-project/opentelementry-go/protobuf/telemetry/v1/telemetrypbv1)
-# predates its nesting under opentelementry/opentelementry-go and doesn't
-# match its real, go-list-verified import path — the same pre-existing
-# mismatch buf.gen.yaml's own managed/override block works around for orm's
-# stubs. Same fix, same reason, here.
-managed:
-  enabled: true
-  override:
-    - file_option: go_package
-      path: telemetry/v1/annotations.proto
-      value: github.com/the-protobuf-project/opentelementry/opentelementry-go/protobuf/telemetry/v1/telemetrypbv1
-    - file_option: go_package
-      path: telemetry/v1/tracing.proto
-      value: github.com/the-protobuf-project/opentelementry/opentelementry-go/protobuf/telemetry/v1/telemetrypbv1
-    - file_option: go_package
-      path: telemetry/v1/metrics.proto
-      value: github.com/the-protobuf-project/opentelementry/opentelementry-go/protobuf/telemetry/v1/telemetrypbv1
+# cross-file Go import for it. That import now resolves directly: telemetry.v1's
+# go_package was corrected to its real path under telemetry/telemetry-go, so the
+# managed/override block that used to patch it here is no longer needed.
 
 inputs:
   - directory: protobuf/examples/proto
 
 plugins:
   - remote: buf.build/protocolbuffers/go:v1.36.11
-    out: opentelementry-go
+    out: telemetry-go
     opt:
-      - module=github.com/the-protobuf-project/opentelementry/opentelementry-go
+      - module=github.com/the-protobuf-project/telemetry/telemetry-go
 
-  - local: opentelementry-go/bin/protoc-gen-telemetry
-    out: opentelementry-go
+  - local: telemetry-go/bin/protoc-gen-telemetry
+    out: telemetry-go
     opt:
-      - module=github.com/the-protobuf-project/opentelementry/opentelementry-go
+      - module=github.com/the-protobuf-project/telemetry/telemetry-go

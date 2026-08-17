@@ -1,0 +1,15 @@
+load("@rules_cc//cc:defs.bzl", "cc_library")
+
+cc_library(
+    name = "telemetry",
+    srcs = ["telemetry.cpp"],
+    visibility = ["//visibility:public"],
+    deps = [
+        "//include/telemetry",
+        "//src/logging",
+        "//src/mcap",
+        "//src/metrics",
+        "//src/otel",
+        "//src/tracing",
+    ],
+)

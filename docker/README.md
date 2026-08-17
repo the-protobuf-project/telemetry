@@ -32,11 +32,11 @@ docker run -d \
   -p 6009:6009 \
   -v opentelemetry-stack-data:/data \
   --name opentelemetry-stack \
-  ghcr.io/the-protobuf-project/opentelementry:latest
+  ghcr.io/the-protobuf-project/telemetry:latest
 ```
 
 Images are published to GitHub Container Registry on each `v*` release:
-`ghcr.io/the-protobuf-project/opentelementry` (multi-arch: `linux/amd64`, `linux/arm64`).
+`ghcr.io/the-protobuf-project/telemetry` (multi-arch: `linux/amd64`, `linux/arm64`).
 
 ## Configuration
 

@@ -1,6 +1,6 @@
 # Changelog
 
-All notable changes to Opentelementry will be documented in this file.
+All notable changes to Telemetry will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
@@ -66,8 +66,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 
 - Migrated from Bazel to Go modules for simpler dependency management
-- Rebranded from Kodo to Opentelementry
-- Updated all documentation with Opentelementry branding
+- Rebranded from Kodo to Telemetry
+- Updated all documentation with Telemetry branding
 - Renamed project references for consistency
 - Updated LICENSE to 2025
 
@@ -89,8 +89,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## Release Links
 
-[1.0.0]: https://github.com/the-protobuf-project/opentelementry/releases/tag/v1.0.0
+[1.0.0]: https://github.com/the-protobuf-project/telemetry/releases/tag/v1.0.0
 
 ---
 
-**Note:** This is the initial open source release of Opentelementry by Machani Robotics.
+**Note:** This is the initial open source release of Telemetry by Machani Robotics.

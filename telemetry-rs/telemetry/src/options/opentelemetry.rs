@@ -63,19 +63,12 @@ impl Default for OpenTelemetryOptions {
 
 impl OpenTelemetryOptions {
     /// Replaces the OTLP configuration with the provided settings.
-    
     ///
-    
     /// # Examples
-    
     ///
-    
     /// ```
-    
     /// let options = OpenTelemetryOptions::default()
-    
     ///     .with_otlp(OTLPOptions::default());
-    
     /// ```
     pub fn with_otlp(mut self, otlp: OTLPOptions) -> Self {
         self.otlp = otlp;

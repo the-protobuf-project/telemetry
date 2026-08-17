@@ -154,17 +154,11 @@ fn default_true() -> bool {
 }
 
 /// Provides the default caller offset for log messages.
-
 ///
-
 /// # Examples
-
 ///
-
 /// ```
-
 /// assert_eq!(default_caller_offset(), 3);
-
 /// ```
 fn default_caller_offset() -> i32 {
     3

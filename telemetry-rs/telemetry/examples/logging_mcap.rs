@@ -1,5 +1,5 @@
-use telemetry::{Environment, Telemetry, logger};
 use serde::Serialize;
+use telemetry::{Environment, Telemetry, logger};
 
 #[derive(Debug, Serialize)]
 struct ChatMessage {
@@ -23,6 +23,7 @@ struct ChatMessage {
 /// # Returns
 ///
 /// `Ok(())` after all messages are logged, or an error if telemetry initialization fails.
+#[tokio::main]
 async fn main() -> anyhow::Result<()> {
     // Auto-discovers telemetry.toml config file, then override with MCAP
     let _telemetry = Telemetry::new()

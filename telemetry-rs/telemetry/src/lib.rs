@@ -188,17 +188,16 @@ impl Telemetry {
             log4rs::init_config(config).map(|_| ())
         });
 
-        let mcap_writer = if telemetry_opts.foxglove.enabled
-            && !telemetry_opts.foxglove.mcap_path.is_empty()
-        {
-            let writer = foxglove::UnifiedMcapWriter::new(
-                &service_opts,
-                &telemetry_opts.foxglove.mcap_path,
-            )?;
-            Some(Arc::new(Mutex::new(writer)))
-        } else {
-            None
-        };
+        let mcap_writer =
+            if telemetry_opts.foxglove.enabled && !telemetry_opts.foxglove.mcap_path.is_empty() {
+                let writer = foxglove::UnifiedMcapWriter::new(
+                    &service_opts,
+                    &telemetry_opts.foxglove.mcap_path,
+                )?;
+                Some(Arc::new(Mutex::new(writer)))
+            } else {
+                None
+            };
 
         let mcap_log_writer = mcap_writer
             .as_ref()
@@ -209,9 +208,7 @@ impl Telemetry {
             &service_opts,
             &telemetry_opts.telemetry,
         )?);
-        let otel_logger = telemetry
-            .as_ref()
-            .and_then(|t| t.get_logger("telemetry"));
+        let otel_logger = telemetry.as_ref().and_then(|t| t.get_logger("telemetry"));
 
         let logger = Logger::new(
             service_opts.name.clone(),
@@ -447,7 +444,6 @@ impl TelemetryBuilder {
     /// ```
     /// let builder = TelemetryBuilder::from_config();
     /// ```
-    pub fn from_config() -> Self
     pub fn from_config() -> Self {
         Self {
             name: None,

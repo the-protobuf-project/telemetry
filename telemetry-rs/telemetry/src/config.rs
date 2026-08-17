@@ -53,7 +53,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::options::{
     Environment, FoxgloveOptions, LogLevel, LoggingOptions, ModuleOptions, OTLPOptions,
-    TelemetryOptions, ProfilingOptions, ServiceOptions, OpenTelemetryOptions, TracingOptions,
+    OpenTelemetryOptions, ProfilingOptions, ServiceOptions, TelemetryOptions, TracingOptions,
 };
 
 /// Complete Telemetry configuration loaded from files/environment.
@@ -371,6 +371,7 @@ impl TelemetryConfig {
     /// let config = TelemetryConfig::load_from("telemetry.toml")?;
     /// # Ok::<(), figment::Error>(())
     /// ```
+    #[allow(clippy::result_large_err)]
     pub fn load_from(path: &str) -> Result<Self, figment::Error> {
         Self::figment_with_path(Some(path)).extract()
     }

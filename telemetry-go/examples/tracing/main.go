@@ -532,7 +532,7 @@ func validateResponse(ctx context.Context, k *telemetry.Telemetry, req ResponseV
 	return response, nil
 }
 
-// formatOutput applies Markdown formatting and final attribution to a generated response. 
+// formatOutput applies Markdown formatting and final attribution to a generated response.
 // It returns the formatted response metadata.
 func formatOutput(ctx context.Context, k *telemetry.Telemetry, req OutputFormattingRequest) (*OutputFormattingResponse, error) {
 	_, span := k.Tracing.Start(ctx, "OutputFormatting", req)

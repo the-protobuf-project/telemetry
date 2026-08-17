@@ -1,7 +1,7 @@
 //! OTLP metrics to `localhost:6009`.
+use std::path::PathBuf;
 use telemetry::derive::Metrics;
 use telemetry::{Environment, logger};
-use std::path::PathBuf;
 
 #[derive(Debug, Metrics)]
 pub struct LlmMetrics {
@@ -42,6 +42,7 @@ pub struct LlmMetrics {
 ///     Ok(())
 /// }
 /// ```
+#[tokio::main]
 async fn main() -> anyhow::Result<()> {
     let mcap_path = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("target/metrics-example.mcap");
     let mut telemetry = telemetry::telemetry_local_otel!()

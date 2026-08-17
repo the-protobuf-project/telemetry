@@ -153,7 +153,7 @@ func extractStructTagAttributes(rv reflect.Value) []otellog.KeyValue {
 }
 
 // dataToOtelAttributes converts various data types to OpenTelemetry KeyValue attributes
-// dataToOtelAttributes converts a value into OpenTelemetry attributes, expanding map entries and preserving complex values under the "data" attribute. Struct values also contribute attributes from `telemetry:"attribute:<name>"` tags. 
+// dataToOtelAttributes converts a value into OpenTelemetry attributes, expanding map entries and preserving complex values under the "data" attribute. Struct values also contribute attributes from `telemetry:"attribute:<name>"` tags.
 // The returned attributes represent the converted value.
 func dataToOtelAttributes(v any) []otellog.KeyValue {
 	if v == nil {

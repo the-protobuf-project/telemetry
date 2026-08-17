@@ -26,6 +26,7 @@ fn simple_operation() {
 /// ```no_run
 /// // Run the binary to initialize telemetry and execute the operation.
 /// ```
+#[tokio::main]
 async fn main() -> anyhow::Result<()> {
     let _telemetry = telemetry::telemetry_local_otel!()
         .with_service("simple-trace-test", "1.0.0")

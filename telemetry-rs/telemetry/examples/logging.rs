@@ -1,5 +1,5 @@
-use telemetry::{Environment, Telemetry, logger};
 use serde::Serialize;
+use telemetry::{Environment, Telemetry, logger};
 
 #[derive(Debug, Serialize)]
 struct ChatMessage {
@@ -23,7 +23,6 @@ struct ChatMessage {
 /// main().expect("chat service should start successfully");
 /// ```
 #[tokio::main]
-async fn main() -> anyhow::Result<()> {
 async fn main() -> anyhow::Result<()> {
     // Auto-discovers telemetry.toml config file
     let _telemetry = Telemetry::new()

@@ -73,7 +73,7 @@ type Builder struct {
 //	p, err := telemetry.New().
 //	    WithService("my-service", "1.0.0").
 //	    WithConfig("config.yaml").
-// New creates a Builder initialized with auto-discovered telemetry and service configuration, using defaults when configuration is unavailable.
+//	    Build()
 func New() *Builder {
 	// Auto-discover and load config on creation
 	telemetryOpts, serviceOpts, _ := options.LoadConfigWithDefaults("")

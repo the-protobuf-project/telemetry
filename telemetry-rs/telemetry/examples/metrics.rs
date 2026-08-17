@@ -38,6 +38,7 @@ pub struct LlmMetrics {
 /// # Errors
 ///
 /// Returns an error if telemetry initialization or metric recording fails.
+#[tokio::main]
 async fn main() -> anyhow::Result<()> {
     // Auto-discovers telemetry.toml config file
     let mut telemetry = Telemetry::new()

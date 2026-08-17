@@ -28,8 +28,17 @@ impl LogMcapWriter {
     /// # Examples
     ///
     /// ```no_run
+    /// # use std::sync::{Arc, Mutex};
+    /// # use telemetry::foxglove::UnifiedMcapWriter;
+    /// # use telemetry::logging::LogMcapWriter;
+    /// # use telemetry::options::ServiceOptions;
+    /// # fn example(
+    /// #     service_opts: &ServiceOptions,
+    /// #     writer: Arc<Mutex<UnifiedMcapWriter>>,
+    /// # ) -> anyhow::Result<()> {
     /// let log_writer = LogMcapWriter::new(&service_opts, writer)?;
     /// # Ok::<(), anyhow::Error>(())
+    /// # }
     /// ```
     ///
     /// `service_opts` supplies the service metadata included in log records, and `writer`
@@ -61,9 +70,12 @@ impl LogMcapWriter {
     /// # Examples
     ///
     /// ```no_run
+    /// # use telemetry::logging::LogMcapWriter;
+    /// # fn example() -> anyhow::Result<()> {
     /// # let logger: LogMcapWriter = todo!();
     /// logger.write_log("info", "Service started", file!(), line!(), None)?;
     /// # Ok::<(), anyhow::Error>(())
+    /// # }
     /// ```
     ///
     /// # Errors

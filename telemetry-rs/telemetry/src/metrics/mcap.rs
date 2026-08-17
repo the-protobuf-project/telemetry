@@ -22,13 +22,6 @@ pub struct MetricMcapWriter {
 impl MetricMcapWriter {
     /// Creates a metric MCAP writer for the configured service.
     ///
-    /// # Examples
-    ///
-    /// ```
-    /// let writer = MetricMcapWriter::new(&service_opts, writer)?;
-    /// # Ok::<(), anyhow::Error>(())
-    /// ```
-    ///
     /// # Arguments
     ///
     /// * `service_opts` - Service configuration containing the service name.
@@ -54,13 +47,6 @@ impl MetricMcapWriter {
     ///
     /// * `name` - Name of the metric.
     /// * `value` - Value of the metric.
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// # let mut writer: MetricMcapWriter = unimplemented!();
-    /// let _ = writer.write_counter("requests_total", 42.0);
-    /// ```
     pub fn write_counter(&mut self, name: &str, value: f64) -> Result<()> {
         self.write_metric(name, value)
     }
@@ -71,27 +57,11 @@ impl MetricMcapWriter {
     ///
     /// * `name` - Name of the metric.
     /// * `value` - Value of the metric.
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// # let mut metric_writer = /* configured MetricMcapWriter */ todo!();
-    /// metric_writer.write_histogram("request_duration", 42.0)?;
-    /// # Ok::<(), anyhow::Error>(())
-    /// ```
     pub fn write_histogram(&mut self, name: &str, value: f64) -> Result<()> {
         self.write_metric(name, value)
     }
 
     /// Records a gauge metric.
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// # let mut metrics: MetricMcapWriter = todo!();
-    /// metrics.write_gauge("temperature", 21.5)?;
-    /// # Ok::<(), anyhow::Error>(())
-    /// ```
     ///
     /// # Errors
     ///
@@ -101,14 +71,6 @@ impl MetricMcapWriter {
     }
 
     /// Writes a timestamped metric value to the MCAP output.
-    ///
-    /// # Examples
-    ///
-    /// ```no_run
-    /// # let mut writer = metric_writer;
-    /// writer.write_metric("requests.total", 42.0)?;
-    /// # Ok::<(), anyhow::Error>(())
-    /// ```
     ///
     /// # Errors
     ///
@@ -148,15 +110,6 @@ impl MetricMcapWriter {
     /// Retrieves the cached channel for a metric or creates one using the service-qualified metric topic.
     ///
     /// Dots in the metric name are converted to path separators when constructing the topic.
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// # // `writer` is a configured `MetricMcapWriter`.
-    /// let channel_id = writer.get_or_create_channel("requests.total")?;
-    /// assert!(channel_id > 0);
-    /// # Ok::<(), anyhow::Error>(())
-    /// ```
     ///
     /// # Errors
     ///

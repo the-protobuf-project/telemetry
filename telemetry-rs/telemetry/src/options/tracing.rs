@@ -14,23 +14,11 @@ pub struct TracingOptions {
 }
 
 /// Provides `true` as the default value for enabled options.
-///
-/// # Examples
-///
-/// ```
-/// assert!(default_true());
-/// ```
 fn default_true() -> bool {
     true
 }
 
 /// Provides the default sampling ratio for tracing.
-///
-/// # Examples
-///
-/// ```
-/// assert_eq!(default_sample_ratio(), 1.0);
-/// ```
 fn default_sample_ratio() -> f64 {
     1.0
 }
@@ -41,6 +29,8 @@ impl Default for TracingOptions {
     /// # Examples
     ///
     /// ```
+    /// use telemetry::options::TracingOptions;
+    ///
     /// let options = TracingOptions::default();
     /// assert!(options.enabled);
     /// assert_eq!(options.sample_ratio, 1.0);

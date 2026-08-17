@@ -28,8 +28,12 @@ impl OtelLogger {
     /// # Examples
     ///
     /// ```no_run
-    /// let logger = SdkLogger::default();
-    /// let otel_logger = OtelLogger::new(logger);
+    /// use opentelemetry::logs::LoggerProvider;
+    /// use opentelemetry_sdk::logs::SdkLoggerProvider;
+    /// use telemetry::logging::OtelLogger;
+    ///
+    /// let provider = SdkLoggerProvider::builder().build();
+    /// let otel_logger = OtelLogger::new(provider.logger("example"));
     /// ```
     pub fn new(logger: SdkLogger) -> Self {
         Self {
@@ -50,6 +54,7 @@ impl OtelLogger {
     /// ```
     /// # use opentelemetry::logs::{Logger, LoggerProvider, Severity};
     /// # use opentelemetry_sdk::logs::SdkLoggerProvider;
+    /// # use telemetry::logging::OtelLogger;
     /// # let provider = SdkLoggerProvider::builder().build();
     /// # let logger = OtelLogger::new(provider.logger("example"));
     /// logger.log(Severity::Info, "Service started", vec![]);
@@ -79,6 +84,7 @@ impl OtelLogger {
     /// # Examples
     ///
     /// ```no_run
+    /// # use telemetry::logging::OtelLogger;
     /// let logger: OtelLogger = unimplemented!();
     /// logger.debug("Connection established", Vec::new());
     /// ```
@@ -91,6 +97,7 @@ impl OtelLogger {
     /// # Examples
     ///
     /// ```no_run
+    /// # use telemetry::logging::OtelLogger;
     /// # let logger: OtelLogger = todo!();
     /// logger.info("Application started", vec![]);
     /// ```
@@ -103,6 +110,7 @@ impl OtelLogger {
     /// # Examples
     ///
     /// ```no_run
+    /// # use telemetry::logging::OtelLogger;
     /// # let logger: OtelLogger = todo!();
     /// logger.warn("Cache miss", vec![]);
     /// ```
@@ -117,6 +125,7 @@ impl OtelLogger {
     /// # Examples
     ///
     /// ```no_run
+    /// # use telemetry::logging::OtelLogger;
     /// # let logger: OtelLogger = todo!();
     /// logger.error("Request failed", vec![]);
     /// ```
@@ -129,6 +138,7 @@ impl OtelLogger {
     /// # Examples
     ///
     /// ```
+    /// # use telemetry::logging::OtelLogger;
     /// # fn example(logger: &OtelLogger) {
     /// logger.fatal("Service unavailable", vec![]);
     /// # }

@@ -276,7 +276,9 @@ impl Telemetry {
     ///
     /// # Examples
     ///
-    /// ```
+    /// ```no_run
+    /// use telemetry::Telemetry;
+    ///
     /// let telemetry = Telemetry::builder("example-service", "1.0.0").build()?;
     /// if let Some(provider) = telemetry.meter_provider() {
     ///     // Use the configured meter provider.
@@ -407,6 +409,8 @@ impl TelemetryBuilder {
     /// # Examples
     ///
     /// ```
+    /// use telemetry::TelemetryBuilder;
+    ///
     /// let _builder = TelemetryBuilder::new("my-service", "1.0.0");
     /// ```
     pub fn new(name: impl Into<String>, version: impl Into<String>) -> Self {
@@ -442,6 +446,8 @@ impl TelemetryBuilder {
     /// # Examples
     ///
     /// ```
+    /// use telemetry::TelemetryBuilder;
+    ///
     /// let builder = TelemetryBuilder::from_config();
     /// ```
     pub fn from_config() -> Self {
@@ -512,6 +518,8 @@ impl TelemetryBuilder {
     /// # Examples
     ///
     /// ```
+    /// use telemetry::Telemetry;
+    ///
     /// let builder = Telemetry::builder("example-service", "1.0.0")
     ///     .with_otlp("localhost", 4317);
     /// ```
@@ -526,6 +534,8 @@ impl TelemetryBuilder {
     /// # Examples
     ///
     /// ```
+    /// use telemetry::TelemetryBuilder;
+    ///
     /// let builder = TelemetryBuilder::new("example-service", "1.0.0")
     ///     .with_local_otel_collector();
     /// ```
@@ -596,6 +606,8 @@ impl TelemetryBuilder {
     /// # Examples
     ///
     /// ```
+    /// use telemetry::Telemetry;
+    ///
     /// let builder = Telemetry::builder("example-service", "1.0")
     ///     .with_mcap("telemetry.mcap");
     /// ```
@@ -615,7 +627,9 @@ impl TelemetryBuilder {
     ///
     /// # Examples
     ///
-    /// ```
+    /// ```no_run
+    /// use telemetry::Telemetry;
+    ///
     /// let telemetry = Telemetry::builder("example-service", "1.0.0").build()?;
     /// # drop(telemetry);
     /// # Ok::<(), Box<dyn std::error::Error>>(())

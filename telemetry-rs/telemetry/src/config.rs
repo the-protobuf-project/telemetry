@@ -111,6 +111,8 @@ impl Default for OpenTelemetryConfig {
     /// # Examples
     ///
     /// ```
+    /// use telemetry::config::OpenTelemetryConfig;
+    ///
     /// let config = OpenTelemetryConfig::default();
     /// assert!(config.enabled);
     /// ```
@@ -248,7 +250,9 @@ impl Default for ProfilingConfig {
     /// # Examples
     ///
     /// ```
-    /// let config = FoxgloveConfig::default();
+    /// use telemetry::config::ProfilingConfig;
+    ///
+    /// let config = ProfilingConfig::default();
     /// assert!(!config.enabled);
     /// assert_eq!(config.server_address, "http://localhost:4040");
     /// ```
@@ -268,6 +272,8 @@ impl TelemetryConfig {
     /// # Examples
     ///
     /// ```
+    /// use telemetry::config::TelemetryConfig;
+    ///
     /// let _figment = TelemetryConfig::figment();
     /// ```
     pub fn figment() -> Figment {
@@ -283,6 +289,8 @@ impl TelemetryConfig {
     /// # Examples
     ///
     /// ```
+    /// use telemetry::config::TelemetryConfig;
+    ///
     /// let figment = TelemetryConfig::figment_with_path(None);
     /// let config: TelemetryConfig = figment.extract().unwrap();
     /// ```
@@ -307,13 +315,6 @@ impl TelemetryConfig {
     ///
     /// Files are checked in order from the current directory, followed by the `.config`
     /// directory. If no supported file exists, the original configuration is returned.
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// let figment = Figment::new();
-    /// let configured = TelemetryConfig::auto_discover_config(figment);
-    /// ```
     fn auto_discover_config(figment: Figment) -> Figment {
         let config_paths = [
             "telemetry.toml",
@@ -368,6 +369,8 @@ impl TelemetryConfig {
     /// # Examples
     ///
     /// ```no_run
+    /// use telemetry::config::TelemetryConfig;
+    ///
     /// let config = TelemetryConfig::load_from("telemetry.toml")?;
     /// # Ok::<(), figment::Error>(())
     /// ```
@@ -384,6 +387,8 @@ impl TelemetryConfig {
     /// # Examples
     ///
     /// ```
+    /// use telemetry::config::TelemetryConfig;
+    ///
     /// let config = TelemetryConfig::default();
     /// let _options = config.to_service_options();
     /// ```
@@ -411,6 +416,8 @@ impl TelemetryConfig {
     /// # Examples
     ///
     /// ```
+    /// use telemetry::config::TelemetryConfig;
+    ///
     /// let config = TelemetryConfig::default();
     /// let _options = config.to_telemetry_options();
     /// ```

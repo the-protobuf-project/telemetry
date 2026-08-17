@@ -28,12 +28,6 @@ pub struct OpenTelemetryOptions {
 }
 
 /// Provides a default enabled value.
-///
-/// # Examples
-///
-/// ```
-/// assert!(default_true());
-/// ```
 fn default_true() -> bool {
     true
 }
@@ -44,6 +38,8 @@ impl Default for OpenTelemetryOptions {
     /// # Examples
     ///
     /// ```
+    /// use telemetry::options::OpenTelemetryOptions;
+    ///
     /// let options = OpenTelemetryOptions::default();
     /// assert!(options.enabled);
     /// assert!(options.logging.enabled);
@@ -67,6 +63,8 @@ impl OpenTelemetryOptions {
     /// # Examples
     ///
     /// ```
+    /// use telemetry::options::{OTLPOptions, OpenTelemetryOptions};
+    ///
     /// let options = OpenTelemetryOptions::default()
     ///     .with_otlp(OTLPOptions::default());
     /// ```

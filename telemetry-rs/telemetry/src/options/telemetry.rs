@@ -43,6 +43,8 @@ impl TelemetryOptions {
     /// # Examples
     ///
     /// ```
+    /// use telemetry::options::TelemetryOptions;
+    ///
     /// let options = TelemetryOptions::new();
     /// ```
     pub fn new() -> Self {
@@ -54,6 +56,8 @@ impl TelemetryOptions {
     /// # Examples
     ///
     /// ```
+    /// use telemetry::options::{LoggingOptions, TelemetryOptions};
+    ///
     /// let options = TelemetryOptions::new()
     ///     .with_logging(LoggingOptions::default());
     /// ```
@@ -67,6 +71,8 @@ impl TelemetryOptions {
     /// # Examples
     ///
     /// ```
+    /// use telemetry::options::{OpenTelemetryOptions, TelemetryOptions};
+    ///
     /// let telemetry = OpenTelemetryOptions::default();
     /// let options = TelemetryOptions::new().with_telemetry(telemetry);
     /// ```

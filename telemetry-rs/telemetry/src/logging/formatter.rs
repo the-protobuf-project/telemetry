@@ -33,6 +33,8 @@ impl Default for TelemetryFormatter {
     /// # Examples
     ///
     /// ```
+    /// use telemetry::logging::TelemetryFormatter;
+    ///
     /// let formatter = TelemetryFormatter::default();
     /// ```
     fn default() -> Self {
@@ -69,6 +71,8 @@ impl TelemetryFormatter {
     /// # Examples
     ///
     /// ```
+    /// use telemetry::logging::TelemetryFormatter;
+    ///
     /// let formatter = TelemetryFormatter::new();
     /// formatter.set_service_info(
     ///     "checkout".to_owned(),
@@ -90,10 +94,11 @@ impl Encode for TelemetryFormatter {
     ///
     /// ```
     /// use log4rs::encode::Encode;
+    /// use log4rs::encode::writer::simple::SimpleWriter;
     /// use telemetry::logging::formatter::TelemetryFormatter;
     ///
     /// let formatter = TelemetryFormatter::new();
-    /// let mut output = Vec::new();
+    /// let mut output = SimpleWriter(Vec::new());
     ///
     /// let record = log::Record::builder()
     ///     .level(log::Level::Info)
@@ -103,7 +108,7 @@ impl Encode for TelemetryFormatter {
     ///     .build();
     ///
     /// formatter.encode(&mut output, &record)?;
-    /// assert!(String::from_utf8(output)?.contains("Service started"));
+    /// assert!(String::from_utf8(output.0)?.contains("Service started"));
     /// # Ok::<(), Box<dyn std::error::Error>>(())
     /// ```
     ///

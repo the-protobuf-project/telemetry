@@ -17,6 +17,8 @@ use opentelemetry::trace::Status;
 /// # Examples
 ///
 /// ```no_run
+/// use telemetry::tracing::init_tokio_tracing;
+///
 /// let tracer = todo!("configure an OpenTelemetry SDK tracer");
 /// init_tokio_tracing(tracer).unwrap();
 /// ```
@@ -114,6 +116,8 @@ impl TelemetryTracing {
     /// # Examples
     ///
     /// ```
+    /// use telemetry::tracing::TelemetryTracing;
+    ///
     /// let tracing = TelemetryTracing::new(
     ///     None::<opentelemetry_sdk::trace::Tracer>,
     /// );

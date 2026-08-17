@@ -122,8 +122,15 @@ impl GlobalLogger {
     /// # Examples
     ///
     /// ```
-    /// # use telemetry::{GlobalLogger, Severity};
-    /// # let logger = GlobalLogger::new("example", "1.0.0", "development", None, None);
+    /// # use opentelemetry::logs::Severity;
+    /// # use telemetry::logging::GlobalLogger;
+    /// # let logger = GlobalLogger::new(
+    /// #     "example".to_owned(),
+    /// #     "1.0.0".to_owned(),
+    /// #     "development".to_owned(),
+    /// #     None,
+    /// #     None,
+    /// # );
     /// logger.log_with_location(
     ///     Severity::Info,
     ///     "Service started".to_owned(),

@@ -37,6 +37,8 @@ impl LogLevel {
     /// # Examples
     ///
     /// ```
+    /// use telemetry::options::LogLevel;
+    ///
     /// assert_eq!(LogLevel::from_u8(3), LogLevel::ModuleLevel_3);
     /// assert_eq!(LogLevel::from_u8(0), LogLevel::Unset);
     /// ```
@@ -62,6 +64,8 @@ impl LogLevel {
     /// # Examples
     ///
     /// ```
+    /// use telemetry::options::LogLevel;
+    ///
     /// assert_eq!(
     ///     LogLevel::ModuleLevel_1.to_level_filter(),
     ///     log::LevelFilter::Error
@@ -89,6 +93,8 @@ impl LogLevel {
     /// # Examples
     ///
     /// ```
+    /// use telemetry::options::LogLevel;
+    ///
     /// assert!(LogLevel::ModuleLevel_1.is_set());
     /// assert!(!LogLevel::Unset.is_set());
     /// ```
@@ -142,24 +148,11 @@ pub struct LogOptions {
 }
 
 /// Provides a default enabled value.
-///
-/// # Examples
-///
-/// ```
-/// assert!(default_true());
-/// ```
-///
 fn default_true() -> bool {
     true
 }
 
 /// Provides the default caller offset for log messages.
-///
-/// # Examples
-///
-/// ```
-/// assert_eq!(default_caller_offset(), 3);
-/// ```
 fn default_caller_offset() -> i32 {
     3
 }
@@ -170,6 +163,8 @@ impl Default for LogOptions {
     /// # Examples
     ///
     /// ```
+    /// use telemetry::options::LogOptions;
+    ///
     /// let options = LogOptions::default();
     /// assert!(options.report_caller);
     /// assert!(options.report_timestamp);

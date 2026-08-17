@@ -49,6 +49,8 @@ impl TelemetryProvider {
     /// # Examples
     ///
     /// ```
+    /// # use telemetry::options::{OpenTelemetryOptions, ServiceOptions};
+    /// # use telemetry::telemetry::TelemetryProvider;
     /// # fn example(
     /// #     service_opts: &ServiceOptions,
     /// #     telemetry_opts: &OpenTelemetryOptions,

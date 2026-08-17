@@ -114,8 +114,11 @@ jobs:
         with:
           python-version: '3.12'
 
+      # Pinned: an unpinned `pip install ruff` silently upgrades on every run, so
+      # an upstream release can break CI with no change to this repo. Keep this
+      # in sync with the rev in .pre-commit-config.yaml.
       - name: Install linters
-        run: pip install ruff mypy
+        run: pip install ruff==0.16.3 mypy==2.3.1
 
       - name: Run Ruff linter
         working-directory: ./telemetry-py

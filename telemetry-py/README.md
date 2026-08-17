@@ -118,11 +118,13 @@ TELEMETRY_TELEMETRY__OTLP__AUTH_TOKEN=your-token
 from telemetry import Telemetry, Environment
 
 # Builder methods have highest priority
-telemetry = Telemetry.new() \
-    .with_service("my-service", "1.0.0") \
-    .environment(Environment.PRODUCTION) \
-    .with_otlp("otel.example.com", 4317) \
+telemetry = (
+    Telemetry.new()
+    .with_service("my-service", "1.0.0")
+    .environment(Environment.PRODUCTION)
+    .with_otlp("otel.example.com", 4317)
     .build()
+)
 ```
 
 ## Core Concepts
@@ -165,10 +167,12 @@ modules to log at different verbosity levels within the same application.
 ```python
 from telemetry import Telemetry, LogLevel
 
-telemetry = Telemetry.new() \
-    .with_service("vision-module", "1.0.0") \
-    .with_log_level(LogLevel.MODULE_LEVEL_3) \
+telemetry = (
+    Telemetry.new()
+    .with_service("vision-module", "1.0.0")
+    .with_log_level(LogLevel.MODULE_LEVEL_3)
     .build()
+)
 ```
 
 #### TOML Configuration
@@ -198,11 +202,13 @@ Metrics are auto-prefixed with service name from config:
 import telemetry
 from telemetry import Telemetry, MetricsBaseModel
 
+
 # No prefix needed - uses service name from telemetry.toml
 class LLMMetrics(MetricsBaseModel):
     tokens: int = telemetry.Counter(description="Total tokens")
     latency: float = telemetry.Histogram(description="Response time")
     active: int = telemetry.Gauge(description="Active requests")
+
 
 with Telemetry.new().build() as p:
     metrics = LLMMetrics(tokens=150, latency=245.5, active=3)
@@ -216,9 +222,11 @@ with Telemetry.new().build() as p:
 import telemetry
 from telemetry import Telemetry, TracedOperation
 
+
 @telemetry.trace("process_request", auto_events=True)
 def process_request(user_id: str):
     return {"status": "success"}
+
 
 with Telemetry.new().build() as p:
     # Using decorator

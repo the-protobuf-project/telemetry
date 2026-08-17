@@ -151,6 +151,7 @@ pub fn derive_metrics(input: TokenStream) -> TokenStream {
 ///     // Function body
 /// }
 /// ```
+#[proc_macro_attribute]
 pub fn instrument(_attr: TokenStream, item: TokenStream) -> TokenStream {
     let input = parse_macro_input!(item as ItemFn);
 

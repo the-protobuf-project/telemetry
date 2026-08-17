@@ -94,7 +94,6 @@ impl OtelLogger {
     /// # let logger: OtelLogger = todo!();
     /// logger.info("Application started", vec![]);
     /// ```
-    pub fn info...
     pub fn info(&self, message: &str, attributes: Vec<KeyValue>) {
         self.log(Severity::Info, message, attributes);
     }
@@ -109,7 +108,6 @@ impl OtelLogger {
     /// ```
     ///
     /// `attributes` provides additional key-value context for the log record.
-    pub fn warn...
     pub fn warn(&self, message: &str, attributes: Vec<KeyValue>) {
         self.log(Severity::Warn, message, attributes);
     }

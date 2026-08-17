@@ -29,12 +29,8 @@ class LLMMetrics(MetricsBaseModel):
     response_time: float = telemetry.Histogram(
         description="LLM response time in milliseconds"
     )
-    active_requests: int = telemetry.Gauge(
-        description="Number of active LLM requests"
-    )
-    cache_hit_rate: float = telemetry.Gauge(
-        description="LLM cache hit rate (0.0-1.0)"
-    )
+    active_requests: int = telemetry.Gauge(description="Number of active LLM requests")
+    cache_hit_rate: float = telemetry.Gauge(description="LLM cache hit rate (0.0-1.0)")
 
 
 # TranscriptionMetrics for speech-to-text
@@ -42,9 +38,7 @@ class LLMMetrics(MetricsBaseModel):
 class TranscriptionMetrics(MetricsBaseModel):
     """Speech-to-text transcription metrics"""
 
-    audio_duration: float = telemetry.Histogram(
-        description="Audio duration in seconds"
-    )
+    audio_duration: float = telemetry.Histogram(description="Audio duration in seconds")
     confidence: float = telemetry.Gauge(
         description="Transcription confidence score (0.0-1.0)"
     )

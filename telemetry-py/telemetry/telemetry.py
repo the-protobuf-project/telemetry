@@ -231,18 +231,13 @@ class Telemetry:
         """Create a new TelemetryBuilder for fluent configuration."""
         return TelemetryBuilder()
 
-    def __init__(
-        self, service_opts: ServiceOptions, telemetry_opts: TelemetryOptions
-    ):
+    def __init__(self, service_opts: ServiceOptions, telemetry_opts: TelemetryOptions):
         self.service_opts = service_opts
         self.telemetry_opts = telemetry_opts
 
         # Initialize unified MCAP writer if enabled
         self.mcap_writer: Optional[UnifiedMcapWriter] = None
-        if (
-            telemetry_opts.foxglove.enabled
-            and telemetry_opts.foxglove.mcap_path
-        ):
+        if telemetry_opts.foxglove.enabled and telemetry_opts.foxglove.mcap_path:
             self.mcap_writer = UnifiedMcapWriter(
                 mcap_path=telemetry_opts.foxglove.mcap_path,
                 service_name=service_opts.name,

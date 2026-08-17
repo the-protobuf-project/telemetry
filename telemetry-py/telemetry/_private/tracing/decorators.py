@@ -65,10 +65,7 @@ def trace(
             # Get Telemetry instance from context
             telemetry_instance = _current_telemetry.get()
 
-            if (
-                not telemetry_instance
-                or not telemetry_instance.tracing.enabled
-            ):
+            if not telemetry_instance or not telemetry_instance.tracing.enabled:
                 return func(*args, **kwargs)
 
             tracing = telemetry_instance.tracing

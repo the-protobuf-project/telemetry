@@ -4,15 +4,15 @@ version: v2
 # protos under protobuf/.
 #
 # Run:  buf generate --template buf.gen.yaml
-# Out:  opentelementry-go/protobuf/{grafana,telemetry}/v1/*pbv1/*.pb.go
+# Out:  telemetry-go/protobuf/{grafana,telemetry}/v1/*pbv1/*.pb.go
 #
-# The module= opt strips the opentelementry-go/protobuf module prefix from each go_package,
-# and out points at that same directory, so a go_package of
-#   .../opentelementry-go/protobuf/grafana/v1/grafanapbv1
-# is written to opentelementry-go/protobuf/grafana/v1/grafanapbv1.
+# The module= opt strips the telemetry/telemetry-go/protobuf module prefix from
+# each go_package, and out points at that same directory, so a go_package of
+#   .../telemetry/telemetry-go/protobuf/grafana/v1/grafanapbv1
+# is written to telemetry-go/protobuf/grafana/v1/grafanapbv1.
 #
 # protobuf/examples/proto/ is excluded: it's a separate, unnamed local buf
-# module (see buf.yaml) driving opentelementry-go/examples/telemetry via its
+# module (see buf.yaml) driving telemetry-go/examples/telemetry via its
 # own buf.gen.example.yaml — this template only regenerates the two
 # BSR-published packages' own stubs.
 inputs:
@@ -22,6 +22,6 @@ inputs:
 
 plugins:
   - remote: buf.build/protocolbuffers/go:v1.36.11
-    out: opentelementry-go/protobuf
+    out: telemetry-go/protobuf
     opt:
-      - module=github.com/the-protobuf-project/opentelementry-go/protobuf
+      - module=github.com/the-protobuf-project/telemetry/telemetry-go/protobuf

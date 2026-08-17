@@ -1,0 +1,176 @@
+name: telemetry
+services:
+  init:
+    image: alpine:latest
+    volumes:
+      - loki-data:/data
+    command: chown -R 10001:10001 /data
+
+  loki:
+    image: grafana/loki:3.2.1
+    command:
+      - -config.file
+      - /mnt/loki-config.yaml
+    volumes:
+      - ./config/loki.yaml:/mnt/loki-config.yaml
+      - loki-data:/data
+    ports:
+      - 3100:3100
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "wget",
+          "--no-verbose",
+          "--tries=1",
+          "--spider",
+          "http://localhost:3100/ready",
+        ]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+      start_period: 10s
+    depends_on:
+      init:
+        condition: service_completed_successfully
+
+  otelcol:
+    build:
+      context: .
+      dockerfile: docker/otelcol.Dockerfile
+    deploy:
+      resources:
+        limits:
+          memory: 200M
+    restart: unless-stopped
+    command: ["--config=/etc/otelcol/config.yaml"]
+    volumes:
+      - ./config/otel-collector.yaml:/etc/otelcol/config.yaml
+    environment:
+      - OTEL_CLOUD_ENDPOINT=${OTEL_CLOUD_ENDPOINT:-https://otel.the-protobuf-project.dev}
+      - OTEL_CLOUD_AUTH_TOKEN=${OTEL_CLOUD_AUTH_TOKEN:-Copyright © 2026}
+    ports:
+      - 4317:4317
+      - 4318:4318
+    healthcheck:
+      test: ["CMD", "/usr/bin/curl", "-f", "http://localhost:13133"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+      start_period: 5s
+    depends_on:
+      loki:
+        condition: service_healthy
+      tempo:
+        condition: service_healthy
+      prometheus:
+        condition: service_healthy
+
+  tempo:
+    image: grafana/tempo:2.6.1
+    command: ["-config.file=/etc/tempo.yaml"]
+    volumes:
+      - ./config/tempo.yaml:/etc/tempo.yaml
+      - tempo-data:/var/tempo
+    ports:
+      - 3200:3200
+      - 3201:3201
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "wget",
+          "--no-verbose",
+          "--tries=1",
+          "--spider",
+          "http://localhost:3201/ready",
+        ]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+      start_period: 10s
+
+  prometheus:
+    image: prom/prometheus:v2.54.1
+    command:
+      - --config.file=/etc/prometheus.yaml
+      - --web.enable-remote-write-receiver
+      - --enable-feature=exemplar-storage
+    volumes:
+      - ./config/prometheus.yaml:/etc/prometheus.yaml
+    ports:
+      - "9090:9090"
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "wget",
+          "--no-verbose",
+          "--tries=1",
+          "--spider",
+          "http://localhost:9090/-/healthy",
+        ]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+      start_period: 5s
+
+  pyroscope:
+    build:
+      context: .
+      dockerfile: docker/pyroscope.Dockerfile
+    ports:
+      - "4040:4040"
+    volumes:
+      - pyroscope-data:/data
+    environment:
+      - PYROSCOPE_STORAGE_PATH=/data
+    healthcheck:
+      test: ["CMD", "/usr/bin/curl", "-f", "http://localhost:4040/ready"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+      # Pyroscope 2.x reports ready only after staged readiness gates settle
+      # (metastore, ingester, segment-writer) which takes ~60-70s on a cold
+      # start. Keep the container in "starting" until then so it is not marked
+      # unhealthy prematurely and block dependents like Grafana.
+      start_period: 120s
+
+  grafana:
+    image: grafana/grafana:11.3.1
+    volumes:
+      - ./config/grafana-datasources.yaml:/etc/grafana/provisioning/datasources/datasources.yaml
+      - ./config/grafana-dashboards.yaml:/etc/grafana/provisioning/dashboards/dashboards.yaml
+      - ./dashboards:/etc/grafana/provisioning/dashboards
+    environment:
+      - GF_AUTH_ANONYMOUS_ENABLED=true
+      - GF_AUTH_ANONYMOUS_ORG_ROLE=Admin
+      - GF_AUTH_DISABLE_LOGIN_FORM=true
+      - GF_FEATURE_TOGGLES_ENABLE=traceqlEditor
+      - GF_INSTALL_PLUGINS=grafana-pyroscope-app
+    ports:
+      - "3000:3000"
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "wget",
+          "--no-verbose",
+          "--tries=1",
+          "--spider",
+          "http://localhost:3000/api/health",
+        ]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+      start_period: 10s
+    depends_on:
+      otelcol:
+        condition: service_healthy
+      pyroscope:
+        condition: service_healthy
+
+volumes:
+  loki-data:
+  tempo-data:
+  pyroscope-data:

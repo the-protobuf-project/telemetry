@@ -12,14 +12,14 @@ syntax = "proto3";
 //      collapse:false, liveNow:false) are regular proto3 fields; callers must
 //      marshal with EmitUnpopulated=true to reproduce those zero-value keys.
 //
-// go_package intentionally mirrors protoverse-go so this file can replace the
-// existing stubs once regenerated and published.
+// go_package matches this file's real import path under telemetry-go so the
+// generated stubs resolve for external consumers of the published BSR module.
 package grafana.v1;
 
 import "google/api/field_behavior.proto";
 import "google/protobuf/struct.proto";
 
-option go_package = "github.com/the-protobuf-project/opentelementry-go/protobuf/grafana/v1/grafanapbv1;grafanapbv1";
+option go_package = "github.com/the-protobuf-project/telemetry/telemetry-go/protobuf/grafana/v1/grafanapbv1;grafanapbv1";
 option java_multiple_files = true;
 option java_outer_classname = "MetadataProto";
 option java_package = "com.grafana.v1";

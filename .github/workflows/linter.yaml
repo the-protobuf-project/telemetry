@@ -13,13 +13,13 @@ jobs:
     name: Lint Go Code
     runs-on: blacksmith-4vcpu-ubuntu-2404
     steps:
-      - name: Check out opentelementry
+      - name: Check out telemetry
         uses: actions/checkout@v6
         with:
-          path: opentelementry
+          path: telemetry
 
       # See ci.yaml's test-go job for why this sibling checkout exists
-      # (opentelementry-go/go.mod's local replace for runtime-go/telemetry).
+      # (telemetry-go/go.mod's local replace for runtime-go/telemetry).
       - name: Check out runtime-go (for the runtime-go/telemetry replace)
         uses: actions/checkout@v6
         with:
@@ -35,14 +35,14 @@ jobs:
         uses: golangci/golangci-lint-action@v9
         with:
           version: latest
-          working-directory: opentelementry/opentelementry-go
+          working-directory: telemetry/telemetry-go
           args: --timeout=5m
 
       - name: Lint examples/telemetry (isolated module)
         uses: golangci/golangci-lint-action@v9
         with:
           version: latest
-          working-directory: opentelementry/opentelementry-go/examples/telemetry
+          working-directory: telemetry/telemetry-go/examples/telemetry
           args: --timeout=5m
 
   lint-markdown:
@@ -91,15 +91,15 @@ jobs:
             ~/.cargo/registry/index/
             ~/.cargo/registry/cache/
             ~/.cargo/git/db/
-            opentelementry-rs/target/
+            telemetry-rs/target/
           key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
 
       - name: Check formatting
-        working-directory: ./opentelementry-rs
+        working-directory: ./telemetry-rs
         run: cargo fmt --all -- --check
 
       - name: Run Clippy
-        working-directory: ./opentelementry-rs
+        working-directory: ./telemetry-rs
         run: cargo clippy --all-targets --all-features -- -D warnings
 
   lint-python:
@@ -114,15 +114,18 @@ jobs:
         with:
           python-version: '3.12'
 
+      # Pinned: an unpinned `pip install ruff` silently upgrades on every run, so
+      # an upstream release can break CI with no change to this repo. Keep this
+      # in sync with the rev in .pre-commit-config.yaml.
       - name: Install linters
-        run: pip install ruff mypy
+        run: pip install ruff==0.16.3 mypy==2.3.1
 
       - name: Run Ruff linter
-        working-directory: ./opentelementry-py
+        working-directory: ./telemetry-py
         run: ruff check .
 
       - name: Run Ruff formatter check
-        working-directory: ./opentelementry-py
+        working-directory: ./telemetry-py
         run: ruff format --check .
 
   check-links:

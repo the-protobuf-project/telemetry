@@ -41,8 +41,8 @@ FROM debian:bookworm-slim
 
 # OCI labels link the published package to the repo (enables the GHCR
 # package to inherit repo visibility and show source/README).
-LABEL org.opencontainers.image.source="https://github.com/the-protobuf-project/opentelementry" \
-  org.opencontainers.image.title="opentelementry-stack" \
+LABEL org.opencontainers.image.source="https://github.com/the-protobuf-project/telemetry" \
+  org.opencontainers.image.title="telemetry-stack" \
   org.opencontainers.image.description="Grafana, Prometheus, Pushgateway, Tempo, Loki, Alertmanager, OTel Collector and Envoy in a single image, fronted by one ingress port (6009)." \
   org.opencontainers.image.licenses="Apache-2.0"
 

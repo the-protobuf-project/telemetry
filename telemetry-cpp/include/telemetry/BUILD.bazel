@@ -1,0 +1,27 @@
+load("@rules_cc//cc:defs.bzl", "cc_library")
+
+cc_library(
+    name = "core",
+    hdrs = [
+        "config.hpp",
+        "platform.hpp",
+    ],
+    defines = ["TELEMETRY_USE_OTEL=1"],
+    strip_include_prefix = "/include",
+    visibility = ["//visibility:public"],
+)
+
+cc_library(
+    name = "telemetry",
+    hdrs = ["telemetry.hpp"],
+    strip_include_prefix = "/include",
+    visibility = ["//visibility:public"],
+    deps = [
+        ":core",
+        "//include/telemetry/logging",
+        "//include/telemetry/mcap",
+        "//include/telemetry/metrics",
+        "//include/telemetry/otel",
+        "//include/telemetry/tracing",
+    ],
+)

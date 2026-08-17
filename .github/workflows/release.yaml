@@ -34,7 +34,7 @@ jobs:
           python-version: '3.12'
 
       - name: Build sdist and wheel
-        working-directory: ./opentelementry-py
+        working-directory: ./telemetry-py
         run: |
           pip install build
           python -m build
@@ -43,7 +43,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: python-dist
-          path: opentelementry-py/dist/*
+          path: telemetry-py/dist/*
 
       # Opt-in: publishes to PyPI only when a PYPI_API_TOKEN secret is configured.
       - name: Publish to PyPI
@@ -51,7 +51,7 @@ jobs:
         uses: pypa/gh-action-pypi-publish@release/v1
         with:
           password: ${{ env.PYPI_API_TOKEN }}
-          packages-dir: opentelementry-py/dist
+          packages-dir: telemetry-py/dist
 
   build-cpp:
     name: Build C++ artifact
@@ -68,22 +68,22 @@ jobs:
           repository-cache: true
 
       - name: Build release library
-        working-directory: ./opentelementry-cpp
-        run: bazel build -c opt //src:opentelementry
+        working-directory: ./telemetry-cpp
+        run: bazel build -c opt //src:telemetry
 
       - name: Package headers and static library
-        working-directory: ./opentelementry-cpp
+        working-directory: ./telemetry-cpp
         run: |
-          mkdir -p dist/opentelementry-cpp
-          cp -r include dist/opentelementry-cpp/
-          cp bazel-bin/src/libopentelementry.a dist/opentelementry-cpp/
-          tar -czf dist/opentelementry-cpp.tar.gz -C dist opentelementry-cpp
+          mkdir -p dist/telemetry-cpp
+          cp -r include dist/telemetry-cpp/
+          cp bazel-bin/src/libtelemetry.a dist/telemetry-cpp/
+          tar -czf dist/telemetry-cpp.tar.gz -C dist telemetry-cpp
 
       - name: Upload C++ artifact
         uses: actions/upload-artifact@v4
         with:
           name: cpp-dist
-          path: opentelementry-cpp/dist/opentelementry-cpp.tar.gz
+          path: telemetry-cpp/dist/telemetry-cpp.tar.gz
 
   package-rust:
     name: Package Rust crate
@@ -98,23 +98,23 @@ jobs:
         uses: dtolnay/rust-toolchain@stable
 
       - name: Verify crates package cleanly
-        working-directory: ./opentelementry-rs
-        run: cargo package -p opentelementry-derive -p opentelementry --no-verify
+        working-directory: ./telemetry-rs
+        run: cargo package -p telemetry-derive -p telemetry --no-verify
 
       - name: Upload crate artifacts
         uses: actions/upload-artifact@v4
         with:
           name: rust-dist
-          path: opentelementry-rs/target/package/*.crate
+          path: telemetry-rs/target/package/*.crate
 
       # Opt-in: publishes to crates.io only when a CARGO_REGISTRY_TOKEN secret is configured.
       # Order matters — the derive crate must be published before the crates that depend on it.
       - name: Publish to crates.io
         if: ${{ startsWith(github.ref, 'refs/tags/') && env.CARGO_REGISTRY_TOKEN != '' }}
-        working-directory: ./opentelementry-rs
+        working-directory: ./telemetry-rs
         run: |
-          cargo publish -p opentelementry-derive
-          cargo publish -p opentelementry
+          cargo publish -p telemetry-derive
+          cargo publish -p telemetry
 
   build-docker:
     name: Build & push observability image (GHCR)

@@ -1,0 +1,42 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "telemetry-py"
+version = "1.0.1"
+description = "Unified observability framework with logging, metrics, and tracing"
+readme = "README.md"
+requires-python = ">=3.12,<3.15"
+dependencies = [
+    "logbook>=1.9.2",
+    "mcap>=1.3.1",
+    "protobuf>=5.0,<8.0",
+    "opentelemetry-sdk>=1.41.0",
+    "opentelemetry-exporter-otlp-proto-grpc>=1.41.0",
+    "pydantic>=2.12.5",
+    "dynaconf>=3.2.13",
+]
+
+[tool.hatch.build.targets.wheel]
+packages = ["telemetry"]
+
+[tool.ruff]
+target-version = "py312"
+
+[tool.ruff.lint]
+# Kept in sync with .pre-commit-config.yaml and .github/workflows/linter.yaml so
+# local, pre-commit and CI all enforce the same set.
+select = ["E", "F", "W", "I", "UP", "B", "N"]
+ignore = [
+    # `ruff format` is authoritative for code line width. The remaining E501s are
+    # docstring prose, comments and f-strings the formatter cannot split, so the
+    # rule only produces noise it has no way to fix.
+    "E501",
+]
+
+[tool.ruff.lint.per-file-ignores]
+# Counter/Histogram/Gauge are deliberately capitalized field helpers, and the
+# lowercase names are already taken by the distinct name-required decorators in
+# the same module. Renaming either one collapses two separate public APIs.
+"telemetry/_private/metrics/decorators.py" = ["N802"]

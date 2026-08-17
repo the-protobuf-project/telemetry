@@ -2,7 +2,7 @@
 extends: default
 
 ignore:
-  - opentelementry-core/deploy/production/envoy/
+  - telemetry-core/deploy/production/envoy/
   - docker/envoy/
 
 rules:

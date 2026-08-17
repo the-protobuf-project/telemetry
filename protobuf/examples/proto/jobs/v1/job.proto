@@ -7,10 +7,10 @@ import "google/api/resource.proto";
 import "telemetry/v1/annotations.proto";
 
 // jobs.v1 is a small, self-contained example schema — not a BSR-published
-// module — that exists solely to drive opentelementry-go/examples/telemetry:
+// module — that exists solely to drive telemetry-go/examples/telemetry:
 // a minimal, realistic proto → protoc-gen-telemetry → generated Go →
 // runtime-go/telemetry pipeline, checked in and runnable end to end.
-option go_package = "github.com/the-protobuf-project/opentelementry/opentelementry-go/examples/telemetry/gen/jobs/v1/jobsv1;jobsv1";
+option go_package = "github.com/the-protobuf-project/telemetry/telemetry-go/examples/telemetry/gen/jobs/v1/jobsv1;jobsv1";
 option java_multiple_files = true;
 option java_outer_classname = "JobProto";
 option java_package = "com.jobs.v1";

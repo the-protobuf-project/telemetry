@@ -3,11 +3,11 @@ bomb
 credentials
 .DS_Store
 *.config.json
-opentelementry-rs/target
+telemetry-rs/target
 coverage
 __pycache__
 .env
 *.mcap
 build
 .terraform*
-opentelementry.toml
+telemetry.toml

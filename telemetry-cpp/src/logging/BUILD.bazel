@@ -1,0 +1,14 @@
+load("@rules_cc//cc:defs.bzl", "cc_library")
+
+cc_library(
+    name = "logging",
+    srcs = ["logger.cpp"],
+    implementation_deps = [
+        "//include/telemetry/logging",
+        "//include/telemetry/mcap",
+        "//include/telemetry/otel",
+        "@opentelemetry-cpp//api",
+    ],
+    strip_include_prefix = "/include",
+    visibility = ["//visibility:public"],
+)

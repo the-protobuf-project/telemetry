@@ -26,17 +26,17 @@ jobs:
         go-version: ['1.26']
 
     steps:
-      - name: Check out opentelementry
+      - name: Check out telemetry
         uses: actions/checkout@v6
         with:
-          path: opentelementry
+          path: telemetry
 
-      # opentelementry-go/go.mod has a local `replace` for
+      # telemetry-go/go.mod has a local `replace` for
       # runtime-go/telemetry (the Meter contract protoc-gen-telemetry's
       # generated code, and this SDK's Meter() adapter, bind to — not
       # published yet), pointing at ../../runtime-go/telemetry relative to
-      # opentelementry-go. CI checks it out as a true sibling of the
-      # `opentelementry` repo to match local development. Drop this checkout
+      # telemetry-go. CI checks it out as a true sibling of the
+      # `telemetry` repo to match local development. Drop this checkout
       # (and the go.mod replace) once runtime-go/telemetry is published.
       - name: Check out runtime-go (for the runtime-go/telemetry replace)
         uses: actions/checkout@v6
@@ -55,41 +55,41 @@ jobs:
           path: |
             ~/.cache/go-build
             ~/go/pkg/mod
-          key: ${{ runner.os }}-go-${{ hashFiles('opentelementry/opentelementry-go/go.sum') }}
+          key: ${{ runner.os }}-go-${{ hashFiles('telemetry/telemetry-go/go.sum') }}
           restore-keys: |
             ${{ runner.os }}-go-
 
       - name: Download dependencies
-        working-directory: opentelementry/opentelementry-go
+        working-directory: telemetry/telemetry-go
         run: go mod download
 
       - name: Verify go.mod is tidy
-        working-directory: opentelementry/opentelementry-go
+        working-directory: telemetry/telemetry-go
         run: |
           go mod tidy
           git diff --exit-code go.mod go.sum
 
       - name: Build
-        working-directory: opentelementry/opentelementry-go
+        working-directory: telemetry/telemetry-go
         run: go build -v ./...
 
       - name: Vet
-        working-directory: opentelementry/opentelementry-go
+        working-directory: telemetry/telemetry-go
         run: go vet ./...
 
       - name: Run tests
-        working-directory: opentelementry/opentelementry-go
+        working-directory: telemetry/telemetry-go
         run: go test -v -race ./...
 
       # examples/telemetry is its own isolated module (see its go.mod) so its
       # dependency graph never touches the root module's — verified
       # separately for the same reason it's isolated in the first place.
       - name: Build examples/telemetry (isolated module)
-        working-directory: opentelementry/opentelementry-go/examples/telemetry
+        working-directory: telemetry/telemetry-go/examples/telemetry
         run: go build -v ./...
 
       - name: Vet examples/telemetry
-        working-directory: opentelementry/opentelementry-go/examples/telemetry
+        working-directory: telemetry/telemetry-go/examples/telemetry
         run: go vet ./...
 
   test-proto:
@@ -109,7 +109,7 @@ jobs:
       - name: Generated stubs up to date
         run: |
           buf generate --template buf.gen.yaml
-          if ! git diff --exit-code -- opentelementry-go/protobuf/; then
+          if ! git diff --exit-code -- telemetry-go/protobuf/; then
             echo "::error::stale protobuf stubs — rerun buf generate and commit"
             exit 1
           fi
@@ -120,7 +120,7 @@ jobs:
           go-version: '1.26'
 
       - name: Build protoc-gen-telemetry
-        working-directory: opentelementry-go
+        working-directory: telemetry-go
         run: go build -o bin/protoc-gen-telemetry ./plugin/cmd/protoc-gen-telemetry
 
       - name: Example schema generates cleanly
@@ -149,17 +149,17 @@ jobs:
             ~/.cargo/registry/index/
             ~/.cargo/registry/cache/
             ~/.cargo/git/db/
-            opentelementry-rs/target/
+            telemetry-rs/target/
           key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
           restore-keys: |
             ${{ runner.os }}-cargo-
 
       - name: Build
-        working-directory: ./opentelementry-rs
+        working-directory: ./telemetry-rs
         run: cargo build --all-targets --all-features --verbose
 
       - name: Run tests
-        working-directory: ./opentelementry-rs
+        working-directory: ./telemetry-rs
         run: cargo test --all-features --verbose
 
   build-python:
@@ -180,11 +180,11 @@ jobs:
           python-version: ${{ matrix.python-version }}
 
       - name: Install package
-        working-directory: ./opentelementry-py
+        working-directory: ./telemetry-py
         run: pip install .
 
       - name: Import smoke test
-        run: python -c "import opentelementry; print('opentelementry', opentelementry.__all__)"
+        run: python -c "import telemetry; print('telemetry', telemetry.__all__)"
 
   build-cpp:
     name: Build C++ SDK
@@ -202,7 +202,7 @@ jobs:
           repository-cache: true
 
       - name: Build library and examples
-        working-directory: ./opentelementry-cpp
+        working-directory: ./telemetry-cpp
         run: bazel build //...
 
   docker-compose:
@@ -214,22 +214,22 @@ jobs:
         uses: actions/checkout@v6
 
       - name: Validate docker-compose.yaml
-        working-directory: ./opentelementry-core
+        working-directory: ./telemetry-core
         run: docker compose config
 
       - name: Start observability stack
-        working-directory: ./opentelementry-core
+        working-directory: ./telemetry-core
         run: |
           docker compose up -d
           sleep 30
 
       - name: Check service health
-        working-directory: ./opentelementry-core
+        working-directory: ./telemetry-core
         run: |
           docker compose ps
           docker compose logs
 
       - name: Stop services
-        working-directory: ./opentelementry-core
+        working-directory: ./telemetry-core
         if: always()
         run: docker compose down -v

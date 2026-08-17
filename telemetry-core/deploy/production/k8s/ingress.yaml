@@ -1,0 +1,146 @@
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: telemetry-ingress
+  namespace: telemetry
+  annotations:
+    kubernetes.io/ingress.class: "alb"
+    alb.ingress.kubernetes.io/scheme: "internet-facing"
+    alb.ingress.kubernetes.io/target-type: "ip"
+    alb.ingress.kubernetes.io/listen-ports: '[{"HTTP": 80}, {"HTTPS": 443}]'
+    alb.ingress.kubernetes.io/ssl-redirect: "443"
+    alb.ingress.kubernetes.io/certificate-arn: "${ACM_CERTIFICATE_ARN}"
+    alb.ingress.kubernetes.io/healthcheck-path: "/api/health"
+    alb.ingress.kubernetes.io/healthcheck-interval-seconds: "15"
+    alb.ingress.kubernetes.io/healthcheck-timeout-seconds: "5"
+    alb.ingress.kubernetes.io/healthy-threshold-count: "2"
+    alb.ingress.kubernetes.io/unhealthy-threshold-count: "2"
+    # Basic auth via ALB (optional - Grafana has its own auth)
+    # alb.ingress.kubernetes.io/auth-type: "cognito"
+spec:
+  ingressClassName: alb
+  rules:
+    - host: telemetry.the-protobuf-project.dev
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: grafana
+                port:
+                  number: 3000
+  tls:
+    - hosts:
+        - telemetry.the-protobuf-project.dev
+      secretName: tls-secret
+---
+# Alternative: Nginx Ingress with basic auth
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: telemetry-ingress-nginx
+  namespace: telemetry
+  annotations:
+    kubernetes.io/ingress.class: "nginx"
+    nginx.ingress.kubernetes.io/ssl-redirect: "true"
+    nginx.ingress.kubernetes.io/auth-type: basic
+    nginx.ingress.kubernetes.io/auth-secret: telemetry-secrets
+    nginx.ingress.kubernetes.io/auth-realm: "Telemetry Telemetry - Authentication Required"
+    cert-manager.io/cluster-issuer: "letsencrypt-prod"
+spec:
+  ingressClassName: nginx
+  rules:
+    - host: telemetry.the-protobuf-project.dev
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: grafana
+                port:
+                  number: 3000
+          - path: /prometheus
+            pathType: Prefix
+            backend:
+              service:
+                name: prometheus
+                port:
+                  number: 9090
+          - path: /alertmanager
+            pathType: Prefix
+            backend:
+              service:
+                name: alertmanager
+                port:
+                  number: 9093
+  tls:
+    - hosts:
+        - telemetry.the-protobuf-project.dev
+      secretName: telemetry-tls
+---
+# OTLP Ingress for otel.the-protobuf-project.dev
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: otel-ingress
+  namespace: telemetry
+  annotations:
+    kubernetes.io/ingress.class: "alb"
+    alb.ingress.kubernetes.io/scheme: "internet-facing"
+    alb.ingress.kubernetes.io/target-type: "ip"
+    alb.ingress.kubernetes.io/listen-ports: '[{"HTTPS": 443}]'
+    alb.ingress.kubernetes.io/certificate-arn: "${ACM_CERTIFICATE_ARN}"
+    alb.ingress.kubernetes.io/healthcheck-path: "/"
+    alb.ingress.kubernetes.io/healthcheck-port: "13133"
+    alb.ingress.kubernetes.io/backend-protocol: "HTTP"
+spec:
+  ingressClassName: alb
+  rules:
+    - host: otel.the-protobuf-project.dev
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: otel-collector
+                port:
+                  number: 4318
+  tls:
+    - hosts:
+        - otel.the-protobuf-project.dev
+      secretName: otel-tls-secret
+---
+# Nginx Ingress alternative for OTLP
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: otel-ingress-nginx
+  namespace: telemetry
+  annotations:
+    kubernetes.io/ingress.class: "nginx"
+    nginx.ingress.kubernetes.io/ssl-redirect: "true"
+    nginx.ingress.kubernetes.io/backend-protocol: "HTTP"
+    nginx.ingress.kubernetes.io/proxy-body-size: "50m"
+    nginx.ingress.kubernetes.io/proxy-read-timeout: "300"
+    nginx.ingress.kubernetes.io/proxy-send-timeout: "300"
+    cert-manager.io/cluster-issuer: "letsencrypt-prod"
+spec:
+  ingressClassName: nginx
+  rules:
+    - host: otel.the-protobuf-project.dev
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: otel-collector
+                port:
+                  number: 4318
+  tls:
+    - hosts:
+        - otel.the-protobuf-project.dev
+      secretName: otel-tls

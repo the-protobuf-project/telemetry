@@ -1,0 +1,17 @@
+load("@rules_cc//cc:defs.bzl", "cc_library")
+
+cc_library(
+    name = "otel",
+    hdrs = ["exporter.hpp"],
+    strip_include_prefix = "/include",
+    visibility = ["//visibility:public"],
+    deps = [
+        "//include/telemetry:core",
+        "@opentelemetry-cpp//api",
+        "@opentelemetry-cpp//exporters/otlp:otlp_http_exporter",
+        "@opentelemetry-cpp//exporters/otlp:otlp_http_log_record_exporter",
+        "@opentelemetry-cpp//exporters/otlp:otlp_http_metric_exporter",
+        "@opentelemetry-cpp//sdk:headers",
+        "@opentelemetry-cpp//sdk/src/resource",
+    ],
+)

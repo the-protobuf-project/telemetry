@@ -1,9 +1,9 @@
 version: v2
 
 # This buf.yaml defines a two-module workspace:
-#   protobuf/       — the publishable BSR module (buf.build/the-protobuf-project/opentelementry)
+#   protobuf/       — the publishable BSR module (buf.build/the-protobuf-project/telemetry)
 #   examples/proto/ — a sample schema annotated with telemetry.v1, driving the
-#                     runnable example under opentelementry-go/examples/telemetry
+#                     runnable example under telemetry-go/examples/telemetry
 #                     (local only)
 #
 # Only protobuf/ has a BSR name, so publish it with:
@@ -11,7 +11,7 @@ version: v2
 # A bare `buf push` errors on the unnamed examples/proto module.
 modules:
   - path: protobuf
-    name: buf.build/the-protobuf-project/opentelementry
+    name: buf.build/the-protobuf-project/telemetry
     excludes:
       - protobuf/examples/proto
       # protobuf/examples/proto is carved out into its own module below so it

@@ -1,6 +1,6 @@
-name: "opentelementry-env"
+name: "telemetry-env"
 include:
-  - ../opentelementry-core/compose.yaml
+  - ../telemetry-core/compose.yaml
 
 services:
   devcontainer:
@@ -9,7 +9,7 @@ services:
       dockerfile: .devcontainer/Dockerfile
     volumes:
       - ..:/workspace:cached
-      - opentelementry-build-cache:/home/developer/.cache
+      - telemetry-build-cache:/home/developer/.cache
       - ${HOME}/.ssh:/home/developer/.ssh
       - ${HOME}/.aws:/home/developer/.aws
     network_mode: host
@@ -21,4 +21,4 @@ services:
       - seccomp:unconfined
 
 volumes:
-  opentelementry-build-cache:
+  telemetry-build-cache:

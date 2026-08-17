@@ -24,11 +24,10 @@ Typical usage example:
 """
 
 from dataclasses import dataclass, field
-from enum import Enum, IntEnum
-from typing import Dict, Optional
+from enum import IntEnum, StrEnum
 
 
-class Environment(str, Enum):
+class Environment(StrEnum):
     """Deployment environment enumeration.
 
     Defines the possible deployment environments for a service.
@@ -135,7 +134,7 @@ class LoggingOptions:
     enabled: bool = True
     level: str = "INFO"
     module_level: LogLevel = LogLevel.UNSET
-    modules: Dict[str, ModuleOptions] = field(default_factory=dict)
+    modules: dict[str, ModuleOptions] = field(default_factory=dict)
 
 
 @dataclass
@@ -221,7 +220,7 @@ class ServiceOptions:
     description: str = ""
     version: str = "1.0.0"
     environment: Environment = Environment.DEVELOPMENT
-    labels: Dict[str, str] = field(default_factory=dict)
+    labels: dict[str, str] = field(default_factory=dict)
 
 
 @dataclass
@@ -239,23 +238,23 @@ class TelemetryOptions:
 
     telemetry: OpenTelemetryOptions = field(default_factory=OpenTelemetryOptions)
     foxglove: FoxgloveOptions = field(default_factory=FoxgloveOptions)
-    logging: Optional[LoggingOptions] = None
-    tracing: Optional[TracingOptions] = None
+    logging: LoggingOptions | None = None
+    tracing: TracingOptions | None = None
 
 
 def from_config(
-    config_path: Optional[str] = None,
+    config_path: str | None = None,
 ) -> tuple[ServiceOptions, TelemetryOptions]:
     """
     Load service and telemetry settings from the configured source.
-    
+
     Parameters:
-    	config_path (Optional[str]): Path to a configuration file. When omitted, uses the configuration subsystem's auto-discovered settings.
-    
+        config_path (Optional[str]): Path to a configuration file. When omitted, uses the configuration subsystem's auto-discovered settings.
+
     Returns:
-    	tuple[ServiceOptions, TelemetryOptions]: Service metadata and top-level telemetry configuration.
+        tuple[ServiceOptions, TelemetryOptions]: Service metadata and top-level telemetry configuration.
     """
-    from .config import settings, load_config
+    from .config import load_config, settings
 
     # Load config (uses auto-discovery or specified path)
     if config_path:
@@ -310,7 +309,7 @@ def from_config(
         module_level = LogLevel.UNSET
 
     # Parse per-module overrides from [logging.modules.<name>]
-    module_overrides: Dict[str, ModuleOptions] = {}
+    module_overrides: dict[str, ModuleOptions] = {}
     raw_modules = cfg.get("logging.modules", {})
     if isinstance(raw_modules, dict):
         for module_name, module_cfg in raw_modules.items():

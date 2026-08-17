@@ -1,25 +1,23 @@
-from typing import Optional, Dict
-
-from .options import (
-    ServiceOptions,
-    TelemetryOptions,
-    Environment,
-    LogLevel,
-    ModuleOptions,
-    from_config,
-)
+from ._private.foxglove import UnifiedMcapWriter
 from ._private.logging import TelemetryLogger
 from ._private.metrics import (
     TelemetryMetrics,
-    set_current_telemetry_metrics,
     reset_current_telemetry_metrics,
+    set_current_telemetry_metrics,
 )
 from ._private.tracing import (
     TelemetryTracing,
-    set_current_telemetry,
     reset_current_telemetry,
+    set_current_telemetry,
 )
-from ._private.foxglove import UnifiedMcapWriter
+from .options import (
+    Environment,
+    LogLevel,
+    ModuleOptions,
+    ServiceOptions,
+    TelemetryOptions,
+    from_config,
+)
 
 
 class TelemetryBuilder:
@@ -40,19 +38,19 @@ class TelemetryBuilder:
     """
 
     def __init__(self):
-        self._config_path: Optional[str] = None
-        self._name: Optional[str] = None
-        self._version: Optional[str] = None
-        self._description: Optional[str] = None
-        self._environment: Optional[Environment] = None
-        self._labels: Dict[str, str] = {}
-        self._otlp_endpoint: Optional[str] = None
-        self._otlp_auth_token: Optional[str] = None
-        self._otlp_secure: Optional[bool] = None
-        self._otlp_use_http: Optional[bool] = None
-        self._mcap_path: Optional[str] = None
+        self._config_path: str | None = None
+        self._name: str | None = None
+        self._version: str | None = None
+        self._description: str | None = None
+        self._environment: Environment | None = None
+        self._labels: dict[str, str] = {}
+        self._otlp_endpoint: str | None = None
+        self._otlp_auth_token: str | None = None
+        self._otlp_secure: bool | None = None
+        self._otlp_use_http: bool | None = None
+        self._mcap_path: str | None = None
         self._tracing_enabled: bool = False
-        self._log_level: Optional[LogLevel] = None
+        self._log_level: LogLevel | None = None
         self._service_from_code: bool = False
 
     def with_config(self, config_path: str) -> "TelemetryBuilder":
@@ -87,7 +85,7 @@ class TelemetryBuilder:
         self._labels[key] = value
         return self
 
-    def with_labels(self, labels: Dict[str, str]) -> "TelemetryBuilder":
+    def with_labels(self, labels: dict[str, str]) -> "TelemetryBuilder":
         """Add multiple custom labels to all telemetry."""
         self._labels.update(labels)
         return self
@@ -109,12 +107,12 @@ class TelemetryBuilder:
 
     def with_otlp_secure(self, secure: bool = True) -> "TelemetryBuilder":
         """Configure whether the OTLP connection uses TLS.
-        
+
         Parameters:
-        	secure (bool): Whether to enable TLS for the OTLP connection.
-        
+                secure (bool): Whether to enable TLS for the OTLP connection.
+
         Returns:
-        	TelemetryBuilder: This builder instance.
+                TelemetryBuilder: This builder instance.
         """
         self._otlp_secure = secure
         return self
@@ -132,7 +130,7 @@ class TelemetryBuilder:
     def with_log_level(self, level: LogLevel) -> "TelemetryBuilder":
         """
         Set the log level for the telemetry service.
-        
+
         Returns:
             TelemetryBuilder: The builder with the specified log level configured.
         """
@@ -147,9 +145,9 @@ class TelemetryBuilder:
     def build(self) -> "Telemetry":
         """
         Build a Telemetry instance from configuration and builder overrides.
-        
+
         Returns:
-        	Telemetry: The configured telemetry instance.
+                Telemetry: The configured telemetry instance.
         """
         # Load config from file (auto-discovery or specified path)
         service_opts, telemetry_opts = from_config(self._config_path)
@@ -237,7 +235,7 @@ class Telemetry:
 
     def __init__(self, service_opts: ServiceOptions, telemetry_opts: TelemetryOptions):
         """Initialize telemetry logging, metrics, tracing, and optional MCAP recording.
-        
+
         Parameters:
             service_opts (ServiceOptions): Service identity and related service settings.
             telemetry_opts (TelemetryOptions): Logging, metrics, tracing, OTLP, and MCAP configuration.
@@ -246,7 +244,7 @@ class Telemetry:
         self.telemetry_opts = telemetry_opts
 
         # Initialize unified MCAP writer if enabled
-        self.mcap_writer: Optional[UnifiedMcapWriter] = None
+        self.mcap_writer: UnifiedMcapWriter | None = None
         if telemetry_opts.foxglove.enabled and telemetry_opts.foxglove.mcap_path:
             self.mcap_writer = UnifiedMcapWriter(
                 mcap_path=telemetry_opts.foxglove.mcap_path,
@@ -286,9 +284,9 @@ class Telemetry:
     def __enter__(self):
         """
         Enter the telemetry context and make this instance current for telemetry and metrics operations.
-        
+
         Returns:
-        	Telemetry: This telemetry instance.
+                Telemetry: This telemetry instance.
         """
         self._telemetry_token = set_current_telemetry(self)
         self._metrics_token = set_current_telemetry_metrics(self)
@@ -297,9 +295,9 @@ class Telemetry:
     def __exit__(self, exc_type, exc_val, exc_tb):
         """
         Exit the telemetry context and release its resources.
-        
+
         Returns:
-        	bool: `False` so exceptions raised within the context propagate.
+                bool: `False` so exceptions raised within the context propagate.
         """
         reset_current_telemetry_metrics(self._metrics_token)
         reset_current_telemetry(self._telemetry_token)

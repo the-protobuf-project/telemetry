@@ -5,7 +5,7 @@ Run from this directory:
     python example.py
 """
 
-from telemetry import Telemetry, LogLevel
+from telemetry import LogLevel, Telemetry
 
 
 def main():
@@ -14,7 +14,7 @@ def main():
     # ========================================
     """
     Demonstrate per-module logging-level configuration and its priority order.
-    
+
     Creates telemetry services with different module-level settings and emits messages at multiple severities to show how environment variables, TOML configuration, code-level settings, and global defaults determine log visibility.
     """
     core = Telemetry.new().with_service("robot-core", "1.0.0").build()

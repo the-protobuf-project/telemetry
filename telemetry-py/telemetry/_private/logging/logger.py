@@ -2,19 +2,21 @@
 Main logging client integrating logbook, OTLP, and MCAP.
 """
 
-from typing import Dict, Any, Optional
-from logbook import Logger as LogbookLogger, StderrHandler
+from typing import Any
+
+from logbook import Logger as LogbookLogger
+from logbook import StderrHandler
 
 from ...options import (
-    ServiceOptions,
-    LoggingOptions,
-    OTLPOptions,
     Environment,
+    LoggingOptions,
     LogLevel,
+    OTLPOptions,
+    ServiceOptions,
 )
-from .formatter import get_custom_formatter, format_data, get_caller_info, _caller_info
-from .otlp import OTLPLogger
+from .formatter import _caller_info, format_data, get_caller_info, get_custom_formatter
 from .mcap import MCAPLogger
+from .otlp import OTLPLogger
 
 
 class TelemetryLogger:
@@ -31,7 +33,7 @@ class TelemetryLogger:
         self,
         service_opts: ServiceOptions,
         logging_opts: LoggingOptions,
-        otlp_opts: Optional[OTLPOptions] = None,
+        otlp_opts: OTLPOptions | None = None,
         mcap_writer=None,
     ):
         self.service_opts = service_opts
@@ -78,7 +80,7 @@ class TelemetryLogger:
     @staticmethod
     def _log_level_to_logbook(level: LogLevel):
         """Convert a telemetry LogLevel to a logbook log level."""
-        from logbook import DEBUG, INFO, ERROR
+        from logbook import DEBUG, ERROR, INFO
 
         if level == LogLevel.MODULE_LEVEL_1:
             return ERROR
@@ -122,7 +124,7 @@ class TelemetryLogger:
 
         return level
 
-    def debug(self, message: str, data: Optional[Dict[str, Any]] = None):
+    def debug(self, message: str, data: dict[str, Any] | None = None):
         """Log debug message"""
         caller_file, caller_line = get_caller_info()
         _caller_info.file, _caller_info.line = caller_file, caller_line
@@ -134,7 +136,7 @@ class TelemetryLogger:
         if self.mcap_logger:
             self.mcap_logger.write_log("DEBUG", message, data)
 
-    def info(self, message: str, data: Optional[Dict[str, Any]] = None):
+    def info(self, message: str, data: dict[str, Any] | None = None):
         """Log info message"""
         caller_file, caller_line = get_caller_info()
         _caller_info.file, _caller_info.line = caller_file, caller_line
@@ -146,7 +148,7 @@ class TelemetryLogger:
         if self.mcap_logger:
             self.mcap_logger.write_log("INFO", message, data)
 
-    def warning(self, message: str, data: Optional[Dict[str, Any]] = None):
+    def warning(self, message: str, data: dict[str, Any] | None = None):
         """Log warning message"""
         caller_file, caller_line = get_caller_info()
         _caller_info.file, _caller_info.line = caller_file, caller_line
@@ -160,7 +162,7 @@ class TelemetryLogger:
         if self.mcap_logger:
             self.mcap_logger.write_log("WARNING", message, data)
 
-    def error(self, message: str, data: Optional[Dict[str, Any]] = None):
+    def error(self, message: str, data: dict[str, Any] | None = None):
         """Log error message"""
         caller_file, caller_line = get_caller_info()
         _caller_info.file, _caller_info.line = caller_file, caller_line
@@ -172,7 +174,7 @@ class TelemetryLogger:
         if self.mcap_logger:
             self.mcap_logger.write_log("ERROR", message, data)
 
-    def critical(self, message: str, data: Optional[Dict[str, Any]] = None):
+    def critical(self, message: str, data: dict[str, Any] | None = None):
         """Log critical message"""
         caller_file, caller_line = get_caller_info()
         _caller_info.file, _caller_info.line = caller_file, caller_line

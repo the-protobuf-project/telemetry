@@ -22,14 +22,16 @@ Typical usage example:
         return "processed"
 """
 
-from pydantic import BaseModel, Field
-from typing import Any, Callable, Optional, Dict
 import functools
 import time
+from collections.abc import Callable
 from contextvars import ContextVar
+from typing import Any
+
+from pydantic import BaseModel, Field
 
 # Global context variable to store the current Telemetry instance
-_current_telemetry_metrics: ContextVar[Optional[Any]] = ContextVar(
+_current_telemetry_metrics: ContextVar[Any | None] = ContextVar(
     "current_telemetry_metrics", default=None
 )
 
@@ -62,7 +64,7 @@ def counter(name: str, description: str = "") -> Any:
 
 
 def histogram(
-    name: str, description: str = "", buckets: Optional[list[float]] = None
+    name: str, description: str = "", buckets: list[float] | None = None
 ) -> Any:
     """Decorator for histogram metric fields.
 
@@ -120,24 +122,24 @@ def gauge(name: str, description: str = "") -> Any:
 
 
 def metric(
-    name: Optional[str] = None,
+    name: str | None = None,
     metric_type: str = "counter",
-    labels: Optional[Dict[str, Any]] = None,
+    labels: dict[str, Any] | None = None,
     record_duration: bool = False,
 ):
     """
     Create a decorator that records metrics for function execution.
-    
+
     Parameters:
         name (Optional[str]): Metric name; defaults to the decorated function's name.
         metric_type (str): Metric type: ``"counter"``, ``"histogram"``, or ``"gauge"``.
         labels (Optional[Dict[str, Any]]): Labels to attach to recorded metrics.
         record_duration (bool): Whether to record execution duration as a histogram.
-    
+
     Returns:
         Callable: A decorator that records the configured metrics and preserves the
         decorated function's return value.
-    
+
     Raises:
         Exception: Re-raises exceptions from the decorated function after recording
             an error metric.
@@ -146,10 +148,10 @@ def metric(
     def decorator(func: Callable) -> Callable:
         """
         Decorate a function to record execution metrics.
-        
+
         Parameters:
             func (Callable): Function whose execution metrics are recorded.
-        
+
         Returns:
             Callable: Wrapped function that preserves the original behavior while recording configured metrics.
         """
@@ -159,10 +161,10 @@ def metric(
         def wrapper(*args, **kwargs):
             """
             Execute the wrapped function and record configured telemetry metrics.
-            
+
             Returns:
                 The wrapped function's result.
-            
+
             Raises:
                 Exception: Re-raises exceptions from the wrapped function after recording an error metric.
             """
@@ -283,13 +285,13 @@ def reset_current_telemetry_metrics(token):
 
 
 # Capitalized field helpers for cleaner syntax
-def Counter(name: Optional[str] = None, description: str = "") -> Any:
+def Counter(name: str | None = None, description: str = "") -> Any:
     """Define a counter metric field with an optional name.
-    
+
     Parameters:
         name (Optional[str]): Metric name; inferred from the model field name when omitted.
         description (str): Human-readable description of the metric.
-    
+
     Returns:
         Any: A Pydantic field configured with counter metric metadata.
     """
@@ -305,18 +307,18 @@ def Counter(name: Optional[str] = None, description: str = "") -> Any:
 
 
 def Histogram(
-    name: Optional[str] = None,
+    name: str | None = None,
     description: str = "",
-    buckets: Optional[list[float]] = None,
+    buckets: list[float] | None = None,
 ) -> Any:
     """
     Create a histogram metric field with optional name inference.
-    
+
     Args:
         name: Optional metric name; inferred from the model field when omitted.
         description: Human-readable description of the metric.
         buckets: Optional explicit histogram bucket boundaries.
-    
+
     Returns:
         A Pydantic field configured with histogram metric metadata.
     """
@@ -331,7 +333,7 @@ def Histogram(
     )
 
 
-def Gauge(name: Optional[str] = None, description: str = "") -> Any:
+def Gauge(name: str | None = None, description: str = "") -> Any:
     """Gauge field helper with automatic name inference.
 
     Args:
@@ -380,14 +382,14 @@ class MetricsBaseModel(BaseModel):
             # Generates: "custom.count"
     """
 
-    _metric_prefix: Optional[str] = None
+    _metric_prefix: str | None = None
 
-    def __init_subclass__(cls, prefix: Optional[str] = None, **kwargs):
+    def __init_subclass__(cls, prefix: str | None = None, **kwargs):
         """Called when a class inherits from MetricsBaseModel."""
         super().__init_subclass__(**kwargs)
         cls._metric_prefix = prefix
 
-    def _resolve_metric_names(self, service_name: Optional[str] = None):
+    def _resolve_metric_names(self, service_name: str | None = None):
         """Resolve metric names with appropriate prefix.
 
         Args:

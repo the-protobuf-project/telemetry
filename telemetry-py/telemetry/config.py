@@ -32,7 +32,8 @@ Example telemetry.toml:
 
 import os as _os
 from pathlib import Path
-from typing import Optional, Dict, Any
+from typing import Any
+
 from dynaconf import Dynaconf, Validator
 
 
@@ -40,7 +41,7 @@ from dynaconf import Dynaconf, Validator
 def _find_config_files() -> list[str]:
     """
     Find the first available telemetry configuration file in the current directory or its `.config` subdirectory.
-    
+
     Returns:
         list[str]: A list containing the selected configuration file path, or an empty list when no supported file exists.
     """
@@ -124,14 +125,14 @@ settings = Dynaconf(
 )
 
 
-def load_config(config_path: Optional[str] = None) -> Dynaconf:
+def load_config(config_path: str | None = None) -> Dynaconf:
     """
     Load configuration from an explicit file or the auto-discovered configuration.
-    
+
     Parameters:
         config_path (Optional[str]): Path to a configuration file. When omitted,
             uses the global settings instance.
-    
+
     Returns:
         Dynaconf: The loaded configuration settings.
     """
@@ -148,7 +149,7 @@ def load_config(config_path: Optional[str] = None) -> Dynaconf:
     return settings
 
 
-def get_service_config() -> Dict[str, Any]:
+def get_service_config() -> dict[str, Any]:
     """Get service configuration as a dictionary."""
     return {
         "name": settings.get("service.name", "unnamed-service"),
@@ -159,7 +160,7 @@ def get_service_config() -> Dict[str, Any]:
     }
 
 
-def get_telemetry_config() -> Dict[str, Any]:
+def get_telemetry_config() -> dict[str, Any]:
     """Get telemetry configuration as a dictionary."""
     return {
         "enabled": settings.get("telemetry.enabled", True),
@@ -177,7 +178,7 @@ def get_telemetry_config() -> Dict[str, Any]:
     }
 
 
-def get_foxglove_config() -> Dict[str, Any]:
+def get_foxglove_config() -> dict[str, Any]:
     """Get Foxglove/MCAP configuration as a dictionary."""
     return {
         "enabled": settings.get("foxglove.enabled", False),
@@ -185,7 +186,7 @@ def get_foxglove_config() -> Dict[str, Any]:
     }
 
 
-def get_logging_config() -> Dict[str, Any]:
+def get_logging_config() -> dict[str, Any]:
     """Get logging configuration as a dictionary."""
     return {
         "report_caller": settings.get("logging.log.report_caller", True),
@@ -193,14 +194,14 @@ def get_logging_config() -> Dict[str, Any]:
     }
 
 
-def get_tracing_config() -> Dict[str, Any]:
+def get_tracing_config() -> dict[str, Any]:
     """Get tracing configuration as a dictionary."""
     return {
         "enabled": settings.get("tracing.enabled", True),
     }
 
 
-def get_profiling_config() -> Dict[str, Any]:
+def get_profiling_config() -> dict[str, Any]:
     """Get profiling configuration as a dictionary."""
     return {
         "enabled": settings.get("profiling.enabled", False),

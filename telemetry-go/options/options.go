@@ -7,11 +7,11 @@ package options
 // The options are defined as structs, which can be easily serialized to JSON
 // or other formats for configuration files.
 type TelemetryOptions struct {
-	Logging   LoggingOptions   `json:"logging"`   // Logging options for the service
-	Foxglove  FoxgloveOptions  `json:"foxglove"`  // Foxglove options for the service
+	Logging   LoggingOptions       `json:"logging"`   // Logging options for the service
+	Foxglove  FoxgloveOptions      `json:"foxglove"`  // Foxglove options for the service
 	Telemetry OpenTelemetryOptions `json:"telemetry"` // Unified telemetry options (OpenTelemetry-based)
-	Profiling ProfilingOptions `json:"profiling"` // Continuous profiling options (Pyroscope)
-	Tracing   TracingOptions   `json:"tracing"`   // Distributed tracing options
+	Profiling ProfilingOptions     `json:"profiling"` // Continuous profiling options (Pyroscope)
+	Tracing   TracingOptions       `json:"tracing"`   // Distributed tracing options
 	// Add more options as needed
 }
 

@@ -16,7 +16,7 @@ Typical usage example:
 """
 
 import time
-from typing import Dict, Any, Optional
+from typing import Any
 
 
 class MCAPLogger:
@@ -52,17 +52,15 @@ class MCAPLogger:
         self.service_version = service_version
         self.service_environment = service_environment
 
-    def write_log(
-        self, level: str, message: str, data: Optional[Dict[str, Any]] = None
-    ):
+    def write_log(self, level: str, message: str, data: dict[str, Any] | None = None):
         """
         Write a timestamped Foxglove log record with service metadata.
-        
+
         Args:
             level: Log severity.
             message: Log message text.
             data: Optional structured data to include in the record. Defaults to an empty dictionary.
-        
+
         Writes are skipped when the MCAP writer is unavailable or closed.
         """
         if self.mcap_writer and not self.mcap_writer.is_closed():

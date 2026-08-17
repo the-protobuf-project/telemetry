@@ -21,13 +21,14 @@ Typical usage example:
     otlp_logger.write_log("INFO", "User logged in", {"user_id": "123"})
 """
 
-from typing import Dict, Any, Optional
+import logging
+from typing import Any
+
+from opentelemetry._logs import get_logger_provider, set_logger_provider
+from opentelemetry.exporter.otlp.proto.grpc._log_exporter import OTLPLogExporter
 from opentelemetry.sdk._logs import LoggerProvider, LoggingHandler
 from opentelemetry.sdk._logs.export import BatchLogRecordProcessor
-from opentelemetry.exporter.otlp.proto.grpc._log_exporter import OTLPLogExporter
 from opentelemetry.sdk.resources import Resource
-from opentelemetry._logs import set_logger_provider, get_logger_provider
-import logging
 
 
 class OTLPLogger:
@@ -53,10 +54,10 @@ class OTLPLogger:
         auth_token: str = "",
         secure: bool = False,
         service_description: str = "",
-        service_labels: Dict[str, str] = None,
+        service_labels: dict[str, str] = None,
     ):
         """Configure an OpenTelemetry logger for a service.
-        
+
         Args:
             service_name: Name of the service.
             service_version: Version of the service.
@@ -135,10 +136,10 @@ class OTLPLogger:
     def _get_log_level_for_environment(self, environment: str) -> int:
         """
         Determine the logging level for a service environment.
-        
+
         Parameters:
             environment (str): Service environment name.
-        
+
         Returns:
             int: `logging.DEBUG` for development environments; `logging.INFO` otherwise.
         """
@@ -152,13 +153,13 @@ class OTLPLogger:
         self,
         level: str,
         message: str,
-        data: Optional[Dict[str, Any]],
+        data: dict[str, Any] | None,
         caller_file: str = "",
         caller_line: int = 0,
     ):
         """
         Emit a structured log entry for the configured service.
-        
+
         Parameters:
             level (str): Log severity name; unknown values use INFO.
             message (str): Log message text.
@@ -166,8 +167,8 @@ class OTLPLogger:
             caller_file (str): Source file path associated with the entry.
             caller_line (int): Source line number associated with the entry.
         """
-        import logging as std_logging
         import json
+        import logging as std_logging
 
         # Map logbook levels to standard logging levels
         level_map = {

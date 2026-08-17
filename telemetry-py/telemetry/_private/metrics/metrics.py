@@ -1,14 +1,14 @@
-from typing import Any, Dict, Optional
-from pydantic import BaseModel
 import time
+from typing import Any
 
 from opentelemetry import metrics
+from opentelemetry.exporter.otlp.proto.grpc.metric_exporter import OTLPMetricExporter
 from opentelemetry.sdk.metrics import MeterProvider
 from opentelemetry.sdk.metrics.export import PeriodicExportingMetricReader
-from opentelemetry.exporter.otlp.proto.grpc.metric_exporter import OTLPMetricExporter
 from opentelemetry.sdk.resources import Resource
+from pydantic import BaseModel
 
-from ...options import ServiceOptions, MetricsOptions, OTLPOptions
+from ...options import MetricsOptions, OTLPOptions, ServiceOptions
 from ..foxglove import UnifiedMcapWriter
 
 
@@ -26,8 +26,8 @@ class TelemetryMetrics:
         self,
         service_opts: ServiceOptions,
         metrics_opts: MetricsOptions,
-        otlp_opts: Optional[OTLPOptions] = None,
-        mcap_writer: Optional[UnifiedMcapWriter] = None,
+        otlp_opts: OTLPOptions | None = None,
+        mcap_writer: UnifiedMcapWriter | None = None,
     ):
         self.service_opts = service_opts
         self.metrics_opts = metrics_opts
@@ -35,10 +35,10 @@ class TelemetryMetrics:
 
         # Initialize OpenTelemetry metrics if enabled
         self.meter = None
-        self._counters: Dict[str, Any] = {}
-        self._histograms: Dict[str, Any] = {}
-        self._gauges: Dict[str, Any] = {}  # Stores UpDownCounter instruments
-        self._gauge_values: Dict[str, float] = {}  # Tracks current gauge values
+        self._counters: dict[str, Any] = {}
+        self._histograms: dict[str, Any] = {}
+        self._gauges: dict[str, Any] = {}  # Stores UpDownCounter instruments
+        self._gauge_values: dict[str, float] = {}  # Tracks current gauge values
 
         if otlp_opts and otlp_opts.enabled:
             self._setup_otel_metrics(service_opts, metrics_opts, otlp_opts)
@@ -79,7 +79,7 @@ class TelemetryMetrics:
 
         self.meter = metrics.get_meter(service_opts.name)
 
-    def record(self, model: BaseModel, labels: Optional[Dict[str, Any]] = None):
+    def record(self, model: BaseModel, labels: dict[str, Any] | None = None):
         """
         Record metrics from a Pydantic model.
 
@@ -137,7 +137,7 @@ class TelemetryMetrics:
                 self._record_gauge(metric_name, float(value), labels)
 
     def _record_counter(
-        self, name: str, value: float, labels: Optional[Dict[str, Any]] = None
+        self, name: str, value: float, labels: dict[str, Any] | None = None
     ):
         """Record a counter metric"""
         # OTEL counter
@@ -160,8 +160,8 @@ class TelemetryMetrics:
         self,
         name: str,
         value: float,
-        labels: Optional[Dict[str, Any]] = None,
-        field_info: Optional[Any] = None,
+        labels: dict[str, Any] | None = None,
+        field_info: Any | None = None,
     ):
         """Record a histogram metric"""
         # OTEL histogram
@@ -199,7 +199,7 @@ class TelemetryMetrics:
             )
 
     def _record_gauge(
-        self, name: str, value: float, labels: Optional[Dict[str, Any]] = None
+        self, name: str, value: float, labels: dict[str, Any] | None = None
     ):
         """Record a gauge metric using UpDownCounter (matches Go implementation)"""
         # OTEL gauge (using UpDownCounter like Go does)
@@ -240,18 +240,16 @@ class TelemetryMetrics:
             )
 
     def counter(
-        self, name: str, value: float = 1.0, labels: Optional[Dict[str, Any]] = None
+        self, name: str, value: float = 1.0, labels: dict[str, Any] | None = None
     ):
         """Manually record a counter metric"""
         self._record_counter(name, value, labels)
 
-    def histogram(
-        self, name: str, value: float, labels: Optional[Dict[str, Any]] = None
-    ):
+    def histogram(self, name: str, value: float, labels: dict[str, Any] | None = None):
         """Manually record a histogram metric"""
         self._record_histogram(name, value, labels)
 
-    def gauge(self, name: str, value: float, labels: Optional[Dict[str, Any]] = None):
+    def gauge(self, name: str, value: float, labels: dict[str, Any] | None = None):
         """Manually record a gauge metric"""
         self._record_gauge(name, value, labels)
 

@@ -12,13 +12,12 @@ Typical usage example:
 """
 
 import time
-from typing import Any, Dict, Optional, TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
+from opentelemetry import context, trace
 from opentelemetry.trace import Status, StatusCode
-from opentelemetry import trace, context
 
-
-from .context import get_trace_context, set_trace_context, reset_trace_context
+from .context import get_trace_context, reset_trace_context, set_trace_context
 
 if TYPE_CHECKING:
     from .tracing import TelemetryTracing
@@ -44,7 +43,7 @@ class SpanContext:
         self,
         tracing: "TelemetryTracing",
         name: str,
-        attributes: Optional[Dict[str, Any]] = None,
+        attributes: dict[str, Any] | None = None,
     ):
         """Initialize the span context.
 
@@ -156,7 +155,7 @@ class SpanContext:
 
         return False
 
-    def add_event(self, name: str, attributes: Optional[Dict[str, Any]] = None):
+    def add_event(self, name: str, attributes: dict[str, Any] | None = None):
         """Add an event to the span.
 
         Events are timestamped annotations that can be added to spans to mark

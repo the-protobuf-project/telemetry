@@ -3,11 +3,12 @@ Unified MCAP writer for logs, metrics, and traces.
 Loads schemas from JSON files for better maintainability.
 """
 
-import time
-from typing import Any, Dict, Optional
-from mcap.writer import Writer
-from mcap.well_known import SchemaEncoding, MessageEncoding
 import json
+import time
+from typing import Any
+
+from mcap.well_known import MessageEncoding, SchemaEncoding
+from mcap.writer import Writer
 
 from .schemas import load_schema
 
@@ -21,7 +22,7 @@ class UnifiedMcapWriter:
     def __init__(self, mcap_path: str, service_name: str):
         """
         Initialize an MCAP writer for the specified service.
-        
+
         Parameters:
             mcap_path (str): Path to the MCAP file to create.
             service_name (str): Name of the service associated with the telemetry data.
@@ -88,8 +89,8 @@ class UnifiedMcapWriter:
         self,
         level: str,
         message: str,
-        data: Dict[str, Any],
-        timestamp: Optional[int] = None,
+        data: dict[str, Any],
+        timestamp: int | None = None,
         name: str = "",
         file: str = "",
         line: int = 0,
@@ -98,7 +99,7 @@ class UnifiedMcapWriter:
     ):
         """
         Write a timestamped log entry to the MCAP file.
-        
+
         Parameters:
             level (str): Textual log level, such as ``DEBUG``, ``INFO``, ``WARNING``, ``ERROR``, or ``FATAL``.
             message (str): Log message.
@@ -152,17 +153,17 @@ class UnifiedMcapWriter:
         name: str,
         value: float,
         metric_type: str = "",
-        labels: Optional[Dict[str, Any]] = None,
-        timestamp: Optional[int] = None,
+        labels: dict[str, Any] | None = None,
+        timestamp: int | None = None,
     ):
         """
         Write a timestamped metric record to the MCAP file.
-        
+
         Parameters:
             name (str): Metric name.
             value (float): Metric value.
             timestamp (Optional[int]): Timestamp in nanoseconds since the Unix epoch. Uses the current time when omitted.
-        
+
         """
         if self._closed:
             return
@@ -189,13 +190,13 @@ class UnifiedMcapWriter:
         trace_id: str,
         span_id: str,
         name: str,
-        parent_span_id: Optional[str] = None,
-        attributes: Optional[Dict[str, Any]] = None,
-        timestamp: Optional[int] = None,
+        parent_span_id: str | None = None,
+        attributes: dict[str, Any] | None = None,
+        timestamp: int | None = None,
     ):
         """
         Write a trace span to the MCAP file.
-        
+
         Parameters:
             trace_id (str): Identifier of the trace containing the span.
             span_id (str): Identifier of the span.
@@ -203,7 +204,7 @@ class UnifiedMcapWriter:
             parent_span_id (Optional[str]): Identifier of the parent span.
             attributes (Optional[Dict[str, Any]]): Key-value attributes associated with the span.
             timestamp (Optional[int]): Timestamp in nanoseconds since the Unix epoch.
-        
+
         """
         if self._closed:
             return

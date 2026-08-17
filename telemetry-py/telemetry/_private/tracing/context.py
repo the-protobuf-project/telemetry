@@ -12,24 +12,24 @@ Typical usage example:
 """
 
 from contextvars import ContextVar
-from typing import Dict
-
 
 # Context variable to store current trace/span IDs
-_trace_context: ContextVar[Dict[str, str]] = ContextVar("trace_context", default={})
+_trace_context: ContextVar[dict[str, str] | None] = ContextVar(
+    "trace_context", default=None
+)
 
 
-def get_trace_context() -> Dict[str, str]:
+def get_trace_context() -> dict[str, str]:
     """Get the current trace context.
 
     Returns:
         A dictionary containing trace_id and span_id if available,
         otherwise an empty dictionary.
     """
-    return _trace_context.get()
+    return _trace_context.get() or {}
 
 
-def set_trace_context(context: Dict[str, str]):
+def set_trace_context(context: dict[str, str]):
     """Set the trace context.
 
     Args:

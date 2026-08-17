@@ -9,10 +9,12 @@ Run with:
     uv run python -m examples.tracing.simple_example
 """
 
+import time
+
+from pydantic import BaseModel
+
 import telemetry
 from telemetry import Telemetry, TracedOperation
-from pydantic import BaseModel
-import time
 
 
 class ProcessingRequest(BaseModel):

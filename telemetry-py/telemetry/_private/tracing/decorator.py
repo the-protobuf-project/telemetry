@@ -13,11 +13,12 @@ Typical usage example:
 
 import functools
 import time
-from typing import Any, Callable, Dict, Optional, TYPE_CHECKING
+from collections.abc import Callable
+from typing import TYPE_CHECKING, Any
 
 from opentelemetry.trace import Status, StatusCode
 
-from .context import get_trace_context, set_trace_context, reset_trace_context
+from .context import get_trace_context, reset_trace_context, set_trace_context
 
 if TYPE_CHECKING:
     from .tracing import TelemetryTracing
@@ -25,8 +26,8 @@ if TYPE_CHECKING:
 
 def create_trace_decorator(
     tracing: "TelemetryTracing",
-    name: Optional[str] = None,
-    attributes: Optional[Dict[str, Any]] = None,
+    name: str | None = None,
+    attributes: dict[str, Any] | None = None,
 ) -> Callable:
     """Create a tracing decorator for automatic span management.
 

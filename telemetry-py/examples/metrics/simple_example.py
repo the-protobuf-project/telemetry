@@ -12,10 +12,11 @@ Run with:
     uv run python -m examples.metrics.simple_example
 """
 
-import telemetry
-from telemetry import Telemetry, MetricsBaseModel
-import time
 import random
+import time
+
+import telemetry
+from telemetry import MetricsBaseModel, Telemetry
 
 
 # LLMMetrics demonstrates automatic metric recording with MetricsBaseModel

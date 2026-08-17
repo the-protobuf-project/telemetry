@@ -17,19 +17,20 @@ Typical usage example:
         span.add_event("checkpoint")
 """
 
-from typing import Any, Callable, Dict, Optional
+from collections.abc import Callable
+from typing import Any
 
 from opentelemetry import trace
-from opentelemetry.sdk.trace import TracerProvider
-from opentelemetry.sdk.trace.export import BatchSpanProcessor
 from opentelemetry.exporter.otlp.proto.grpc.trace_exporter import OTLPSpanExporter
 from opentelemetry.sdk.resources import Resource
+from opentelemetry.sdk.trace import TracerProvider
+from opentelemetry.sdk.trace.export import BatchSpanProcessor
 
-from ...options import ServiceOptions, TracingOptions, OTLPOptions
+from ...options import OTLPOptions, ServiceOptions, TracingOptions
 from ..foxglove import UnifiedMcapWriter
+from .context import get_current_span_id, get_current_trace_id
 from .decorator import create_trace_decorator
 from .span_context import SpanContext
-from .context import get_current_trace_id, get_current_span_id
 
 
 class TelemetryTracing:
@@ -52,8 +53,8 @@ class TelemetryTracing:
         self,
         service_opts: ServiceOptions,
         tracing_opts: TracingOptions,
-        otlp_opts: Optional[OTLPOptions] = None,
-        mcap_writer: Optional[UnifiedMcapWriter] = None,
+        otlp_opts: OTLPOptions | None = None,
+        mcap_writer: UnifiedMcapWriter | None = None,
     ):
         """Initialize the tracing system.
 
@@ -111,8 +112,8 @@ class TelemetryTracing:
 
     def trace(
         self,
-        name: Optional[str] = None,
-        attributes: Optional[Dict[str, Any]] = None,
+        name: str | None = None,
+        attributes: dict[str, Any] | None = None,
     ) -> Callable:
         """Decorator to automatically trace a function.
 
@@ -134,7 +135,7 @@ class TelemetryTracing:
         return create_trace_decorator(self, name, attributes)
 
     def start_span(
-        self, name: str, attributes: Optional[Dict[str, Any]] = None
+        self, name: str, attributes: dict[str, Any] | None = None
     ) -> SpanContext:
         """Manually start a span using a context manager.
 
@@ -156,7 +157,7 @@ class TelemetryTracing:
         """
         return SpanContext(self, name, attributes)
 
-    def get_current_trace_id(self) -> Optional[str]:
+    def get_current_trace_id(self) -> str | None:
         """Get the current trace ID from context.
 
         Returns:
@@ -165,7 +166,7 @@ class TelemetryTracing:
         trace_id = get_current_trace_id()
         return trace_id if trace_id else None
 
-    def get_current_span_id(self) -> Optional[str]:
+    def get_current_span_id(self) -> str | None:
         """Get the current span ID from context.
 
         Returns:

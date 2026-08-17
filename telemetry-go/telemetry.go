@@ -59,10 +59,10 @@ type Telemetry struct {
 
 // Builder provides a fluent API for configuring and creating a Telemetry instance.
 type Builder struct {
-	serviceOpts        options.ServiceOptions
+	serviceOpts   options.ServiceOptions
 	telemetryOpts options.TelemetryOptions
-	configPath         string
-	err                error
+	configPath    string
+	err           error
 }
 
 // New creates a new Telemetry Builder with sensible defaults.
@@ -78,7 +78,7 @@ func New() *Builder {
 	// Auto-discover and load config on creation
 	telemetryOpts, serviceOpts, _ := options.LoadConfigWithDefaults("")
 	return &Builder{
-		serviceOpts:        *serviceOpts,
+		serviceOpts:   *serviceOpts,
 		telemetryOpts: *telemetryOpts,
 	}
 }

@@ -18,8 +18,8 @@ import (
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/metric"
 
-	"github.com/the-protobuf-project/telemetry/telemetry-go/internal/metrics"
 	"github.com/the-protobuf-project/runtime-go/telemetry"
+	"github.com/the-protobuf-project/telemetry/telemetry-go/internal/metrics"
 )
 
 // Meter returns a telemetry.Meter backed by this instance's OTel SDK meter

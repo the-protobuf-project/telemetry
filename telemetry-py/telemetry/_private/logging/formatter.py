@@ -18,12 +18,28 @@ Typical usage example:
 """
 
 import threading
-from typing import Dict, Any
-
+from typing import Any
 
 # Thread-local storage for caller information
 # This allows the formatter to access caller info set by the logger
 _caller_info = threading.local()
+
+# ANSI color codes
+GRAY = "\x1b[90m"
+CYAN = "\x1b[36m"
+YELLOW = "\x1b[33m"
+RED = "\x1b[31m"
+GREEN = "\x1b[32m"
+BLUE = "\x1b[34m"
+RESET = "\x1b[0m"
+
+LEVEL_COLORS = {
+    "DEBUG": BLUE,
+    "INFO": GREEN,
+    "WARNING": YELLOW,
+    "ERROR": RED,
+    "CRITICAL": RED,
+}
 
 
 def get_custom_formatter():
@@ -41,24 +57,7 @@ def get_custom_formatter():
     """
 
     def custom_format(record, handler):
-        # Color codes
-        GRAY = "\x1b[90m"
-        CYAN = "\x1b[36m"
-        YELLOW = "\x1b[33m"
-        RED = "\x1b[31m"
-        GREEN = "\x1b[32m"
-        BLUE = "\x1b[34m"
-        RESET = "\x1b[0m"
-
-        level_colors = {
-            "DEBUG": BLUE,
-            "INFO": GREEN,
-            "WARNING": YELLOW,
-            "ERROR": RED,
-            "CRITICAL": RED,
-        }
-
-        level_color = level_colors.get(record.level_name, RESET)
+        level_color = LEVEL_COLORS.get(record.level_name, RESET)
 
         # Format file and line info - use thread-local caller info
         file_info = ""
@@ -93,7 +92,7 @@ def get_custom_formatter():
     return custom_format
 
 
-def format_data(data: Dict[str, Any]) -> str:
+def format_data(data: dict[str, Any]) -> str:
     """Format a data dictionary for pretty-printed output.
 
     Converts a dictionary to indented JSON and adds visual separators
@@ -123,7 +122,7 @@ def format_data(data: Dict[str, Any]) -> str:
 def get_caller_info():
     """
     Identify the external caller's source file and line number.
-    
+
     Returns:
         tuple[str, int]: The caller's relative path or basename and line number,
         or ``("unknown", 0)`` when no suitable caller is found.

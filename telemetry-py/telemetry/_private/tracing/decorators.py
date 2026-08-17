@@ -16,31 +16,32 @@ Typical usage example:
 
 import functools
 import time
-from typing import Any, Callable, Dict, Optional, TYPE_CHECKING
+from collections.abc import Callable
 from contextvars import ContextVar
+from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
     from .tracing import TelemetryTracing
 
 # Global context variable to store the current Telemetry instance
-_current_telemetry: ContextVar[Optional[Any]] = ContextVar(
+_current_telemetry: ContextVar[Any | None] = ContextVar(
     "current_telemetry", default=None
 )
 
 
 def trace(
-    name: Optional[str] = None,
-    attributes: Optional[Dict[str, Any]] = None,
+    name: str | None = None,
+    attributes: dict[str, Any] | None = None,
     auto_events: bool = True,
 ):
     """
     Create a decorator that traces function execution with an automatically managed span.
-    
+
     Parameters:
         name (Optional[str]): Span name; defaults to the wrapped function's name.
         attributes (Optional[Dict[str, Any]]): Attributes to attach to the span.
         auto_events (bool): Whether to record start, completion, and failure events.
-    
+
     Returns:
         A decorator that wraps a function with tracing.
     """
@@ -48,9 +49,9 @@ def trace(
     def decorator(func: Callable) -> Callable:
         """
         Wrap a function with optional telemetry span tracing and lifecycle events.
-        
+
         Returns:
-        	Callable: The wrapped function.
+                Callable: The wrapped function.
         """
         span_name = name or func.__name__
 
@@ -58,9 +59,9 @@ def trace(
         def wrapper(*args, **kwargs):
             """
             Executes the wrapped function within a telemetry span when tracing is enabled.
-            
+
             Returns:
-            	result (Any): The wrapped function's result.
+                result (Any): The wrapped function's result.
             """
             # Get Telemetry instance from context
             telemetry_instance = _current_telemetry.get()
@@ -97,18 +98,18 @@ def trace(
 
 # Alias for backwards compatibility
 def traced(
-    name: Optional[str] = None,
-    attributes: Optional[Dict[str, Any]] = None,
+    name: str | None = None,
+    attributes: dict[str, Any] | None = None,
     auto_events: bool = True,
 ):
     """
     Create a tracing decorator using the legacy `traced` name.
-    
+
     Args:
         name: Optional span name; defaults to the decorated function's name.
         attributes: Optional span attributes.
         auto_events: Whether to record start and completion events automatically.
-    
+
     Returns:
         A decorator that traces the decorated function.
     """
@@ -141,10 +142,10 @@ def reset_current_telemetry(token):
 def trace_step(event_name: str):
     """
     Mark a function as a traced step within a larger operation.
-    
+
     Args:
         event_name: Name assigned to the traced step.
-    
+
     Returns:
         A decorator that preserves the wrapped function's behavior and records the step name as metadata.
     """
@@ -192,7 +193,7 @@ class TracedOperation:
         self,
         tracing: "TelemetryTracing",
         name: str,
-        attributes: Optional[Dict[str, Any]] = None,
+        attributes: dict[str, Any] | None = None,
     ):
         """Initialize the traced operation.
 
@@ -226,7 +227,7 @@ class TracedOperation:
         self.span.__exit__(exc_type, exc_val, exc_tb)
         return False
 
-    def step(self, event_name: str, attributes: Optional[Dict[str, Any]] = None):
+    def step(self, event_name: str, attributes: dict[str, Any] | None = None):
         """Add a step event to the operation.
 
         Args:
@@ -246,7 +247,7 @@ class TracedOperation:
         if self.span:
             self.span.set_attribute(key, value)
 
-    def add_event(self, name: str, attributes: Optional[Dict[str, Any]] = None):
+    def add_event(self, name: str, attributes: dict[str, Any] | None = None):
         """Add an event to the operation's span.
 
         Args:

@@ -26,8 +26,8 @@ import (
 	"math/rand"
 	"time"
 
-	telemetrysdk "github.com/the-protobuf-project/telemetry/telemetry-go"
 	"github.com/the-protobuf-project/runtime-go/telemetry"
+	telemetrysdk "github.com/the-protobuf-project/telemetry/telemetry-go"
 
 	"github.com/the-protobuf-project/telemetry/telemetry-go/examples/telemetry/gen/jobs/v1/jobsv1"
 )

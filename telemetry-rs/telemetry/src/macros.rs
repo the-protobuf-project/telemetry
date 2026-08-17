@@ -20,8 +20,7 @@ pub const DEFAULT_OTEL_COLLECTOR_OTLP_PORT: u16 = 12_005;
 #[macro_export]
 macro_rules! telemetry_local_otel {
     () => {
-        $crate::Telemetry::new()
-            .with_otlp("localhost", $crate::DEFAULT_OTEL_COLLECTOR_OTLP_PORT)
+        $crate::Telemetry::new().with_otlp("localhost", $crate::DEFAULT_OTEL_COLLECTOR_OTLP_PORT)
     };
 }
 

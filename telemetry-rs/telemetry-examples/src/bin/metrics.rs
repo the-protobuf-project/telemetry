@@ -1,7 +1,7 @@
 //! OTLP metrics to `localhost:6009`.
+use std::path::PathBuf;
 use telemetry::derive::Metrics;
 use telemetry::{Environment, logger};
-use std::path::PathBuf;
 
 #[derive(Debug, Metrics)]
 pub struct LlmMetrics {

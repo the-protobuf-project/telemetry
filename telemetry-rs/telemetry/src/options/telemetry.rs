@@ -2,7 +2,9 @@
 //!
 //! Aggregates all configuration options for the Telemetry library.
 
-use super::{FoxgloveOptions, LoggingOptions, ProfilingOptions, OpenTelemetryOptions, TracingOptions};
+use super::{
+    FoxgloveOptions, LoggingOptions, OpenTelemetryOptions, ProfilingOptions, TracingOptions,
+};
 use serde::{Deserialize, Serialize};
 
 /// Main configuration options for Telemetry.

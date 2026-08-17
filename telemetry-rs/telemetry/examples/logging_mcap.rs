@@ -1,5 +1,5 @@
-use telemetry::{Environment, Telemetry, logger};
 use serde::Serialize;
+use telemetry::{Environment, Telemetry, logger};
 
 #[derive(Debug, Serialize)]
 struct ChatMessage {

@@ -53,7 +53,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::options::{
     Environment, FoxgloveOptions, LogLevel, LoggingOptions, ModuleOptions, OTLPOptions,
-    TelemetryOptions, ProfilingOptions, ServiceOptions, OpenTelemetryOptions, TracingOptions,
+    OpenTelemetryOptions, ProfilingOptions, ServiceOptions, TelemetryOptions, TracingOptions,
 };
 
 /// Complete Telemetry configuration loaded from files/environment.

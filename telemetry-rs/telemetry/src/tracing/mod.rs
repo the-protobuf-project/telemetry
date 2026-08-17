@@ -7,7 +7,7 @@
 pub mod tracing;
 
 pub use ::tracing as reexport;
-pub use tracing::{TelemetryTracing, Span, init_tokio_tracing};
+pub use tracing::{Span, TelemetryTracing, init_tokio_tracing};
 
 /// Re-export Telemetry's instrument macro.
 ///

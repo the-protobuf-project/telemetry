@@ -1,6 +1,6 @@
 //! Logs to console + OTLP logs to local collector (`localhost:6009`).
-use telemetry::{Environment, logger};
 use serde::Serialize;
+use telemetry::{Environment, logger};
 
 #[derive(Debug, Serialize)]
 struct ChatMessage {

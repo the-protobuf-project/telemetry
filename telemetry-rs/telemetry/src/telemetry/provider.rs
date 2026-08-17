@@ -4,7 +4,7 @@
 //! OpenTelemetry logging and metrics exporters.
 
 use crate::logging::OtelLogger;
-use crate::options::{ServiceOptions, OpenTelemetryOptions};
+use crate::options::{OpenTelemetryOptions, ServiceOptions};
 use anyhow::{Result, anyhow};
 use opentelemetry::KeyValue;
 use opentelemetry::logs::LoggerProvider as _;
@@ -37,7 +37,10 @@ impl TelemetryProvider {
     ///
     /// * `service_opts` - Service configuration
     /// * `telemetry_opts` - Telemetry configuration
-    pub fn new(service_opts: &ServiceOptions, telemetry_opts: &OpenTelemetryOptions) -> Result<Self> {
+    pub fn new(
+        service_opts: &ServiceOptions,
+        telemetry_opts: &OpenTelemetryOptions,
+    ) -> Result<Self> {
         let telemetry_enabled = telemetry_opts.enabled && telemetry_opts.otlp.enabled;
         let logging_enabled = telemetry_enabled && telemetry_opts.logging.enabled;
         let metrics_enabled = telemetry_enabled && telemetry_opts.metrics.enabled;

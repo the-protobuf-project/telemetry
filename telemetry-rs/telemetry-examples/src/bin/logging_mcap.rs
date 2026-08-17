@@ -1,7 +1,7 @@
 //! MCAP + optional OTLP (`localhost:6009`).
-use telemetry::{Environment, logger};
 use serde::Serialize;
 use std::path::PathBuf;
+use telemetry::{Environment, logger};
 
 #[derive(Debug, Serialize)]
 struct ChatMessage {

@@ -393,4 +393,4 @@ use_http = true
 
 ## License
 
-Copyright © 2026 Machani Robotics. Apache License 2.0.
+Copyright © 2026 The Protobuf Project. Apache License 2.0.

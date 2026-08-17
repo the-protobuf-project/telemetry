@@ -176,7 +176,7 @@ opentelemetry/
 
 ## Contributing
 
-We welcome contributions! Telemetry is open-source and maintained by Machani Robotics.
+We welcome contributions! Telemetry is open-source and maintained by The Protobuf Project.
 
 1. Fork the repository
 2. Create a feature branch
@@ -185,6 +185,6 @@ We welcome contributions! Telemetry is open-source and maintained by Machani Rob
 
 ## License
 
-Copyright © 2026 Machani Robotics
+Copyright © 2026 The Protobuf Project
 
 Licensed under the Apache License, Version 2.0.

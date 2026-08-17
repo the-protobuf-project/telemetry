@@ -351,4 +351,4 @@ curl -v https://otel.yourdomain.com/v1/traces \
 
 ## License
 
-Copyright © 2026 Machani Robotics. Apache License 2.0.
+Copyright © 2026 The Protobuf Project. Apache License 2.0.

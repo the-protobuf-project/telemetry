@@ -4,7 +4,7 @@
 
 **Telemetry** is a unified observability framework providing multi-language SDKs
 (Go, Rust, Python) for OpenTelemetry-based logging, metrics, tracing, and
-profiling. Built by Machani Robotics for production robotics systems with
+profiling. Built by The Protobuf Project for production robotics systems with
 MCAP recording for offline analysis.
 
 ## Architecture Patterns

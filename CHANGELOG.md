@@ -93,4 +93,4 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
-**Note:** This is the initial open source release of Telemetry by Machani Robotics.
+**Note:** This is the initial open source release of Telemetry by The Protobuf Project.

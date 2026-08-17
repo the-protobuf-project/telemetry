@@ -1093,6 +1093,6 @@ metric.WithAttributes(
 
 ## License
 
-Copyright © 2026 Machani Robotics
+Copyright © 2026 The Protobuf Project
 
 Licensed under the Apache License, Version 2.0.

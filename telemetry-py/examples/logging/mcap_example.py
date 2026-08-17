@@ -21,6 +21,12 @@ import time
 
 def main():
     # Uses telemetry.toml config - enable foxglove.enabled=true and set foxglove.file_path
+    """
+    Demonstrate structured MCAP logging for visualization in Foxglove Studio.
+    
+    The telemetry context records application lifecycle events, repeated request
+    and error entries, and completion metadata before closing automatically.
+    """
     with Telemetry.new().build() as telemetry:
         telemetry.logger.info(
             "MCAP logging demo started", {"foxglove_url": "https://studio.foxglove.dev"}

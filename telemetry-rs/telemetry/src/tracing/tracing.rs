@@ -7,19 +7,19 @@ use anyhow::Result;
 use opentelemetry::KeyValue;
 use opentelemetry::trace::Status;
 
-/// Initialize tokio-rs/tracing with OpenTelemetry integration.
+/// Configures global `tracing` instrumentation with OpenTelemetry and console output.
 ///
-/// This sets up the tracing subscriber to send spans to OpenTelemetry/Tempo
-/// via OTLP. Use the #[instrument] macro on functions to automatically create spans.
+/// The supplied tracer receives application spans while infrastructure and exporter-related
+/// targets are excluded from OpenTelemetry output. Console filtering respects `RUST_LOG`;
+/// setting `ENABLE_TRACING_DEFAULT` enables trace-level output by default. If a global subscriber
+/// is already configured, a warning is logged and initialization still succeeds.
 ///
-/// Set ENABLE_TRACING_DEFAULT=true to show TRACE logs from dependencies.
-/// Default is to only show INFO and above on the console.
+/// # Examples
 ///
-/// **Parent chain:** app `#[instrument]` spans must not sit under a globally filtered-out parent.
-/// We avoid a single global `EnvFilter` for that reason.
-///
-/// **OTLP noise:** gRPC export runs h2/hyper/tonic internally; those spans must not be sent to the
-/// collector (they show up as junk traces). We filter **only those targets** on the OTEL layer.
+/// ```no_run
+/// let tracer = todo!("configure an OpenTelemetry SDK tracer");
+/// init_tokio_tracing(tracer).unwrap();
+/// ```
 pub fn init_tokio_tracing(tracer: opentelemetry_sdk::trace::Tracer) -> Result<()> {
     use tracing_subscriber::EnvFilter;
     use tracing_subscriber::Layer;
@@ -109,7 +109,16 @@ pub struct TelemetryTracing {
 }
 
 impl TelemetryTracing {
-    /// Creates a new TelemetryTracing instance from an existing telemetry tracer.
+    /// Creates a tracing instance with an optional OpenTelemetry tracer.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// let tracing = TelemetryTracing::new(
+    ///     None::<opentelemetry_sdk::trace::Tracer>,
+    /// );
+    /// assert!(!tracing.is_enabled());
+    /// ```
     pub fn new(tracer: Option<opentelemetry_sdk::trace::Tracer>) -> Self {
         Self { tracer }
     }

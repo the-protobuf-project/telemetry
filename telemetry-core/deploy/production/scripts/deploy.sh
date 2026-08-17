@@ -29,6 +29,7 @@ OTEL_DOMAIN="${OTEL_API_DOMAIN:-otel.the-protobuf-project.dev}"
 ROUTE53_ZONE_ID="${ROUTE53_ZONE_ID:-Z024449328NM4DCSLOMSC}"
 [ -z "${OTLP_API_AUTH_TOKEN:-}" ] && OTLP_API_AUTH_TOKEN=$(openssl rand -hex 32)
 
+# usage prints the available deployment commands and usage examples.
 usage() {
     cat << EOF
 ${BLUE}Telemetry Telemetry Deployment${NC}
@@ -69,6 +70,7 @@ install_docker() {
     '
 }
 
+# copy_files prepares the remote telemetry directories and copies production configuration, Envoy, Compose, and available dashboard files to the EC2 host.
 copy_files() {
     local ip=$1
     echo "Copying files..."
@@ -79,6 +81,7 @@ copy_files() {
     [ -d "$OTEL_DIR/dashboards" ] && scp -i "$SSH_KEY" -r "$OTEL_DIR/dashboards/"* "ec2-user@$ip:/opt/telemetry/dashboards/" 2>/dev/null || true
 }
 
+# create_env_file writes deployment credentials, service domains, and the OTLP authentication token to the remote telemetry environment file.
 create_env_file() {
     local ip=$1
     ssh -i "$SSH_KEY" "ec2-user@$ip" "cat > /opt/telemetry/.env << EOF
@@ -90,6 +93,7 @@ OTLP_API_AUTH_TOKEN=$OTLP_API_AUTH_TOKEN
 EOF"
 }
 
+# start_services starts the telemetry services on the remote host and displays their container status.
 start_services() {
     local ip=$1
     echo "Starting services..."
@@ -125,6 +129,7 @@ cmd_provision() {
     print_summary "$ip"
 }
 
+# cmd_deploy updates files and restarts the telemetry services on the specified host.
 cmd_deploy() {
     local ip=$1
     [ -z "$ip" ] && { usage; exit 1; }
@@ -142,12 +147,14 @@ cmd_status() {
     ssh -i "$SSH_KEY" "ec2-user@$ip" "sudo docker ps --format 'table {{.Names}}\t{{.Status}}'"
 }
 
+# cmd_logs follows logs for a specified service on the remote telemetry host, or for all Compose services when no service is provided.
 cmd_logs() {
     local ip=$1; local svc=${2:-}
     [ -z "$ip" ] && { usage; exit 1; }
     [ -n "$svc" ] && ssh -i "$SSH_KEY" "ec2-user@$ip" "sudo docker logs -f $svc" || ssh -i "$SSH_KEY" "ec2-user@$ip" "cd /opt/telemetry && sudo docker-compose -f docker-compose.prod.yaml logs -f"
 }
 
+# cmd_ssh opens an SSH session to the specified EC2 instance.
 cmd_ssh() {
     local ip=$1
     [ -z "$ip" ] && { usage; exit 1; }

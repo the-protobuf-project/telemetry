@@ -12,7 +12,7 @@ type Tracer struct {
 	tracer trace.Tracer
 }
 
-// NewTracer creates a new Tracer instance
+// NewTracer creates a Tracer backed by the supplied OpenTelemetry tracer.
 func NewTracer(tracer trace.Tracer) *Tracer {
 	return &Tracer{
 		tracer: tracer,

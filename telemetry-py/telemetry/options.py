@@ -246,31 +246,14 @@ class TelemetryOptions:
 def from_config(
     config_path: Optional[str] = None,
 ) -> tuple[ServiceOptions, TelemetryOptions]:
-    """Load Telemetry configuration from config file and environment variables.
-
-    Uses dynaconf to load configuration with the following priority:
-    1. Defaults (lowest priority)
-    2. Config file (telemetry.toml / telemetry.yaml / telemetry.json)
-    3. Environment variables (TELEMETRY_*)
-
-    Auto-discovers config files from:
-    1. TELEMETRY_CONFIG_PATH environment variable
-    2. telemetry.toml in current directory
-    3. .config/telemetry.toml
-
-    Args:
-        config_path: Optional path to config file. If not provided,
-                    auto-discovers telemetry.toml/yaml/json.
-
+    """
+    Load service and telemetry settings from the configured source.
+    
+    Parameters:
+    	config_path (Optional[str]): Path to a configuration file. When omitted, uses the configuration subsystem's auto-discovered settings.
+    
     Returns:
-        A tuple containing (ServiceOptions, TelemetryOptions) loaded from config.
-
-    Example:
-        # Auto-discover telemetry.toml
-        service_opts, telemetry_opts = from_config()
-
-        # Or specify config path
-        service_opts, telemetry_opts = from_config("./config/telemetry.toml")
+    	tuple[ServiceOptions, TelemetryOptions]: Service metadata and top-level telemetry configuration.
     """
     from .config import settings, load_config
 

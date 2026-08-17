@@ -3,6 +3,11 @@
 #include <thread>
 #include <chrono>
 
+/**
+ * @brief Demonstrates telemetry collection with logs, metrics, tracing, and MCAP output.
+ *
+ * @return int Zero on successful completion.
+ */
 int main() {
     auto telemetry = telemetry::Telemetry::builder("example-service", "1.0.0")
         .description("Example service demonstrating telemetry-cpp")

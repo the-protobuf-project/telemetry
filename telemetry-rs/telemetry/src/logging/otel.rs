@@ -19,24 +19,41 @@ pub struct OtelLogger {
 }
 
 impl OtelLogger {
-    /// Creates a new OpenTelemetry logger.
+    /// Creates a new OpenTelemetry logger wrapper.
     ///
     /// # Arguments
     ///
-    /// * `logger` - SDK logger instance from OpenTelemetry
+    /// * `logger` - The SDK logger used to emit log records.
+    ///
+    /// # Examples
+    ///
+    /// ```no_run
+    /// let logger = SdkLogger::default();
+    /// let otel_logger = OtelLogger::new(logger);
+    /// ```
     pub fn new(logger: SdkLogger) -> Self {
         Self {
             logger: Arc::new(logger),
         }
     }
 
-    /// Logs a message with the specified severity and attributes.
+    /// Emits a message at the specified severity with its associated attributes.
     ///
     /// # Arguments
     ///
-    /// * `severity` - Log severity level
-    /// * `message` - Log message
-    /// * `attributes` - Key-value attributes to attach
+    /// * `severity` - Severity level assigned to the log record.
+    /// * `message` - Message stored in the log record.
+    /// * `attributes` - Key-value attributes attached to the log record.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # use opentelemetry::logs::{Logger, LoggerProvider, Severity};
+    /// # use opentelemetry_sdk::logs::SdkLoggerProvider;
+    /// # let provider = SdkLoggerProvider::builder().build();
+    /// # let logger = OtelLogger::new(provider.logger("example"));
+    /// logger.log(Severity::Info, "Service started", vec![]);
+    /// ```
     pub fn log(&self, severity: Severity, message: &str, attributes: Vec<KeyValue>) {
         let mut record = self.logger.create_log_record();
 
@@ -52,27 +69,72 @@ impl OtelLogger {
         self.logger.emit(record);
     }
 
-    /// Logs a debug-level message.
+    /// Logs a debug-level message with the provided attributes.
+    ///
+    /// # Arguments
+    ///
+    /// * `message` - The message to log.
+    /// * `attributes` - Attributes to attach to the log record.
+    ///
+    /// # Examples
+    ///
+    /// ```no_run
+    /// let logger: OtelLogger = unimplemented!();
+    /// logger.debug("Connection established", Vec::new());
+    /// ```
     pub fn debug(&self, message: &str, attributes: Vec<KeyValue>) {
         self.log(Severity::Debug, message, attributes);
     }
 
-    /// Logs an info-level message.
+    /// Logs an info-level message with the provided attributes.
+    ///
+    /// # Examples
+    ///
+    /// ```no_run
+    /// # let logger: OtelLogger = todo!();
+    /// logger.info("Application started", vec![]);
+    /// ```
+    pub fn info...
     pub fn info(&self, message: &str, attributes: Vec<KeyValue>) {
         self.log(Severity::Info, message, attributes);
     }
 
-    /// Logs a warning-level message.
+    /// Logs a warning-level message with the supplied attributes.
+    ///
+    /// # Examples
+    ///
+    /// ```no_run
+    /// # let logger: OtelLogger = todo!();
+    /// logger.warn("Cache miss", vec![]);
+    /// ```
+    ///
+    /// `attributes` provides additional key-value context for the log record.
+    pub fn warn...
     pub fn warn(&self, message: &str, attributes: Vec<KeyValue>) {
         self.log(Severity::Warn, message, attributes);
     }
 
-    /// Logs an error-level message.
+    /// Logs a message with error severity and its associated attributes.
+    ///
+    /// # Examples
+    ///
+    /// ```no_run
+    /// # let logger: OtelLogger = todo!();
+    /// logger.error("Request failed", vec![]);
+    /// ```
     pub fn error(&self, message: &str, attributes: Vec<KeyValue>) {
         self.log(Severity::Error, message, attributes);
     }
 
-    /// Logs a fatal-level message.
+    /// Records a fatal-level message with optional attributes.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # fn example(logger: &OtelLogger) {
+    /// logger.fatal("Service unavailable", vec![]);
+    /// # }
+    /// ```
     pub fn fatal(&self, message: &str, attributes: Vec<KeyValue>) {
         self.log(Severity::Fatal, message, attributes);
     }

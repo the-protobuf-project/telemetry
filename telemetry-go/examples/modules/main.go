@@ -6,6 +6,7 @@ import (
 	"github.com/the-protobuf-project/telemetry/telemetry-go"
 )
 
+// main demonstrates telemetry logging configuration precedence across the core service and three modules.
 func main() {
 	// ========================================
 	// 1. Main service — uses global logging.level from telemetry.toml (Level 2 = Info)

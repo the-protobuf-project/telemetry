@@ -18,7 +18,7 @@ func formatPrefix(serviceOpts options.ServiceOptions) string {
 	return fmt.Sprintf("%s (%s | %s)", serviceOpts.Name, serviceOpts.Version, serviceOpts.Environment)
 }
 
-// resolveTimeFormat determines the appropriate time format string.
+// resolveTimeFormat returns the Go time layout selected by the logging options, defaulting to RFC3339 when no supported format is configured.
 func resolveTimeFormat(opts options.LoggingOptions) string {
 	switch opts.Log.TimeFormatKey {
 	case options.TimeFormatRFC3339:
@@ -91,7 +91,7 @@ func resolveLogLevel(serviceName string, opts options.LoggingOptions, env option
 	return level
 }
 
-// resolveCallerOffset returns the correct caller offset.
+// resolveCallerOffset returns the configured positive caller offset or the default offset of 2.
 func resolveCallerOffset(opts options.LoggingOptions) int {
 	if opts.Log.CallerOffset > 0 {
 		return opts.Log.CallerOffset
@@ -100,7 +100,9 @@ func resolveCallerOffset(opts options.LoggingOptions) int {
 	return 2
 }
 
-// extractStructTagAttributes extracts attributes from struct fields with `telemetry:"attribute:key_name"` tags
+// extractStructTagAttributes extracts OpenTelemetry attributes from exported fields
+// tagged with telemetry:"attribute:<name>", including fields in nested structs. It
+// also adds the extraction time and the name of the input struct.
 func extractStructTagAttributes(rv reflect.Value) []otellog.KeyValue {
 	if rv.Kind() != reflect.Struct {
 		return nil
@@ -151,7 +153,8 @@ func extractStructTagAttributes(rv reflect.Value) []otellog.KeyValue {
 }
 
 // dataToOtelAttributes converts various data types to OpenTelemetry KeyValue attributes
-// It extracts struct tags with format `telemetry:"attribute:key_name"` and adds them as attributes
+// dataToOtelAttributes converts a value into OpenTelemetry attributes, expanding map entries and preserving complex values under the "data" attribute. Struct values also contribute attributes from `telemetry:"attribute:<name>"` tags. 
+// The returned attributes represent the converted value.
 func dataToOtelAttributes(v any) []otellog.KeyValue {
 	if v == nil {
 		return nil

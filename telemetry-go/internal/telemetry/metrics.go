@@ -11,7 +11,7 @@ type Metrics struct {
 	meter metric.Meter
 }
 
-// NewMetrics creates a new Metrics instance
+// NewMetrics creates a Metrics wrapper for the provided meter.
 func NewMetrics(meter metric.Meter) *Metrics {
 	return &Metrics{
 		meter: meter,

@@ -108,7 +108,14 @@ class TelemetryBuilder:
         return self
 
     def with_otlp_secure(self, secure: bool = True) -> "TelemetryBuilder":
-        """Enable/disable TLS for OTLP connection."""
+        """Configure whether the OTLP connection uses TLS.
+        
+        Parameters:
+        	secure (bool): Whether to enable TLS for the OTLP connection.
+        
+        Returns:
+        	TelemetryBuilder: This builder instance.
+        """
         self._otlp_secure = secure
         return self
 
@@ -123,19 +130,11 @@ class TelemetryBuilder:
         return self
 
     def with_log_level(self, level: LogLevel) -> "TelemetryBuilder":
-        """Set the log level for this service/module.
-
-        This acts as the code-level default. It can be overridden by the
-        config file via [logging.modules.<service-name>] or env vars.
-
-        Priority chain (highest to lowest):
-            env var > TOML per-module override > with_log_level() > environment default
-
-        Example:
-            telemetry = Telemetry.new() \\
-                .with_service("vision", "1.0.0") \\
-                .with_log_level(LogLevel.MODULE_LEVEL_3) \\
-                .build()
+        """
+        Set the log level for the telemetry service.
+        
+        Returns:
+            TelemetryBuilder: The builder with the specified log level configured.
         """
         self._log_level = level
         return self
@@ -146,7 +145,12 @@ class TelemetryBuilder:
         return self
 
     def build(self) -> "Telemetry":
-        """Build and return the Telemetry instance."""
+        """
+        Build a Telemetry instance from configuration and builder overrides.
+        
+        Returns:
+        	Telemetry: The configured telemetry instance.
+        """
         # Load config from file (auto-discovery or specified path)
         service_opts, telemetry_opts = from_config(self._config_path)
 
@@ -232,6 +236,12 @@ class Telemetry:
         return TelemetryBuilder()
 
     def __init__(self, service_opts: ServiceOptions, telemetry_opts: TelemetryOptions):
+        """Initialize telemetry logging, metrics, tracing, and optional MCAP recording.
+        
+        Parameters:
+            service_opts (ServiceOptions): Service identity and related service settings.
+            telemetry_opts (TelemetryOptions): Logging, metrics, tracing, OTLP, and MCAP configuration.
+        """
         self.service_opts = service_opts
         self.telemetry_opts = telemetry_opts
 
@@ -274,13 +284,23 @@ class Telemetry:
         )
 
     def __enter__(self):
-        """Enter context manager"""
+        """
+        Enter the telemetry context and make this instance current for telemetry and metrics operations.
+        
+        Returns:
+        	Telemetry: This telemetry instance.
+        """
         self._telemetry_token = set_current_telemetry(self)
         self._metrics_token = set_current_telemetry_metrics(self)
         return self
 
     def __exit__(self, exc_type, exc_val, exc_tb):
-        """Exit context manager and close resources"""
+        """
+        Exit the telemetry context and release its resources.
+        
+        Returns:
+        	bool: `False` so exceptions raised within the context propagate.
+        """
         reset_current_telemetry_metrics(self._metrics_token)
         reset_current_telemetry(self._telemetry_token)
         self.close()

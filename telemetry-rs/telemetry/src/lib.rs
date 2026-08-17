@@ -92,17 +92,17 @@ impl Telemetry {
         TelemetryBuilder::from_config()
     }
 
-    /// Creates a new builder for configuring Telemetry.
+    /// Creates a builder initialized with the service name and version.
     ///
     /// # Arguments
     ///
-    /// * `name` - Service name
-    /// * `version` - Service version
+    /// * `name` - The service name.
+    /// * `version` - The service version.
     ///
     /// # Examples
     ///
     /// ```no_run
-    /// use telemetry::{Telemetry, Environment};
+    /// use telemetry::{Environment, Telemetry};
     ///
     /// let telemetry = Telemetry::builder("my-service", "1.0.0")
     ///     .environment(Environment::Production)
@@ -114,20 +114,22 @@ impl Telemetry {
         TelemetryBuilder::new(name, version)
     }
 
-    /// Creates a new Telemetry instance from options (legacy API).
+    /// Creates and initializes a telemetry instance from service and telemetry options.
     ///
-    /// Initializes all observability components based on the provided configuration.
-    /// For new code, prefer using `Telemetry::new()` or `Telemetry::builder()` instead.
+    /// Prefer [`Telemetry::new`] or [`Telemetry::builder`] for new code.
     ///
     /// # Arguments
     ///
-    /// * `service_opts` - Service configuration (name, version, environment)
-    /// * `telemetry_opts` - Telemetry configuration (telemetry, Foxglove options)
+    /// * `service_opts` - Service identity and deployment environment settings.
+    /// * `telemetry_opts` - Logging, tracing, metrics, OTLP, and MCAP settings.
     ///
     /// # Examples
     ///
     /// ```no_run
-    /// use telemetry::{Telemetry, options::{ServiceOptions, TelemetryOptions}};
+    /// use telemetry::{
+    ///     options::{ServiceOptions, TelemetryOptions},
+    ///     Telemetry,
+    /// };
     ///
     /// let service_opts = ServiceOptions::new("my-service", "1.0.0");
     /// let telemetry_opts = TelemetryOptions::new();
@@ -186,16 +188,17 @@ impl Telemetry {
             log4rs::init_config(config).map(|_| ())
         });
 
-        let mcap_writer =
-            if telemetry_opts.foxglove.enabled && !telemetry_opts.foxglove.mcap_path.is_empty() {
-                let writer = foxglove::UnifiedMcapWriter::new(
-                    &service_opts,
-                    &telemetry_opts.foxglove.mcap_path,
-                )?;
-                Some(Arc::new(Mutex::new(writer)))
-            } else {
-                None
-            };
+        let mcap_writer = if telemetry_opts.foxglove.enabled
+            && !telemetry_opts.foxglove.mcap_path.is_empty()
+        {
+            let writer = foxglove::UnifiedMcapWriter::new(
+                &service_opts,
+                &telemetry_opts.foxglove.mcap_path,
+            )?;
+            Some(Arc::new(Mutex::new(writer)))
+        } else {
+            None
+        };
 
         let mcap_log_writer = mcap_writer
             .as_ref()
@@ -206,7 +209,9 @@ impl Telemetry {
             &service_opts,
             &telemetry_opts.telemetry,
         )?);
-        let otel_logger = telemetry.as_ref().and_then(|t| t.get_logger("telemetry"));
+        let otel_logger = telemetry
+            .as_ref()
+            .and_then(|t| t.get_logger("telemetry"));
 
         let logger = Logger::new(
             service_opts.name.clone(),
@@ -270,34 +275,43 @@ impl Telemetry {
         self.mcap_writer.clone()
     }
 
-    /// Returns the OpenTelemetry meter provider if configured.
+    /// Provides access to the configured OpenTelemetry meter provider.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// let telemetry = Telemetry::builder("example-service", "1.0.0").build()?;
+    /// if let Some(provider) = telemetry.meter_provider() {
+    ///     // Use the configured meter provider.
+    /// }
+    /// # Ok::<(), Box<dyn std::error::Error>>(())
+    /// ```
+    ///
+    /// The value is `Some` when a meter provider is configured, and `None` otherwise.
     pub fn meter_provider(&self) -> Option<Arc<opentelemetry_sdk::metrics::SdkMeterProvider>> {
         self.telemetry.as_ref().and_then(|t| t.meter_provider())
     }
 
-    /// Manually closes the Telemetry instance and cleans up resources.
+    /// Shuts down telemetry providers and closes the MCAP writer.
     ///
-    /// This shuts down telemetry providers and closes MCAP writers.
-    ///
-    /// **Note**: Resources are automatically cleaned up when Telemetry goes out of scope
-    /// via the Drop trait. You only need to call this manually if you want explicit
-    /// error handling during cleanup.
+    /// Calling this method more than once has no effect. Cleanup errors are combined
+    /// and returned to the caller.
     ///
     /// # Examples
     ///
     /// ```no_run
-    /// use telemetry::{Telemetry, options::{ServiceOptions, TelemetryOptions}};
+    /// use telemetry::{
+    ///     options::{ServiceOptions, TelemetryOptions},
+    ///     Telemetry,
+    /// };
     ///
-    /// let service_opts = ServiceOptions::new("my-service", "1.0.0");
-    /// let telemetry_opts = TelemetryOptions::new();
-    /// let mut telemetry = Telemetry::init(service_opts, telemetry_opts).unwrap();
+    /// let mut telemetry = Telemetry::init(
+    ///     ServiceOptions::new("my-service", "1.0.0"),
+    ///     TelemetryOptions::new(),
+    /// )?;
     ///
-    /// // Use telemetry...
-    ///
-    /// // Optional: Manually close if you need error handling
-    /// telemetry.close().unwrap();
-    ///
-    /// // Otherwise, resources are cleaned up automatically when telemetry goes out of scope
+    /// telemetry.close()?;
+    /// # Ok::<(), anyhow::Error>(())
     /// ```
     pub fn close(&mut self) -> Result<()> {
         if self.closed {
@@ -336,6 +350,17 @@ impl Telemetry {
 }
 
 impl Drop for Telemetry {
+    /// Closes telemetry resources automatically when the instance leaves scope.
+    ///
+    /// Cleanup errors are ignored because `Drop` cannot return them.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// {
+    ///     // A Telemetry instance is closed automatically at the end of this scope.
+    /// }
+    /// ```
     fn drop(&mut self) {
         let _ = self.close();
     }
@@ -380,7 +405,13 @@ pub struct TelemetryBuilder {
 pub use telemetry_derive::{instrument, trace};
 
 impl TelemetryBuilder {
-    /// Creates a new builder with service name and version.
+    /// Creates a builder initialized with a service name and version.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// let _builder = TelemetryBuilder::new("my-service", "1.0.0");
+    /// ```
     pub fn new(name: impl Into<String>, version: impl Into<String>) -> Self {
         Self {
             name: Some(name.into()),
@@ -402,13 +433,21 @@ impl TelemetryBuilder {
         }
     }
 
-    /// Creates a new builder that will auto-discover configuration.
+    /// Creates a builder that discovers its configuration from the environment and standard telemetry configuration files.
     ///
-    /// Configuration is loaded from:
-    /// 1. `TELEMETRY_CONFIG_PATH` environment variable
-    /// 2. `telemetry.toml` in current directory
-    /// 3. `telemetry.yaml` / `telemetry.yml` / `telemetry.json`
-    /// 4. `.config/telemetry.toml` / `.config/telemetry.yaml` / `.config/telemetry.json`
+    /// Configuration is searched for in the following order:
+    ///
+    /// 1. The path specified by `TELEMETRY_CONFIG_PATH`.
+    /// 2. `telemetry.toml` in the current directory.
+    /// 3. `telemetry.yaml`, `telemetry.yml`, or `telemetry.json` in the current directory.
+    /// 4. Matching files in `.config`.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// let builder = TelemetryBuilder::from_config();
+    /// ```
+    pub fn from_config() -> Self
     pub fn from_config() -> Self {
         Self {
             name: None,
@@ -467,19 +506,33 @@ impl TelemetryBuilder {
         self
     }
 
-    /// Enables OpenTelemetry OTLP export.
+    /// Configures the OTLP collector host and port.
     ///
     /// # Arguments
     ///
-    /// * `host` - OTLP collector host
-    /// * `port` - OTLP collector port (gRPC default unless `with_otlp_http` / config `use_http`)
+    /// * `host` - OTLP collector host.
+    /// * `port` - OTLP collector port.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// let builder = Telemetry::builder("example-service", "1.0.0")
+    ///     .with_otlp("localhost", 4317);
+    /// ```
     pub fn with_otlp(mut self, host: impl Into<String>, port: u16) -> Self {
         self.otlp_host = Some(host.into());
         self.otlp_port = Some(port);
         self
     }
 
-    /// OTLP to local collector on [`DEFAULT_OTEL_COLLECTOR_OTLP_PORT`] (gRPC), same as [`telemetry_local_otel!`].
+    /// Configures OTLP export to the local collector using the default gRPC port.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// let builder = TelemetryBuilder::new("example-service", "1.0.0")
+    ///     .with_local_otel_collector();
+    /// ```
     pub fn with_local_otel_collector(self) -> Self {
         self.with_otlp("localhost", DEFAULT_OTEL_COLLECTOR_OTLP_PORT)
     }
@@ -538,17 +591,39 @@ impl TelemetryBuilder {
         self
     }
 
-    /// Enables MCAP recording to the specified file path.
+    /// Enables MCAP recording and sets the output file path.
     ///
     /// # Arguments
     ///
-    /// * `path` - Path to the MCAP output file
+    /// * `path` - Path to the MCAP output file.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// let builder = Telemetry::builder("example-service", "1.0")
+    ///     .with_mcap("telemetry.mcap");
+    /// ```
     pub fn with_mcap(mut self, path: impl Into<String>) -> Self {
         self.mcap_path = Some(path.into());
         self
     }
 
-    /// Builds and initializes the Telemetry instance.
+    /// Builds and initializes a telemetry instance from the builder configuration.
+    ///
+    /// Configuration is loaded from the configured path or discovered automatically when available.
+    /// Builder values override loaded configuration, and initialization errors are returned to the caller.
+    ///
+    /// # Returns
+    ///
+    /// The initialized [`Telemetry`] instance, or an error if initialization fails.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// let telemetry = Telemetry::builder("example-service", "1.0.0").build()?;
+    /// # drop(telemetry);
+    /// # Ok::<(), Box<dyn std::error::Error>>(())
+    /// ```
     pub fn build(self) -> Result<Telemetry> {
         // Load config from file if available
         let config = if let Some(path) = &self.config_path {

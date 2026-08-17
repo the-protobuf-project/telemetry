@@ -10,6 +10,15 @@ namespace telemetry::logging {
 
 class Formatter {
 public:
+    /**
+     * @brief Formats a log entry as a timestamped text line with service metadata.
+     *
+     * @param entry Log entry containing the timestamp, level, message, and optional source and JSON data.
+     * @param service_name Name of the service that produced the entry.
+     * @param service_version Version of the service that produced the entry.
+     * @param environment Deployment environment associated with the entry.
+     * @return Formatted log line containing the local timestamp, metadata, message, and optional JSON data.
+     */
     static std::string format(const LogEntry& entry,
                               const std::string& service_name,
                               const std::string& service_version,
@@ -42,6 +51,12 @@ public:
         return oss.str();
     }
 
+    /**
+     * @brief Gets the ANSI color code associated with a log level.
+     *
+     * @param level Log level used to select the color code.
+     * @return std::string ANSI color code for the level, or an empty string when no code is available.
+     */
     static std::string level_color_code(Level level) {
 #if TELEMETRY_PLATFORM_FREERTOS
         return "";
@@ -58,6 +73,11 @@ public:
 #endif
     }
 
+    /**
+     * @brief Provides the ANSI escape sequence that resets terminal text formatting.
+     *
+     * @return std::string ANSI reset sequence, or an empty string on FreeRTOS.
+     */
     static std::string reset_color() {
 #if TELEMETRY_PLATFORM_FREERTOS
         return "";

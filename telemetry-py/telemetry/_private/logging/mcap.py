@@ -55,19 +55,15 @@ class MCAPLogger:
     def write_log(
         self, level: str, message: str, data: Optional[Dict[str, Any]] = None
     ):
-        """Write a log entry to the MCAP file.
-
-        Writes a log record to the MCAP file using the Foxglove Log schema.
-        The log includes timestamp, level, message, and structured data.
-
+        """
+        Write a timestamped Foxglove log record with service metadata.
+        
         Args:
-            level: Log level string (DEBUG, INFO, WARNING, ERROR, CRITICAL).
+            level: Log severity.
             message: Log message text.
-            data: Optional dictionary of structured data to include.
-
-        Note:
-            Logs are only written if the MCAP writer is open. Closed writers
-            are silently ignored to prevent errors during shutdown.
+            data: Optional structured data to include in the record. Defaults to an empty dictionary.
+        
+        Writes are skipped when the MCAP writer is unavailable or closed.
         """
         if self.mcap_writer and not self.mcap_writer.is_closed():
             self.mcap_writer.write_log(

@@ -179,6 +179,13 @@ void Logger::error(const char* message, const T& data, const char* file, uint32_
 }
 
 template<typename T>
+/**
+ * @brief Logs a fatal message with structured data.
+ *
+ * @param data Object providing a `to_json()` method for serialization.
+ * @param file Source file associated with the log entry.
+ * @param line Source line associated with the log entry.
+ */
 void Logger::fatal(const char* message, const T& data, const char* file, uint32_t line) {
     log(Level::Fatal, message, file, line, data.to_json());
 }

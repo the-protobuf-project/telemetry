@@ -6,6 +6,7 @@ IMAGE_NAME="${IMAGE_NAME:-ghcr.io/the-protobuf-project/telemetry}"
 
 VERSION="${IMAGE_TAG:-1.0.0}"
 
+# usage prints the script's supported modes, configurable environment variables, and registry login requirement before exiting with status 1.
 usage() {
     echo "Usage: $0 <amd64|arm64|manifest|local>"
     echo ""

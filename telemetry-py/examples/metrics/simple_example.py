@@ -47,6 +47,9 @@ class TranscriptionMetrics(MetricsBaseModel):
 
 def main():
     # Uses telemetry.toml config for OTLP endpoint and service info
+    """
+    Run the telemetry metrics example and record simulated LLM and transcription metrics.
+    """
     with Telemetry.new().build() as p:
         p.logger.info("Metrics Example Started")
         p.logger.info("Metrics will be written to OTLP and MCAP")

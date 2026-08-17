@@ -40,7 +40,10 @@ type LabelDecision struct {
 // resource-typed field happens to classify as TypeBool or TypeEnum.
 //
 // InferLabel is pure (no protogen/protoreflect dependency) so the rule can be
-// exercised directly in unit tests without constructing proto descriptors.
+// InferLabel determines whether a field should be projected as a metric label and
+// whether forcing it as a label warrants a warning. Explicit overrides take
+// precedence; without an override, only boolean and enum fields that are not
+// resource references are treated as labels.
 func InferLabel(override *bool, fieldType schema.FieldType, isResourceRef bool) LabelDecision {
 	isBoolOrEnum := fieldType == schema.TypeBool || fieldType == schema.TypeEnum
 
@@ -70,7 +73,7 @@ var durationLikeSubstrings = []string{
 // IsDurationLike reports whether fieldName (a proto field's snake_case name)
 // matches InferKind's histogram-worthy heuristic. Exported so a Target or test
 // can explain *why* a field auto-detected the way it did, without duplicating
-// the substring list.
+// IsDurationLike reports whether a field name contains a duration-related substring.
 func IsDurationLike(fieldName string) bool {
 	lower := strings.ToLower(fieldName)
 	for _, sub := range durationLikeSubstrings {
@@ -88,7 +91,8 @@ func IsDurationLike(fieldName string) bool {
 // otherwise KindGauge. KindCounter and KindUpDownCounter are never
 // auto-detected: a single scalar field can't safely be assumed monotonic from
 // its type or name alone, so those two kinds are only reachable via an
-// explicit override.
+// InferKind determines the metric instrument kind from an explicit override or field name.
+// It preserves specified kinds and infers histogram for duration-like names and gauge otherwise.
 func InferKind(override MetricKind, fieldName string) MetricKind {
 	if override != KindUnspecified {
 		return override

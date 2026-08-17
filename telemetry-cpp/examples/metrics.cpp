@@ -5,6 +5,15 @@
 #include <vector>
 #include <cstdlib>
 
+/**
+ * @brief Resolves the OTLP exporter endpoint from the environment.
+ *
+ * Uses the `OTEL_EXPORTER_OTLP_ENDPOINT` value when set, applying port
+ * `4317` when the value contains only a host. Defaults to `localhost:4317`
+ * when the environment variable is unset.
+ *
+ * @return Pair containing the endpoint host and port.
+ */
 std::pair<std::string, uint16_t> get_otel_endpoint() {
     const char* env = std::getenv("OTEL_EXPORTER_OTLP_ENDPOINT");
     if (env) {
@@ -25,9 +34,21 @@ struct LlmMetrics : public telemetry::metrics::RecordMetrics {
     double cache_hit_rate = 0.0;
 
     LlmMetrics() = default;
-    LlmMetrics(uint64_t count, double latency, double hit_rate)
+    /**
+         * @brief Creates LLM metrics with request, latency, and cache hit-rate values.
+         *
+         * @param count Number of requests.
+         * @param latency Response latency in milliseconds.
+         * @param hit_rate Cache hit rate.
+         */
+        LlmMetrics(uint64_t count, double latency, double hit_rate)
         : request_count(count), latency_ms(latency), cache_hit_rate(hit_rate) {}
 
+    /**
+     * @brief Defines the metrics reported for LLM activity.
+     *
+     * @return Vector containing request count, response latency, and cache hit rate metrics.
+     */
     std::vector<telemetry::metrics::MetricField> metric_fields() const override {
         return {
             {"llm.requests.total", telemetry::metrics::MetricType::Counter,
@@ -40,6 +61,11 @@ struct LlmMetrics : public telemetry::metrics::RecordMetrics {
     }
 };
 
+/**
+ * @brief Records example API and LLM metrics for 30 seconds.
+ *
+ * @return 0 on successful completion.
+ */
 int main() {
     auto [otel_host, otel_port] = get_otel_endpoint();
 

@@ -4,6 +4,15 @@
 #include <thread>
 #include <cstdlib>
 
+/**
+ * @brief Resolves the OTLP exporter host and port from the environment.
+ *
+ * Uses `OTEL_EXPORTER_OTLP_ENDPOINT` when set and defaults the port to `4317`
+ * when the endpoint does not include one. If the variable is unset, returns
+ * `localhost` and port `4317`.
+ *
+ * @return A host and port pair for the OTLP exporter.
+ */
 std::pair<std::string, uint16_t> get_otel_endpoint() {
     const char* env = std::getenv("OTEL_EXPORTER_OTLP_ENDPOINT");
     if (env) {
@@ -18,12 +27,22 @@ std::pair<std::string, uint16_t> get_otel_endpoint() {
     return {"localhost", 4317};
 }
 
+/**
+ * @brief Executes a simple traced operation.
+ *
+ * @param tracer Tracer used to create the operation span.
+ */
 void simple_operation(telemetry::tracing::Tracer& tracer) {
     TELEMETRY_SPAN(tracer, "simple_operation");
     TELEMETRY_LOG_INFO("This is a simple traced operation");
     std::this_thread::sleep_for(std::chrono::milliseconds(100));
 }
 
+/**
+ * @brief Runs the simple tracing example and exports a span to the configured OTLP endpoint.
+ *
+ * @return 0 after the tracing operation and export wait complete.
+ */
 int main() {
     auto [otel_host, otel_port] = get_otel_endpoint();
 

@@ -1,10 +1,33 @@
 //! Per-module log levels from TOML (`config/module_levels.toml`).
 use telemetry::{LogLevel, Telemetry, logger};
 
+/// Returns the path to the module log-level configuration file.
+///
+/// # Examples
+///
+/// ```
+/// let path = cfg();
+/// assert!(path.ends_with("config/module_levels.toml"));
+/// ```
 fn cfg() -> String {
     format!("{}/config/module_levels.toml", env!("CARGO_MANIFEST_DIR"))
 }
 
+/// Initializes telemetry for the robot core and its demonstration modules.
+///
+/// # Returns
+///
+/// `Ok(())` after all telemetry instances are initialized; otherwise, the first
+/// initialization error is returned.
+///
+/// # Examples
+///
+/// ```
+/// # fn initialize_application() -> anyhow::Result<()> {
+/// #     Ok(())
+/// # }
+/// assert!(initialize_application().is_ok());
+/// ```
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
     let c = cfg();

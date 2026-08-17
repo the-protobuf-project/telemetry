@@ -23,12 +23,17 @@ pub struct LogMcapWriter {
 }
 
 impl LogMcapWriter {
-    /// Creates a new MCAP log writer.
+    /// Creates an MCAP log writer configured with service metadata and a `/logs` channel.
     ///
-    /// # Arguments
+    /// # Examples
     ///
-    /// * `service_opts` - Service configuration options
-    /// * `writer` - Shared MCAP writer instance
+    /// ```no_run
+    /// let log_writer = LogMcapWriter::new(&service_opts, writer)?;
+    /// # Ok::<(), anyhow::Error>(())
+    /// ```
+    ///
+    /// `service_opts` supplies the service metadata included in log records, and `writer`
+    /// is the shared MCAP writer used to create the log channel and publish messages.
     pub fn new(
         service_opts: &ServiceOptions,
         writer: Arc<Mutex<UnifiedMcapWriter>>,
@@ -47,15 +52,24 @@ impl LogMcapWriter {
         })
     }
 
-    /// Writes a log entry to the MCAP file.
+    /// Writes a structured log entry to the MCAP file.
     ///
-    /// # Arguments
+    /// Log levels are mapped to Foxglove severity values from 1 (`debug`) through
+    /// 5 (`fatal`). Unknown levels use the `info` severity. Missing structured
+    /// data is recorded as an empty object.
     ///
-    /// * `level` - Log level (debug, info, warn, error, fatal)
-    /// * `message` - Log message
-    /// * `file` - Source file path
-    /// * `line` - Line number in source file
-    /// * `data` - Optional structured data
+    /// # Examples
+    ///
+    /// ```no_run
+    /// # let logger: LogMcapWriter = todo!();
+    /// logger.write_log("info", "Service started", file!(), line!(), None)?;
+    /// # Ok::<(), anyhow::Error>(())
+    /// ```
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the log entry cannot be serialized or written to the
+    /// MCAP file.
     pub fn write_log(
         &self,
         level: &str,

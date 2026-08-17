@@ -33,35 +33,35 @@ def trace(
     attributes: Optional[Dict[str, Any]] = None,
     auto_events: bool = True,
 ):
-    """Decorator for automatic tracing with event tracking.
-
-    This is the main tracing decorator that can be used at module level.
-    It automatically finds the Telemetry instance from the execution context.
-
-    Args:
-        name: Optional span name. Defaults to function name.
-        attributes: Optional dictionary of span attributes.
-        auto_events: If True, automatically add start/end events.
-
+    """
+    Create a decorator that traces function execution with an automatically managed span.
+    
+    Parameters:
+        name (Optional[str]): Span name; defaults to the wrapped function's name.
+        attributes (Optional[Dict[str, Any]]): Attributes to attach to the span.
+        auto_events (bool): Whether to record start, completion, and failure events.
+    
     Returns:
-        A decorator that can be applied to functions.
-
-    Example:
-        import telemetry
-
-        @telemetry.trace("process_data", auto_events=True)
-        def process_data(data):
-            # Automatically traced!
-            return result
+        A decorator that wraps a function with tracing.
     """
 
     def decorator(func: Callable) -> Callable:
-        """Decorator that wraps a function with tracing."""
+        """
+        Wrap a function with optional telemetry span tracing and lifecycle events.
+        
+        Returns:
+        	Callable: The wrapped function.
+        """
         span_name = name or func.__name__
 
         @functools.wraps(func)
         def wrapper(*args, **kwargs):
-            """Wrapper function that creates a span and executes the function."""
+            """
+            Executes the wrapped function within a telemetry span when tracing is enabled.
+            
+            Returns:
+            	result (Any): The wrapped function's result.
+            """
             # Get Telemetry instance from context
             telemetry_instance = _current_telemetry.get()
 
@@ -101,17 +101,16 @@ def traced(
     attributes: Optional[Dict[str, Any]] = None,
     auto_events: bool = True,
 ):
-    """Alias for trace() decorator.
-
-    Alias for trace() decorator for backwards compatibility.
-
+    """
+    Create a tracing decorator using the legacy `traced` name.
+    
     Args:
-        name: Optional span name. Defaults to function name.
-        attributes: Optional dictionary of span attributes.
-        auto_events: If True, automatically add start/end events.
-
+        name: Optional span name; defaults to the decorated function's name.
+        attributes: Optional span attributes.
+        auto_events: Whether to record start and completion events automatically.
+    
     Returns:
-        A decorator that can be applied to functions.
+        A decorator that traces the decorated function.
     """
     return trace(name, attributes, auto_events)
 
@@ -140,23 +139,14 @@ def reset_current_telemetry(token):
 
 
 def trace_step(event_name: str):
-    """Decorator to mark a function as a traced step within a larger operation.
-
-    This creates a sub-span for the decorated function and adds it as an event
-    to the parent span.
-
+    """
+    Mark a function as a traced step within a larger operation.
+    
     Args:
-        event_name: Name of the event/step.
-
+        event_name: Name assigned to the traced step.
+    
     Returns:
-        A decorator that can be applied to functions.
-
-    Example:
-        class Pipeline:
-            @trace_step("validating_input")
-            def validate(self, data):
-                # Creates event: validating_input
-                return validated_data
+        A decorator that preserves the wrapped function's behavior and records the step name as metadata.
     """
 
     def decorator(func: Callable) -> Callable:

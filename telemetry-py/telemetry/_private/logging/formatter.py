@@ -121,20 +121,12 @@ def format_data(data: Dict[str, Any]) -> str:
 
 
 def get_caller_info():
-    """Get the actual caller's file and line number.
-
-    Inspects the call stack to find the first frame outside the Telemetry SDK,
-    skipping _private frames to show the actual user code location.
-
+    """
+    Identify the external caller's source file and line number.
+    
     Returns:
-        A tuple of (filename, line_number). The filename is relative to the
-        current directory if possible, otherwise just the basename.
-        Returns ("unknown", 0) if no suitable frame is found.
-
-    Example:
-        >>> file, line = get_caller_info()
-        >>> print(f"Called from {file}:{line}")
-        Called from examples/my_script.py:42
+        tuple[str, int]: The caller's relative path or basename and line number,
+        or ``("unknown", 0)`` when no suitable caller is found.
     """
     import inspect
     import os

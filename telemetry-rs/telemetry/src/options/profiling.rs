@@ -69,19 +69,51 @@ pub struct ProfilingOptions {
     pub tags: HashMap<String, String>,
 }
 
+/// Provides a default value of `true`.
+///
+/// # Examples
+///
+/// ```
+/// assert!(default_true());
+/// ```
 fn default_true() -> bool {
     true
 }
 
+/// Provides the default Pyroscope server address.
+///
+/// # Examples
+///
+/// ```
+/// assert_eq!(default_server_address(), "http://localhost:4040");
+/// ```
 fn default_server_address() -> String {
     "http://localhost:4040".to_string()
 }
 
+/// Provides the default profiling rate.
+///
+/// # Examples
+///
+/// ```
+/// assert_eq!(default_profile_rate(), 5);
+/// ```
 fn default_profile_rate() -> i32 {
     5
 }
 
 impl Default for ProfilingOptions {
+    /// Creates profiling options with profiling disabled and standard default settings.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// let options = ProfilingOptions::default();
+    /// assert!(!options.enabled);
+    /// assert_eq!(options.server_address, "http://localhost:4040");
+    /// ```
+    ///
+    /// Returns a configuration with CPU, allocation, and in-use profiling enabled; optional profiling types disabled; and mutex and block profile rates set to `5`.
     fn default() -> Self {
         Self {
             enabled: false,

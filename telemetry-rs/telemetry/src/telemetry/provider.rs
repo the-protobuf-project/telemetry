@@ -4,7 +4,7 @@
 //! OpenTelemetry logging and metrics exporters.
 
 use crate::logging::OtelLogger;
-use crate::options::{OpenTelemetryOptions, ServiceOptions};
+use crate::options::{ServiceOptions, OpenTelemetryOptions};
 use anyhow::{Result, anyhow};
 use opentelemetry::KeyValue;
 use opentelemetry::logs::LoggerProvider as _;
@@ -31,16 +31,34 @@ pub struct TelemetryProvider {
 }
 
 impl TelemetryProvider {
-    /// Creates a new telemetry provider.
+    /// Creates a telemetry provider configured for the enabled OpenTelemetry signals.
+    ///
+    /// Disabled signals do not create providers. Enabled signals are configured for
+    /// OTLP export using the service and telemetry settings.
     ///
     /// # Arguments
     ///
-    /// * `service_opts` - Service configuration
-    /// * `telemetry_opts` - Telemetry configuration
-    pub fn new(
-        service_opts: &ServiceOptions,
-        telemetry_opts: &OpenTelemetryOptions,
-    ) -> Result<Self> {
+    /// * `service_opts` - Service identity, environment, version, and custom labels.
+    /// * `telemetry_opts` - OpenTelemetry enablement, exporter, endpoint, and
+    ///   authentication settings.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if an enabled OTLP exporter cannot be built.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # fn example(
+    /// #     service_opts: &ServiceOptions,
+    /// #     telemetry_opts: &OpenTelemetryOptions,
+    /// # ) -> Result<(), Box<dyn std::error::Error>> {
+    /// let provider = TelemetryProvider::new(service_opts, telemetry_opts)?;
+    /// # let _ = provider;
+    /// # Ok(())
+    /// # }
+    /// ```
+    pub fn new(service_opts: &ServiceOptions, telemetry_opts: &OpenTelemetryOptions) -> Result<Self> {
         let telemetry_enabled = telemetry_opts.enabled && telemetry_opts.otlp.enabled;
         let logging_enabled = telemetry_enabled && telemetry_opts.logging.enabled;
         let metrics_enabled = telemetry_enabled && telemetry_opts.metrics.enabled;

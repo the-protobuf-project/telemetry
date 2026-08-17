@@ -166,6 +166,7 @@ func main() {
 	runMaleniaWithError()
 }
 
+// runMaleniaConversationPipeline runs a traced seven-component conversation pipeline and waits for telemetry export.
 func runMaleniaConversationPipeline() {
 	// Uses telemetry.toml config for service info and OTLP endpoint
 	k, err := telemetry.New().Build()
@@ -202,7 +203,8 @@ func runMaleniaConversationPipeline() {
 	time.Sleep(2 * time.Second)
 }
 
-// processMaleniaConversation orchestrates the complete conversation pipeline with 7 traced components
+// processMaleniaConversation orchestrates the seven-stage conversation pipeline and records its traced execution.
+// It returns an error when any pipeline component fails.
 func processMaleniaConversation(ctx context.Context, k *telemetry.Telemetry, req ConversationRequest) error {
 	// Create root span for the entire conversation pipeline
 	return k.Tracing.Trace(ctx, "MaleniaConversationPipeline", req, func(ctx context.Context, span *telemetry.Span) error {
@@ -328,7 +330,8 @@ func processMaleniaConversation(ctx context.Context, k *telemetry.Telemetry, req
 	})
 }
 
-// Component 1: Input Processing
+// processInput validates and prepares raw conversation input, detecting its language and token count.
+// It returns the processed input details and any processing error.
 func processInput(ctx context.Context, k *telemetry.Telemetry, req InputProcessingRequest) (*InputProcessingResponse, error) {
 	_, span := k.Tracing.Start(ctx, "InputProcessing", req)
 	defer span.End()
@@ -360,7 +363,8 @@ func processInput(ctx context.Context, k *telemetry.Telemetry, req InputProcessi
 	return response, nil
 }
 
-// Component 2: Context Retrieval
+// retrieveContext gathers conversation history and user preferences for a request.
+// It returns the aggregated context details and retrieval metadata.
 func retrieveContext(ctx context.Context, k *telemetry.Telemetry, req ContextRetrievalRequest) (*ContextRetrievalResponse, error) {
 	_, span := k.Tracing.Start(ctx, "ContextRetrieval", req)
 	defer span.End()
@@ -392,7 +396,8 @@ func retrieveContext(ctx context.Context, k *telemetry.Telemetry, req ContextRet
 	return response, nil
 }
 
-// Component 3: Intent Classification
+// classifyIntent classifies a conversation request and extracts recognized entities.
+// It returns the classified intent, confidence score, and entities.
 func classifyIntent(ctx context.Context, k *telemetry.Telemetry, req IntentClassificationRequest) (*IntentClassificationResponse, error) {
 	_, span := k.Tracing.Start(ctx, "IntentClassification", req)
 	defer span.End()
@@ -424,7 +429,8 @@ func classifyIntent(ctx context.Context, k *telemetry.Telemetry, req IntentClass
 	return response, nil
 }
 
-// Component 4: Knowledge Search
+// searchKnowledge searches the knowledge base for documents relevant to the request.
+// It returns the search results and their average relevance score.
 func searchKnowledge(ctx context.Context, k *telemetry.Telemetry, req KnowledgeSearchRequest) (*KnowledgeSearchResponse, error) {
 	_, span := k.Tracing.Start(ctx, "KnowledgeSearch", req)
 	defer span.End()
@@ -456,7 +462,8 @@ func searchKnowledge(ctx context.Context, k *telemetry.Telemetry, req KnowledgeS
 	return response, nil
 }
 
-// Component 5: Response Generation
+// generateResponse generates an AI response for the supplied conversation request.
+// It returns the generated response and its token usage and processing metadata.
 func generateResponse(ctx context.Context, k *telemetry.Telemetry, req ResponseGenerationRequest) (*ResponseGenerationResponse, error) {
 	_, span := k.Tracing.Start(ctx, "ResponseGeneration", req)
 	defer span.End()
@@ -492,7 +499,8 @@ func generateResponse(ctx context.Context, k *telemetry.Telemetry, req ResponseG
 	return response, nil
 }
 
-// Component 6: Response Validation
+// validateResponse checks a generated response for safety, personally identifiable information, toxicity, and format validity.
+// It returns the validation results for the original request.
 func validateResponse(ctx context.Context, k *telemetry.Telemetry, req ResponseValidationRequest) (*ResponseValidationResponse, error) {
 	_, span := k.Tracing.Start(ctx, "ResponseValidation", req)
 	defer span.End()
@@ -524,7 +532,8 @@ func validateResponse(ctx context.Context, k *telemetry.Telemetry, req ResponseV
 	return response, nil
 }
 
-// Component 7: Output Formatting
+// formatOutput applies Markdown formatting and final attribution to a generated response. 
+// It returns the formatted response metadata.
 func formatOutput(ctx context.Context, k *telemetry.Telemetry, req OutputFormattingRequest) (*OutputFormattingResponse, error) {
 	_, span := k.Tracing.Start(ctx, "OutputFormatting", req)
 	defer span.End()
@@ -555,7 +564,7 @@ func formatOutput(ctx context.Context, k *telemetry.Telemetry, req OutputFormatt
 	return response, nil
 }
 
-// Error handling example
+// runMaleniaWithError demonstrates conversation pipeline tracing for an LLM rate-limit failure.
 func runMaleniaWithError() {
 	ctx := context.Background()
 

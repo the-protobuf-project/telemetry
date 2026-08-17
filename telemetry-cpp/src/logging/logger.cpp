@@ -13,6 +13,13 @@ namespace telemetry::logging {
 
 std::unique_ptr<Logger> GlobalLogger::instance_ = nullptr;
 
+/**
+ * @brief Creates a logger with service identity and environment metadata.
+ *
+ * @param service_name Name of the service producing log messages.
+ * @param service_version Version of the service producing log messages.
+ * @param environment Deployment environment associated with the service.
+ */
 Logger::Logger(const std::string& service_name,
                const std::string& service_version,
                const std::string& environment)
@@ -29,6 +36,15 @@ Logger::Logger(const std::string& service_name,
 #endif
 }
 
+/**
+ * @brief Creates a logger with service metadata and optional MCAP and OpenTelemetry output.
+ *
+ * @param service_name Name of the service emitting log messages.
+ * @param service_version Version of the service emitting log messages.
+ * @param environment Deployment environment associated with the service.
+ * @param mcap_writer Optional writer for MCAP log output.
+ * @param otel_exporter Optional exporter for OpenTelemetry log output.
+ */
 Logger::Logger(const std::string& service_name,
                const std::string& service_version,
                const std::string& environment,
@@ -64,6 +80,11 @@ Logger::~Logger() {
     platform::destroy_mutex(mutex_);
 }
 
+/**
+ * @brief Constructs a logger by transferring state from another logger.
+ *
+ * @param other Logger whose state is transferred.
+ */
 Logger::Logger(Logger&& other) noexcept
     : service_name_(std::move(other.service_name_))
     , service_version_(std::move(other.service_version_))
@@ -81,6 +102,12 @@ Logger::Logger(Logger&& other) noexcept
     , mutex_(platform::create_mutex()) {
 }
 
+/**
+ * @brief Replaces this logger with the state of another logger.
+ *
+ * @param other Logger whose state is moved into this logger.
+ * @return Reference to this logger.
+ */
 Logger& Logger::operator=(Logger&& other) noexcept {
     if (this != &other) {
         platform::destroy_mutex(mutex_);
@@ -102,6 +129,11 @@ Logger& Logger::operator=(Logger&& other) noexcept {
     return *this;
 }
 
+/**
+ * @brief Sets the minimum severity level for log messages.
+ *
+ * @param level Minimum severity level to log.
+ */
 void Logger::set_level(Level level) {
     platform::ScopedLock lock(mutex_);
     level_ = level;
@@ -150,6 +182,17 @@ void Logger::fatal(const char* message, const char* file, uint32_t line) {
     log(Level::Fatal, message, file, line);
 }
 
+/**
+ * @brief Dispatches a log entry to the configured outputs and sinks.
+ *
+ * Messages below the configured severity threshold are ignored.
+ *
+ * @param level Severity of the message.
+ * @param message Message text.
+ * @param file Source file associated with the message.
+ * @param line Source line associated with the message.
+ * @param data_json Optional JSON data associated with the message.
+ */
 void Logger::log(Level level, const char* message, const char* file, uint32_t line,
                  const std::string& data_json) {
     if (static_cast<int>(level) < static_cast<int>(level_)) {
@@ -176,6 +219,11 @@ void Logger::log(Level level, const char* message, const char* file, uint32_t li
     }
 }
 
+/**
+ * @brief Writes a log entry to the platform's console output.
+ *
+ * @param entry Log entry to write.
+ */
 void Logger::log_to_console(const LogEntry& entry) {
 #if !TELEMETRY_PLATFORM_FREERTOS
     if (!spdlog_logger_) return;
@@ -199,12 +247,22 @@ void Logger::log_to_console(const LogEntry& entry) {
 #endif
 }
 
+/**
+ * @brief Writes a log entry to the configured MCAP output.
+ *
+ * @param entry Log entry to write.
+ */
 void Logger::log_to_mcap(const LogEntry& entry) {
     if (!mcap_writer_) return;
     mcap_writer_->write_log(entry);
 }
 
 #if TELEMETRY_USE_OTEL
+/**
+ * @brief Emits a log entry through the configured OpenTelemetry logger.
+ *
+ * @param entry Log entry to emit.
+ */
 void Logger::log_to_otel(const LogEntry& entry) {
     if (!otel_logger_) return;
 
@@ -236,6 +294,9 @@ Logger* GlobalLogger::get() {
     return instance_.get();
 }
 
+/**
+ * @brief Shuts down the global logger.
+ */
 void GlobalLogger::shutdown() {
     instance_.reset();
 }

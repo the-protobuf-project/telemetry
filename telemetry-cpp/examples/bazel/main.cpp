@@ -36,6 +36,11 @@ struct ChatMessage {
     }
 };
 
+/**
+ * @brief Runs the chat service telemetry and structured logging example.
+ *
+ * @return int Zero after completing the example.
+ */
 int main() {
     auto [otel_host, otel_port] = get_otel_endpoint();
 

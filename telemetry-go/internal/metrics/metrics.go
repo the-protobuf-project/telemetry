@@ -29,7 +29,8 @@ type Metrics struct {
 	labels      map[string]string // Service labels to add as metric attributes
 }
 
-// NewMetrics creates a new Metrics instance
+// NewMetrics creates a Metrics instance configured with the service options and OpenTelemetry metrics.
+// When a unified MCAP writer is provided, it also configures MCAP metric output when initialization succeeds.
 func NewMetrics(serviceOpts options.ServiceOptions, unifiedWriter *foxglove.UnifiedMcapWriter, otelMetrics *telemetry.Metrics) *Metrics {
 	m := &Metrics{
 		otelMetrics: otelMetrics,

@@ -7,6 +7,12 @@
 
 namespace telemetry::otel {
 
+/**
+ * @brief Initializes the OpenTelemetry exporter for a service.
+ *
+ * @param service_opts Service name and version used for telemetry resource attributes.
+ * @param endpoint Base OTLP endpoint used to configure telemetry exporters.
+ */
 OtelExporter::OtelExporter(const ServiceOptions& service_opts, const std::string& endpoint)
     : service_name_(service_opts.name)
     , service_version_(service_opts.version)
@@ -104,6 +110,9 @@ opentelemetry::nostd::shared_ptr<metrics_api::Meter> OtelExporter::get_meter() {
     return meter_provider_->GetMeter(service_name_, service_version_);
 }
 
+/**
+ * @brief Shuts down all initialized OpenTelemetry providers and disables the exporter.
+ */
 void OtelExporter::shutdown() {
     if (!enabled_) return;
 

@@ -9,6 +9,11 @@
 
 namespace telemetry::tracing {
 
+/**
+ * @brief Initializes a tracing span with its identifiers and start timestamp.
+ *
+ * @param mcap_writer Optional MCAP writer used to record the span.
+ */
 Span::Span(const std::string& name, const std::string& trace_id,
            const std::string& span_id, std::shared_ptr<mcap::McapWriter> mcap_writer)
     : name_(name)
@@ -128,6 +133,13 @@ Tracer::Tracer(const ServiceOptions& service_opts)
     rng_.seed(rd());
 }
 
+/**
+ * @brief Creates a tracer configured with service metadata and optional exporters.
+ *
+ * @param service_opts Service name, version, and environment configuration.
+ * @param mcap_writer Optional MCAP writer for recording spans.
+ * @param otel_exporter Optional OpenTelemetry exporter.
+ */
 Tracer::Tracer(const ServiceOptions& service_opts,
                std::shared_ptr<mcap::McapWriter> mcap_writer
 #if TELEMETRY_USE_OTEL
@@ -146,6 +158,16 @@ Tracer::Tracer(const ServiceOptions& service_opts,
     rng_.seed(rd());
 }
 
+/**
+ * @brief Creates a tracer configured with service metadata and optional exporters.
+ *
+ * @param service_opts Service name, version, and environment metadata.
+ * @param mcap_writer Optional writer for recording span data.
+ * @param otlp_endpoint Endpoint used for OTLP export.
+#if TELEMETRY_USE_OTEL
+ * @param otel_exporter Optional OpenTelemetry exporter.
+#endif
+ */
 Tracer::Tracer(const ServiceOptions& service_opts,
                std::shared_ptr<mcap::McapWriter> mcap_writer,
                const std::string& otlp_endpoint
@@ -170,6 +192,11 @@ Tracer::~Tracer() {
     platform::destroy_mutex(mutex_);
 }
 
+/**
+ * @brief Transfers ownership of a tracer's configuration and runtime state.
+ *
+ * @param other Tracer whose state is transferred to this instance.
+ */
 Tracer::Tracer(Tracer&& other) noexcept
     : service_name_(std::move(other.service_name_))
     , service_version_(std::move(other.service_version_))
@@ -184,6 +211,12 @@ Tracer::Tracer(Tracer&& other) noexcept
     , mutex_(platform::create_mutex()) {
 }
 
+/**
+ * @brief Move-assigns tracer configuration and state from another tracer.
+ *
+ * @param other Tracer whose configuration and state are transferred.
+ * @return Tracer& This tracer.
+ */
 Tracer& Tracer::operator=(Tracer&& other) noexcept {
     if (this != &other) {
         platform::destroy_mutex(mutex_);
@@ -234,6 +267,9 @@ ScopedSpan::ScopedSpan(Tracer& tracer, const std::string& name)
     : span_(tracer.start_span(name)) {
 }
 
+/**
+ * @brief Ends the scoped span.
+ */
 ScopedSpan::~ScopedSpan() {
     span_.end();
 }

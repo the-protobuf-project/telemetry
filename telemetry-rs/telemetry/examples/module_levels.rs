@@ -1,5 +1,19 @@
 use telemetry::{LogLevel, Telemetry, logger};
 
+/// Initializes telemetry for the example services and demonstrates their logging levels.
+///
+/// # Examples
+///
+/// ```
+/// # fn main() -> anyhow::Result<()> {
+/// #     // Run the example binary to initialize telemetry and view its log output.
+/// #     Ok(())
+/// # }
+/// ```
+///
+/// # Returns
+///
+/// An error if telemetry initialization fails.
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
     // ========================================

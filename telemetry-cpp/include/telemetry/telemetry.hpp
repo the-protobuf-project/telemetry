@@ -30,14 +30,39 @@ public:
     Telemetry(Telemetry&&) noexcept;
     Telemetry& operator=(Telemetry&&) noexcept;
 
-    logging::Logger& logger() { return *logger_; }
-    metrics::Metrics& metrics() { return *metrics_; }
-    tracing::Tracer& tracer() { return *tracer_; }
+    /**
+ * @brief Provides access to the telemetry logger.
+ *
+ * @return logging::Logger& Reference to the logger owned by this telemetry instance.
+ */
+logging::Logger& logger() { return *logger_; }
+    /**
+ * @brief Provides access to the metrics instance.
+ *
+ * @return metrics::Metrics& Reference to the metrics instance.
+ */
+metrics::Metrics& metrics() { return *metrics_; }
+    /**
+ * @brief Provides access to the telemetry tracer.
+ *
+ * @return Reference to the tracer.
+ */
+tracing::Tracer& tracer() { return *tracer_; }
 
-    std::shared_ptr<mcap::McapWriter> mcap_writer() { return mcap_writer_; }
+    /**
+ * @brief Returns the MCAP writer owned by the telemetry instance.
+ *
+ * @return std::shared_ptr<mcap::McapWriter> The configured MCAP writer, or an empty pointer if MCAP writing is unavailable.
+ */
+std::shared_ptr<mcap::McapWriter> mcap_writer() { return mcap_writer_; }
 
 #if TELEMETRY_USE_OTEL
-    otel::OtelExporter* otel_exporter() { return otel_exporter_.get(); }
+    /**
+ * @brief Provides access to the OpenTelemetry exporter.
+ *
+ * @return otel::OtelExporter* The configured exporter, or `nullptr` when exporting is disabled.
+ */
+otel::OtelExporter* otel_exporter() { return otel_exporter_.get(); }
 #endif
 
     void flush();

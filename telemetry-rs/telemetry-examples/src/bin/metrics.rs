@@ -1,7 +1,7 @@
 //! OTLP metrics to `localhost:6009`.
-use std::path::PathBuf;
 use telemetry::derive::Metrics;
 use telemetry::{Environment, logger};
+use std::path::PathBuf;
 
 #[derive(Debug, Metrics)]
 pub struct LlmMetrics {
@@ -27,7 +27,21 @@ pub struct LlmMetrics {
     pub cache_hit_rate: f64,
 }
 
-#[tokio::main]
+/// Initializes telemetry, records sample API and LLM metrics, and flushes the results.
+///
+/// # Errors
+///
+/// Returns an error if telemetry initialization, metric recording, or flushing fails.
+///
+/// # Examples
+///
+/// ```no_run
+/// #[tokio::test]
+/// async fn records_metrics() -> anyhow::Result<()> {
+///     main().await?;
+///     Ok(())
+/// }
+/// ```
 async fn main() -> anyhow::Result<()> {
     let mcap_path = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("target/metrics-example.mcap");
     let mut telemetry = telemetry::telemetry_local_otel!()

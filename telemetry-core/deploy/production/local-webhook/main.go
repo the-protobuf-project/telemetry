@@ -34,6 +34,7 @@ type AlertmanagerPayload struct {
 	Alerts            []Alert           `json:"alerts"`
 }
 
+// sendNotification displays a desktop notification with the specified title and message on supported operating systems.
 func sendNotification(title, message string) {
 	switch runtime.GOOS {
 	case "darwin":
@@ -50,6 +51,7 @@ func sendNotification(title, message string) {
 	}
 }
 
+// webhookHandler processes Alertmanager webhook POST requests and sends a desktop notification for each alert. It responds with the received status after successful processing.
 func webhookHandler(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
 		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
@@ -86,26 +88,31 @@ func webhookHandler(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(map[string]string{"status": "received"})
 }
 
+// criticalHandler handles critical alert webhook requests.
 func criticalHandler(w http.ResponseWriter, r *http.Request) {
 	log.Println("CRITICAL alert received!")
 	webhookHandler(w, r)
 }
 
+// warningHandler logs and processes warning alert webhook requests.
 func warningHandler(w http.ResponseWriter, r *http.Request) {
 	log.Println("WARNING alert received")
 	webhookHandler(w, r)
 }
 
+// localHandler processes alerts received for the local system endpoint.
 func localHandler(w http.ResponseWriter, r *http.Request) {
 	log.Println("LOCAL SYSTEM alert received")
 	webhookHandler(w, r)
 }
 
+// healthHandler reports that the local webhook service is healthy.
 func healthHandler(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusOK)
 	json.NewEncoder(w).Encode(map[string]string{"status": "healthy"})
 }
 
+// main starts the alert webhook HTTP server using the port specified by the PORT environment variable or port 9095 by default.
 func main() {
 	port := os.Getenv("PORT")
 	if port == "" {

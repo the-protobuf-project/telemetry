@@ -51,6 +51,8 @@ type LLMRequestEvent struct {
 	ErrorMessage string `json:"error_message,omitempty"`
 }
 
+// main demonstrates multilingual chat telemetry logging with structured messages,
+// transcription events, and LLM request events.
 func main() {
 	// Uses telemetry.toml config for service info and OTLP endpoint
 	p, err := telemetry.New().Build()

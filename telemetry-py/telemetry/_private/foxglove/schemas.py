@@ -8,7 +8,15 @@ from typing import Dict
 
 
 def load_schema(schema_name: str) -> str:
-    """Load a JSON schema from the schemas directory"""
+    """
+    Load a named JSON schema from the package's schemas directory.
+    
+    Parameters:
+        schema_name (str): Name of the schema file without the `.json` extension.
+    
+    Returns:
+        str: The schema serialized as a JSON string.
+    """
     schema_dir = Path(__file__).parent / "schemas"
     schema_path = schema_dir / f"{schema_name}.json"
 
@@ -19,7 +27,12 @@ def load_schema(schema_name: str) -> str:
 
 
 def get_all_schemas() -> Dict[str, dict]:
-    """Load all available schemas"""
+    """
+    Load all available JSON schemas.
+    
+    Returns:
+        Dict[str, dict]: A mapping from each schema filename stem to its parsed contents.
+    """
     schemas = {}
     schema_dir = Path(__file__).parent / "schemas"
 

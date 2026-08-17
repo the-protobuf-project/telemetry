@@ -29,7 +29,25 @@ pub enum LogLevel {
 }
 
 impl LogLevel {
-    /// Convert from an integer (used when deserializing from TOML `level = 3`).
+    /// Converts a serialized numeric level to its corresponding logging level.
+    ///
+    /// Values `1` through `3` map to explicit module levels; all other values map to
+    /// [`LogLevel::Unset`].
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// assert_eq!(LogLevel::from_u8(3), LogLevel::ModuleLevel_3);
+    /// assert_eq!(LogLevel::from_u8(0), LogLevel::Unset);
+    /// ```
+    ///
+    /// # Parameters
+    ///
+    /// * `v` - Numeric level value from serialized configuration.
+    ///
+    /// # Returns
+    ///
+    /// The corresponding [`LogLevel`].
     pub fn from_u8(v: u8) -> Self {
         match v {
             1 => LogLevel::ModuleLevel_1,
@@ -39,7 +57,20 @@ impl LogLevel {
         }
     }
 
-    /// Convert to a `log::LevelFilter` for log4rs configuration.
+    /// Maps the configured logging level to its corresponding [`log::LevelFilter`].
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// assert_eq!(
+    ///     LogLevel::ModuleLevel_1.to_level_filter(),
+    ///     log::LevelFilter::Error
+    /// );
+    /// ```
+    ///
+    /// # Returns
+    ///
+    /// The corresponding log filter; unset levels use [`log::LevelFilter::Info`].
     pub fn to_level_filter(self) -> log::LevelFilter {
         match self {
             LogLevel::ModuleLevel_1 => log::LevelFilter::Error,
@@ -49,7 +80,18 @@ impl LogLevel {
         }
     }
 
-    /// Returns true if this level is explicitly set (not Unset).
+    /// Determines whether the logging level is explicitly configured.
+    ///
+    /// # Returns
+    ///
+    /// `true` for an explicit logging level, `false` for [`LogLevel::Unset`].
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// assert!(LogLevel::ModuleLevel_1.is_set());
+    /// assert!(!LogLevel::Unset.is_set());
+    /// ```
     pub fn is_set(self) -> bool {
         self != LogLevel::Unset
     }
@@ -99,15 +141,46 @@ pub struct LogOptions {
     pub caller_offset: i32,
 }
 
+/// Provides a default enabled value.
+///
+/// # Examples
+///
+/// ```
+/// assert!(default_true());
+/// ```
+///
 fn default_true() -> bool {
     true
 }
 
+/// Provides the default caller offset for log messages.
+
+///
+
+/// # Examples
+
+///
+
+/// ```
+
+/// assert_eq!(default_caller_offset(), 3);
+
+/// ```
 fn default_caller_offset() -> i32 {
     3
 }
 
 impl Default for LogOptions {
+    /// Creates logging options with caller and timestamp reporting enabled and the default timestamp format.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// let options = LogOptions::default();
+    /// assert!(options.report_caller);
+    /// assert!(options.report_timestamp);
+    /// ```
+    ///
     fn default() -> Self {
         Self {
             prefix: String::new(),

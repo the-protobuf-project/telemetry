@@ -55,23 +55,17 @@ class OTLPLogger:
         service_description: str = "",
         service_labels: Dict[str, str] = None,
     ):
-        """Initialize the OTLP logger.
-
-        Sets up OpenTelemetry logging with OTLP exporter and attaches a handler
-        to Python's root logger. Log level is determined by service_environment:
-        - development: DEBUG
-        - staging: INFO
-        - production: WARNING
-
+        """Configure an OpenTelemetry logger for a service.
+        
         Args:
-            service_name: Name of the service for resource attributes.
+            service_name: Name of the service.
             service_version: Version of the service.
-            service_environment: Deployment environment (e.g., "production", "development", "staging").
-            endpoint: OTLP endpoint (e.g., "localhost:4317" or "otel.example.com").
-            auth_token: Bearer token for authentication.
-            secure: Use TLS for connection.
-            service_description: Optional service description.
-            service_labels: Optional dictionary of service labels.
+            service_environment: Deployment environment used to determine the log level.
+            endpoint: OTLP gRPC exporter endpoint.
+            auth_token: Optional bearer token for exporter authentication.
+            secure: Whether to use TLS for the exporter connection.
+            service_description: Optional description of the service.
+            service_labels: Optional labels added to exported log records.
         """
         # Store service description and labels for use in log attributes
         self.service_description = service_description
@@ -139,13 +133,14 @@ class OTLPLogger:
         self.service_environment = service_environment
 
     def _get_log_level_for_environment(self, environment: str) -> int:
-        """Determine log level based on service environment.
-
-        Args:
-            environment: Service environment string (development, staging, production).
-
+        """
+        Determine the logging level for a service environment.
+        
+        Parameters:
+            environment (str): Service environment name.
+        
         Returns:
-            Python logging level integer.
+            int: `logging.DEBUG` for development environments; `logging.INFO` otherwise.
         """
         env_lower = environment.lower()
         if env_lower == "development":
@@ -161,22 +156,15 @@ class OTLPLogger:
         caller_file: str = "",
         caller_line: int = 0,
     ):
-        """Write a log entry to OTLP.
-
-        Emits a log record to Python's standard logging, which is then captured
-        by the OpenTelemetry LoggingHandler and exported to the OTLP collector.
-
-        Args:
-            level: Log level string (DEBUG, INFO, WARNING, ERROR, CRITICAL).
-            message: Log message text.
-            data: Optional dictionary of structured data to include as attributes.
-            caller_file: Source file path where the log was called.
-            caller_line: Line number where the log was called.
-
-        Note:
-            Structured data is added both as a JSON string in the 'data' attribute
-            and as individual fields for easier querying. Reserved LogRecord keys
-            are prefixed with 'field.' to avoid conflicts.
+        """
+        Emit a structured log entry for the configured service.
+        
+        Parameters:
+            level (str): Log severity name; unknown values use INFO.
+            message (str): Log message text.
+            data (Optional[Dict[str, Any]]): Structured fields to include in the log entry.
+            caller_file (str): Source file path associated with the entry.
+            caller_line (int): Source line number associated with the entry.
         """
         import logging as std_logging
         import json

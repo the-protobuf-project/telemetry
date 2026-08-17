@@ -54,7 +54,9 @@ type noopErrorHandler struct{}
 func (n noopErrorHandler) Handle(_ error) {}
 
 // New creates a new Telemetry instance with OpenTelemetry SDK configured
-// based on the provided service and telemetry options.
+// New creates a Telemetry instance from the provided service and OpenTelemetry options.
+// It initializes the enabled tracing, metrics, and logging components and returns an
+// error if resource creation or component initialization fails.
 func New(ctx context.Context, serviceOpts options.ServiceOptions, telemetryOpts options.OpenTelemetryOptions) (*Telemetry, error) {
 	// Suppress noisy OTel exporter errors (e.g. connection refused)
 	otel.SetErrorHandler(noopErrorHandler{})
@@ -128,7 +130,9 @@ func (t *Telemetry) createResource(serviceOpts options.ServiceOptions) (*resourc
 }
 
 // resolveOTLPConfig resolves the OTLP endpoint and headers from the options.
-// Supports both new (endpoint, auth_token) and legacy (host, port, headers) config.
+// resolveOTLPConfig resolves an OTLP endpoint, request headers, and security setting from the provided options.
+// It supports endpoint-based and legacy host/port configuration, applies protocol-specific default ports,
+// and adds bearer authorization when an authentication token is configured.
 func resolveOTLPConfig(otlp *options.OTLPOptions) (endpoint string, headers map[string]string, secure bool) {
 	headers = make(map[string]string)
 

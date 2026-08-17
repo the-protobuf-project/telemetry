@@ -19,6 +19,13 @@ class UnifiedMcapWriter:
     """
 
     def __init__(self, mcap_path: str, service_name: str):
+        """
+        Initialize an MCAP writer for the specified service.
+        
+        Parameters:
+            mcap_path (str): Path to the MCAP file to create.
+            service_name (str): Name of the service associated with the telemetry data.
+        """
         self.mcap_path = mcap_path
         self.service_name = service_name
         self._closed = False
@@ -32,7 +39,7 @@ class UnifiedMcapWriter:
         self._setup_schemas()
 
     def _setup_schemas(self):
-        """Setup MCAP schemas by loading from JSON files"""
+        """Register the JSON schemas and channels used for logs, metrics, and traces."""
         # Load schemas from JSON files
         log_schema = load_schema("log")
         metric_schema = load_schema("metric")
@@ -89,7 +96,20 @@ class UnifiedMcapWriter:
         service_version: str = "",
         service_environment: str = "",
     ):
-        """Write a log entry to MCAP using Foxglove Log schema"""
+        """
+        Write a timestamped log entry to the MCAP file.
+        
+        Parameters:
+            level (str): Textual log level, such as ``DEBUG``, ``INFO``, ``WARNING``, ``ERROR``, or ``FATAL``.
+            message (str): Log message.
+            data (Dict[str, Any]): Additional structured log data.
+            timestamp (Optional[int]): Timestamp in nanoseconds since the Unix epoch. Uses the current time when omitted.
+            name (str): Logger name. Uses the service name when omitted.
+            file (str): Source file associated with the log entry.
+            line (int): Source line associated with the log entry.
+            service_version (str): Version of the service that produced the entry.
+            service_environment (str): Environment in which the service is running.
+        """
         if self._closed:
             return
 
@@ -135,7 +155,15 @@ class UnifiedMcapWriter:
         labels: Optional[Dict[str, Any]] = None,
         timestamp: Optional[int] = None,
     ):
-        """Write a metric to MCAP using mahcanirobotics.metric schema"""
+        """
+        Write a timestamped metric record to the MCAP file.
+        
+        Parameters:
+            name (str): Metric name.
+            value (float): Metric value.
+            timestamp (Optional[int]): Timestamp in nanoseconds since the Unix epoch. Uses the current time when omitted.
+        
+        """
         if self._closed:
             return
 
@@ -165,7 +193,18 @@ class UnifiedMcapWriter:
         attributes: Optional[Dict[str, Any]] = None,
         timestamp: Optional[int] = None,
     ):
-        """Write a trace span to MCAP"""
+        """
+        Write a trace span to the MCAP file.
+        
+        Parameters:
+            trace_id (str): Identifier of the trace containing the span.
+            span_id (str): Identifier of the span.
+            name (str): Name of the span.
+            parent_span_id (Optional[str]): Identifier of the parent span.
+            attributes (Optional[Dict[str, Any]]): Key-value attributes associated with the span.
+            timestamp (Optional[int]): Timestamp in nanoseconds since the Unix epoch.
+        
+        """
         if self._closed:
             return
 
@@ -194,7 +233,9 @@ class UnifiedMcapWriter:
         return self._closed
 
     def close(self):
-        """Close the MCAP writer and file"""
+        """
+        Close the MCAP writer and its underlying file. Repeated calls have no effect.
+        """
         if not self._closed:
             self.writer.finish()
             self.file.close()

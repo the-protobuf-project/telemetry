@@ -20,6 +20,7 @@ type ChatMessage struct {
 	Timestamp int64  `json:"timestamp"`
 }
 
+// main configures telemetry, emits sample chat messages across multiple log levels, and reports the locations of the resulting observability outputs.
 func main() {
 	// Uses telemetry.toml config for service info and OTLP endpoint
 	// Enable foxglove in telemetry.toml to record MCAP

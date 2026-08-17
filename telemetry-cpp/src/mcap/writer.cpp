@@ -25,7 +25,12 @@ std::string timestamp_to_iso8601(uint64_t timestamp_ns) {
     return oss.str();
 }
 
-}  // namespace
+}  /**
+ * @brief Initializes an MCAP writer for the specified output path and service.
+ *
+ * @param service_opts Service metadata used for recorded telemetry.
+ * @param path Binary output file path.
+ */
 
 McapWriter::McapWriter(const ServiceOptions& service_opts, const std::string& path)
     : path_(path)
@@ -58,12 +63,21 @@ McapWriter::~McapWriter() {
     platform::destroy_mutex(mutex_);
 }
 
+/**
+ * @brief Registers the schemas used for log, metric, and span messages.
+ */
 void McapWriter::register_schemas() {
     schemas_["Log"] = {"Log", "jsonschema", schemas::LOG_SCHEMA};
     schemas_["Metric"] = {"Metric", "jsonschema", schemas::METRIC_SCHEMA};
     schemas_["Span"] = {"Span", "jsonschema", schemas::SPAN_SCHEMA};
 }
 
+/**
+ * @brief Obtains the MCAP schema ID for a registered schema.
+ *
+ * @param schema_name Name of the schema to retrieve or register.
+ * @return uint16_t The schema ID, or 0 if the schema is unknown or schema support is unavailable.
+ */
 uint16_t McapWriter::get_or_create_schema(const std::string& schema_name) {
 #if !TELEMETRY_PLATFORM_FREERTOS
     auto it = schema_ids_.find(schema_name);
@@ -92,6 +106,13 @@ uint16_t McapWriter::get_or_create_schema(const std::string& schema_name) {
 #endif
 }
 
+/**
+ * @brief Retrieves or creates an MCAP channel for a topic.
+ *
+ * @param topic Topic associated with the channel.
+ * @param schema_name Name of the schema used by the channel.
+ * @return uint16_t Existing or newly created channel ID, or `0` on FreeRTOS.
+ */
 uint16_t McapWriter::ensure_channel(const std::string& topic, const std::string& schema_name) {
 #if !TELEMETRY_PLATFORM_FREERTOS
     auto it = channel_ids_.find(topic);
@@ -119,6 +140,15 @@ uint16_t McapWriter::create_channel(const std::string& topic, const std::string&
     return ensure_channel(topic, schema_name);
 }
 
+/**
+ * @brief Writes a serialized message to the specified MCAP channel.
+ *
+ * @param channel_id Identifier of the destination channel.
+ * @param data Serialized message data.
+ * @param size Size of the serialized message data in bytes.
+ * @param log_time Message log timestamp in nanoseconds.
+ * @param publish_time Message publication timestamp in nanoseconds.
+ */
 void McapWriter::write_message(uint16_t channel_id, const uint8_t* data, size_t size,
                                 uint64_t log_time, uint64_t publish_time) {
 #if !TELEMETRY_PLATFORM_FREERTOS
@@ -138,6 +168,11 @@ void McapWriter::write_message(uint16_t channel_id, const uint8_t* data, size_t 
 #endif
 }
 
+/**
+ * @brief Writes a log entry to the MCAP log channel.
+ *
+ * @param entry Log entry containing the message, severity, source location, timestamp, and optional JSON data.
+ */
 void McapWriter::write_log(const logging::LogEntry& entry) {
 #if !TELEMETRY_PLATFORM_FREERTOS
     if (!is_open_ || closed_) return;
@@ -163,6 +198,14 @@ void McapWriter::write_log(const logging::LogEntry& entry) {
 #endif
 }
 
+/**
+ * @brief Writes a metric record to the MCAP output.
+ *
+ * @param name Metric name.
+ * @param type Metric type.
+ * @param value Numeric metric value.
+ * @param timestamp_ns Metric timestamp in nanoseconds since the Unix epoch.
+ */
 void McapWriter::write_metric(const std::string& name, const std::string& type,
                                double value, uint64_t timestamp_ns) {
 #if !TELEMETRY_PLATFORM_FREERTOS
@@ -184,6 +227,16 @@ void McapWriter::write_metric(const std::string& name, const std::string& type,
 #endif
 }
 
+/**
+ * @brief Records a tracing span with its identifiers, timing, name, and status.
+ *
+ * @param name Span name.
+ * @param trace_id Trace identifier.
+ * @param span_id Span identifier.
+ * @param start_ns Span start time as nanoseconds since the Unix epoch.
+ * @param end_ns Span end time as nanoseconds since the Unix epoch.
+ * @param status Span completion status.
+ */
 void McapWriter::write_span(const std::string& name, const std::string& trace_id,
                              const std::string& span_id, uint64_t start_ns,
                              uint64_t end_ns, const std::string& status) {
@@ -208,6 +261,9 @@ void McapWriter::write_span(const std::string& name, const std::string& trace_id
 #endif
 }
 
+/**
+ * @brief Flushes buffered MCAP output to the destination file.
+ */
 void McapWriter::flush() {
 #if !TELEMETRY_PLATFORM_FREERTOS
     if (!is_open_ || closed_) return;
@@ -216,6 +272,11 @@ void McapWriter::flush() {
 #endif
 }
 
+/**
+ * @brief Closes the MCAP writer and its output file.
+ *
+ * Further writes are ignored after the writer is closed.
+ */
 void McapWriter::close() {
 #if !TELEMETRY_PLATFORM_FREERTOS
     if (closed_) return;

@@ -53,7 +53,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::options::{
     Environment, FoxgloveOptions, LogLevel, LoggingOptions, ModuleOptions, OTLPOptions,
-    OpenTelemetryOptions, ProfilingOptions, ServiceOptions, TelemetryOptions, TracingOptions,
+    TelemetryOptions, ProfilingOptions, ServiceOptions, OpenTelemetryOptions, TracingOptions,
 };
 
 /// Complete Telemetry configuration loaded from files/environment.
@@ -106,6 +106,14 @@ pub struct OpenTelemetryConfig {
 }
 
 impl Default for OpenTelemetryConfig {
+    /// Creates an enabled OpenTelemetry configuration with default OTLP and metrics settings.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// let config = OpenTelemetryConfig::default();
+    /// assert!(config.enabled);
+    /// ```
     fn default() -> Self {
         Self {
             enabled: true,
@@ -235,6 +243,15 @@ pub struct ProfilingConfig {
 }
 
 impl Default for ProfilingConfig {
+    /// Creates a disabled configuration with the default local server address.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// let config = FoxgloveConfig::default();
+    /// assert!(!config.enabled);
+    /// assert_eq!(config.server_address, "http://localhost:4040");
+    /// ```
     fn default() -> Self {
         Self {
             enabled: false,
@@ -244,17 +261,31 @@ impl Default for ProfilingConfig {
 }
 
 impl TelemetryConfig {
-    /// Creates a Figment instance for loading configuration.
+    /// Creates a Figment instance configured with defaults, an optional configuration file, and `TELEMETRY_*` environment variables.
     ///
-    /// Configuration is loaded in this priority order (highest to lowest):
-    /// 1. Environment variables (`TELEMETRY_*`)
-    /// 2. Config file (auto-discovered or specified)
-    /// 3. Default values
+    /// Configuration sources are applied from lowest to highest priority: defaults, the discovered or specified configuration file, and environment variables.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// let _figment = TelemetryConfig::figment();
+    /// ```
     pub fn figment() -> Figment {
         Self::figment_with_path(None)
     }
 
-    /// Creates a Figment instance with a specific config file path.
+    /// Builds a [`Figment`] configuration from defaults and the highest-priority available sources.
+    ///
+    /// A provided path takes precedence over `TELEMETRY_CONFIG_PATH`, which takes precedence over
+    /// automatic configuration-file discovery. Environment variables prefixed with `TELEMETRY_` are
+    /// merged last.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// let figment = TelemetryConfig::figment_with_path(None);
+    /// let config: TelemetryConfig = figment.extract().unwrap();
+    /// ```
     pub fn figment_with_path(config_path: Option<&str>) -> Figment {
         let mut figment = Figment::from(Serialized::defaults(TelemetryConfig::default()));
 
@@ -272,7 +303,17 @@ impl TelemetryConfig {
         figment.merge(Env::prefixed("TELEMETRY_").split("_"))
     }
 
-    /// Auto-discover and load configuration files.
+    /// Loads the first available telemetry configuration file from the supported default paths.
+    ///
+    /// Files are checked in order from the current directory, followed by the `.config`
+    /// directory. If no supported file exists, the original configuration is returned.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// let figment = Figment::new();
+    /// let configured = TelemetryConfig::auto_discover_config(figment);
+    /// ```
     fn auto_discover_config(figment: Figment) -> Figment {
         let config_paths = [
             "telemetry.toml",
@@ -314,13 +355,38 @@ impl TelemetryConfig {
         Self::figment().extract()
     }
 
-    /// Load configuration from a specific file path.
-    #[allow(clippy::result_large_err)]
+    /// Loads configuration from the specified file path.
+    ///
+    /// # Arguments
+    ///
+    /// * `path` - Path to the configuration file.
+    ///
+    /// # Returns
+    ///
+    /// The loaded telemetry configuration or a Figment error.
+    ///
+    /// # Examples
+    ///
+    /// ```no_run
+    /// let config = TelemetryConfig::load_from("telemetry.toml")?;
+    /// # Ok::<(), figment::Error>(())
+    /// ```
     pub fn load_from(path: &str) -> Result<Self, figment::Error> {
         Self::figment_with_path(Some(path)).extract()
     }
 
-    /// Convert to ServiceOptions for Telemetry initialization.
+    /// Converts the configured service identity into options for telemetry initialization.
+    ///
+    /// Environment names are matched case-insensitively, with unknown values mapped to
+    /// the development environment. Service labels are preserved.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// let config = TelemetryConfig::default();
+    /// let _options = config.to_service_options();
+    /// ```
+    ///
     pub fn to_service_options(&self) -> ServiceOptions {
         let env = match self.service.environment.to_lowercase().as_str() {
             "production" | "prod" => Environment::Production,
@@ -335,7 +401,18 @@ impl TelemetryConfig {
             .with_labels(self.service.labels.clone())
     }
 
-    /// Convert to TelemetryOptions for Telemetry initialization.
+    /// Converts the configured telemetry, logging, Foxglove, profiling, and tracing settings into runtime options.
+    ///
+    /// # Returns
+    ///
+    /// The runtime telemetry options derived from this configuration.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// let config = TelemetryConfig::default();
+    /// let _options = config.to_telemetry_options();
+    /// ```
     pub fn to_telemetry_options(&self) -> TelemetryOptions {
         let (host, port) = Self::parse_endpoint(&self.telemetry.otlp.endpoint);
 

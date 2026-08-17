@@ -125,41 +125,47 @@ def metric(
     labels: Optional[Dict[str, Any]] = None,
     record_duration: bool = False,
 ):
-    """Decorator for automatic metric recording from function execution.
-
-    This decorator automatically records metrics when a function is called.
-    It can track call counts (counter), execution duration (histogram), or
-    custom values returned by the function (gauge).
-
-    Args:
-        name: Metric name. Defaults to function name.
-        metric_type: Type of metric - "counter", "histogram", or "gauge".
-        labels: Optional labels/tags to attach to the metric.
-        record_duration: If True, records function duration as a histogram.
-
+    """
+    Create a decorator that records metrics for function execution.
+    
+    Parameters:
+        name (Optional[str]): Metric name; defaults to the decorated function's name.
+        metric_type (str): Metric type: ``"counter"``, ``"histogram"``, or ``"gauge"``.
+        labels (Optional[Dict[str, Any]]): Labels to attach to recorded metrics.
+        record_duration (bool): Whether to record execution duration as a histogram.
+    
     Returns:
-        A decorator that can be applied to functions.
-
-    Example:
-        import telemetry
-
-        @telemetry.metric("api_requests", metric_type="counter")
-        def handle_request():
-            return "processed"
-
-        @telemetry.metric("api_latency", record_duration=True)
-        def slow_operation():
-            time.sleep(0.1)
-            return "done"
+        Callable: A decorator that records the configured metrics and preserves the
+        decorated function's return value.
+    
+    Raises:
+        Exception: Re-raises exceptions from the decorated function after recording
+            an error metric.
     """
 
     def decorator(func: Callable) -> Callable:
-        """Decorator that wraps a function with metric recording."""
+        """
+        Decorate a function to record execution metrics.
+        
+        Parameters:
+            func (Callable): Function whose execution metrics are recorded.
+        
+        Returns:
+            Callable: Wrapped function that preserves the original behavior while recording configured metrics.
+        """
         metric_name = name or func.__name__
 
         @functools.wraps(func)
         def wrapper(*args, **kwargs):
-            """Wrapper function that records metrics."""
+            """
+            Execute the wrapped function and record configured telemetry metrics.
+            
+            Returns:
+                The wrapped function's result.
+            
+            Raises:
+                Exception: Re-raises exceptions from the wrapped function after recording an error metric.
+            """
             # Get Telemetry instance from context
             telemetry_instance = _current_telemetry_metrics.get()
 
@@ -278,19 +284,14 @@ def reset_current_telemetry_metrics(token):
 
 # Capitalized field helpers for cleaner syntax
 def Counter(name: Optional[str] = None, description: str = "") -> Any:
-    """Counter field helper with automatic name inference.
-
-    Args:
-        name: Optional metric name. If not provided, uses field name.
-        description: Human-readable description of the metric.
-
+    """Define a counter metric field with an optional name.
+    
+    Parameters:
+        name (Optional[str]): Metric name; inferred from the model field name when omitted.
+        description (str): Human-readable description of the metric.
+    
     Returns:
-        A Pydantic Field with counter metric metadata.
-
-    Example:
-        @telemetry.MetricModel
-        class MyMetrics(BaseModel):
-            requests: int = Counter(description="Total requests")
+        Any: A Pydantic field configured with counter metric metadata.
     """
     return Field(
         default=0,
@@ -308,20 +309,16 @@ def Histogram(
     description: str = "",
     buckets: Optional[list[float]] = None,
 ) -> Any:
-    """Histogram field helper with automatic name inference.
-
+    """
+    Create a histogram metric field with optional name inference.
+    
     Args:
-        name: Optional metric name. If not provided, uses field name.
+        name: Optional metric name; inferred from the model field when omitted.
         description: Human-readable description of the metric.
-        buckets: Optional explicit bucket boundaries for the histogram.
-
+        buckets: Optional explicit histogram bucket boundaries.
+    
     Returns:
-        A Pydantic Field with histogram metric metadata.
-
-    Example:
-        @telemetry.MetricModel
-        class MyMetrics(BaseModel):
-            latency: float = Histogram(description="API latency in ms", buckets=[0.1, 0.5, 1.0])
+        A Pydantic field configured with histogram metric metadata.
     """
     return Field(
         default=0.0,

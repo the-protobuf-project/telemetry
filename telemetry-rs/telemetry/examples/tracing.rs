@@ -3,25 +3,52 @@
 use telemetry::tracing::instrument;
 use telemetry::{Environment, Telemetry};
 
-/// Each call runs **inside** the caller’s active span → same trace, child spans.
-#[instrument]
+/// Creates a tracing span for a simulated database connection.
+///
+/// # Examples
+///
+/// ```
+/// connect_to_db();
+/// ```
 fn connect_to_db() {
     telemetry::logger::info!("child span: connect_to_db");
     std::thread::sleep(std::time::Duration::from_millis(80));
 }
 
+/// Simulates a database query.
+///
+/// # Examples
+///
+/// ```
+/// query_database();
+/// ```
 #[instrument]
 fn query_database() {
     telemetry::logger::info!("child span: query_database");
     std::thread::sleep(std::time::Duration::from_millis(80));
 }
 
-#[instrument]
+/// Processes a unit of data.
+///
+/// # Examples
+///
+/// ```
+/// process_data();
+/// ```
+///
+/// #[instrument]
 fn process_data() {
     telemetry::logger::info!("child span: process_data");
     std::thread::sleep(std::time::Duration::from_millis(80));
 }
 
+/// Saves data while recording a child tracing span.
+///
+/// # Examples
+///
+/// ```
+/// save_data();
+/// ```
 #[instrument]
 fn save_data() {
     telemetry::logger::info!("child span: save_data");
@@ -37,7 +64,15 @@ fn run_sync_pipeline() {
     save_data();
 }
 
-#[instrument]
+/// Executes a named asynchronous pipeline step, completing after a short delay.
+///
+/// # Examples
+///
+/// ```
+/// # async fn example() {
+/// async_step("fetch").await;
+/// # }
+/// ```
 async fn async_step(name: &'static str) {
     telemetry::logger::info!("async child step={}", name);
     tokio::time::sleep(tokio::time::Duration::from_millis(60)).await;
@@ -56,6 +91,13 @@ async fn full_demo() {
     run_async_pipeline().await;
 }
 
+/// Initializes telemetry, runs the complete tracing demo, flushes exported data, and shuts down telemetry.
+///
+/// # Examples
+///
+/// ```no_run
+/// // Run the binary to execute the demo and export its trace.
+/// ```
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
     let mut telemetry = Telemetry::new()

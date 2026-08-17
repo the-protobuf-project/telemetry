@@ -28,6 +28,13 @@ impl std::fmt::Debug for TelemetryFormatter {
 }
 
 impl Default for TelemetryFormatter {
+    /// Creates a formatter with empty service metadata.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// let formatter = TelemetryFormatter::default();
+    /// ```
     fn default() -> Self {
         Self::new()
     }
@@ -51,13 +58,24 @@ impl TelemetryFormatter {
         }
     }
 
-    /// Sets the service information for the formatter.
+    /// Updates the service name, version, and deployment environment used by the formatter.
     ///
     /// # Arguments
     ///
-    /// * `name` - Service name
-    /// * `version` - Service version
-    /// * `environment` - Deployment environment
+    /// * `name` - Service name.
+    /// * `version` - Service version.
+    /// * `environment` - Deployment environment.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// let formatter = TelemetryFormatter::new();
+    /// formatter.set_service_info(
+    ///     "checkout".to_owned(),
+    ///     "1.0.0".to_owned(),
+    ///     "production".to_owned(),
+    /// );
+    /// ```
     pub fn set_service_info(&self, name: String, version: String, environment: String) {
         *self.service_name.lock().unwrap() = name;
         *self.service_version.lock().unwrap() = version;
@@ -66,6 +84,34 @@ impl TelemetryFormatter {
 }
 
 impl Encode for TelemetryFormatter {
+    /// Formats a log record with timestamp, severity, source location, service metadata, and message.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use log4rs::encode::Encode;
+    /// use telemetry::logging::formatter::TelemetryFormatter;
+    ///
+    /// let formatter = TelemetryFormatter::new();
+    /// let mut output = Vec::new();
+    ///
+    /// let record = log::Record::builder()
+    ///     .level(log::Level::Info)
+    ///     .file(Some("src/main.rs"))
+    ///     .line(Some(10))
+    ///     .args(format_args!("Service started"))
+    ///     .build();
+    ///
+    /// formatter.encode(&mut output, &record)?;
+    /// assert!(String::from_utf8(output)?.contains("Service started"));
+    /// # Ok::<(), Box<dyn std::error::Error>>(())
+    /// ```
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if writing the formatted record fails.
+    ///
+    /// @returns `Ok(())` after the record is written, or the underlying write error.
     fn encode(&self, w: &mut dyn Write, record: &Record) -> anyhow::Result<()> {
         let timestamp = Local::now().format("%Y-%m-%dT%H:%M::%S");
         let level = record.level();

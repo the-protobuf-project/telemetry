@@ -73,7 +73,7 @@ type Builder struct {
 //	p, err := telemetry.New().
 //	    WithService("my-service", "1.0.0").
 //	    WithConfig("config.yaml").
-//	    Build()
+// New creates a Builder initialized with auto-discovered telemetry and service configuration, using defaults when configuration is unavailable.
 func New() *Builder {
 	// Auto-discover and load config on creation
 	telemetryOpts, serviceOpts, _ := options.LoadConfigWithDefaults("")
@@ -334,7 +334,8 @@ func isLocalHost(host string) bool {
 	return false
 }
 
-// autoConfigureOTLP automatically configures OTLP settings based on the endpoint or host.
+// autoConfigureOTLP enables OTLP and applies transport defaults based on the configured endpoint or host.
+// Remote hosts using ports 443 or 4318 enable TLS and HTTP; port 4317 retains its configured security setting.
 func autoConfigureOTLP(otlp *options.OTLPOptions) {
 	// Auto-enable OTLP when an endpoint is configured
 	if !otlp.Enabled && otlp.Endpoint != "" {
@@ -368,6 +369,7 @@ func autoConfigureOTLP(otlp *options.OTLPOptions) {
 }
 
 // NewLegacy creates a new Telemetry instance using the legacy API (for backward compatibility).
+// NewLegacy creates telemetry clients from an explicit context and configuration.
 // Deprecated: Use New().WithConfig().Build() instead.
 func NewLegacy(ctx context.Context, serviceOpts options.ServiceOptions, opts options.TelemetryOptions) (*Telemetry, error) {
 	// Auto-configure OTLP settings

@@ -1,6 +1,6 @@
 //! Logs to console + OTLP logs to local collector (`localhost:6009`).
-use serde::Serialize;
 use telemetry::{Environment, logger};
+use serde::Serialize;
 
 #[derive(Debug, Serialize)]
 struct ChatMessage {
@@ -12,6 +12,19 @@ struct ChatMessage {
     timestamp: i64,
 }
 
+/// Starts the chat service, initializes telemetry, logs a sample message, and waits briefly before exiting.
+///
+/// # Examples
+///
+/// ```
+/// # #[tokio::main]
+/// # async fn main() -> anyhow::Result<()> {
+/// main().await?;
+/// # Ok(())
+/// # }
+/// ```
+///
+/// Returns an error if telemetry initialization fails.
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
     let _telemetry = telemetry::telemetry_local_otel!()

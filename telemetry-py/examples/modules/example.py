@@ -12,6 +12,11 @@ def main():
     # ========================================
     # 1. Main service — uses global logging.level from telemetry.toml (Level 2 = Info)
     # ========================================
+    """
+    Demonstrate per-module logging-level configuration and its priority order.
+    
+    Creates telemetry services with different module-level settings and emits messages at multiple severities to show how environment variables, TOML configuration, code-level settings, and global defaults determine log visibility.
+    """
     core = Telemetry.new().with_service("robot-core", "1.0.0").build()
 
     core.logger.info("=== Robot Core Started ===")

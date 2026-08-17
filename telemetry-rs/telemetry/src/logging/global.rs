@@ -109,17 +109,29 @@ impl GlobalLogger {
         attrs
     }
 
-    /// Logs a message with location information to all configured backends.
-    ///
-    /// This method is typically called by the log macros and builder, not directly.
+    /// Logs a message with its source location to the console and configured backends.
     ///
     /// # Arguments
     ///
-    /// * `level` - Severity level of the log
-    /// * `message` - Log message
-    /// * `data` - Optional structured data to attach
-    /// * `file` - Source file location
-    /// * `line` - Line number in source file
+    /// * `level` - Severity of the message.
+    /// * `message` - Message text to log.
+    /// * `data` - Optional structured data associated with the message.
+    /// * `file` - Source file containing the log call.
+    /// * `line` - Source line containing the log call.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # use telemetry::{GlobalLogger, Severity};
+    /// # let logger = GlobalLogger::new("example", "1.0.0", "development", None, None);
+    /// logger.log_with_location(
+    ///     Severity::Info,
+    ///     "Service started".to_owned(),
+    ///     None,
+    ///     file!(),
+    ///     line!(),
+    /// );
+    /// ```
     pub fn log_with_location(
         &self,
         level: Severity,

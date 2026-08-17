@@ -110,6 +110,7 @@ func (s *JobService) Complete(ctx context.Context, job *Job, elapsed time.Durati
 	s.activeJobs.Add(ctx, -1, telemetry.Labels{"queue": job.Queue})
 }
 
+// main runs the job service telemetry example and records its metrics to an MCAP file.
 func main() {
 	ctx := context.Background()
 

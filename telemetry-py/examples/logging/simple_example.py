@@ -16,6 +16,9 @@ from telemetry import Telemetry
 def main():
     # Auto-discovers telemetry.toml config file
     # No builder overrides - uses config file values
+    """
+    Demonstrate chat service telemetry logging using automatically discovered configuration.
+    """
     with Telemetry.new().build() as telemetry:
         telemetry.logger.info("Chat service started")
         telemetry.logger.debug("Debug mode enabled")

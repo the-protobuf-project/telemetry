@@ -30,6 +30,7 @@ type InferenceRequest struct {
 	ProcessingLoc string // "cpu", "gpu", or "memory"
 }
 
+// main initializes telemetry, runs the configured inference simulation, and closes telemetry when the simulation completes.
 func main() {
 	// Uses telemetry.toml config for service info and OTLP endpoint
 	p, err := telemetry.New().Build()
@@ -68,7 +69,7 @@ func main() {
 	p.Logger.Info("Simulation completed")
 }
 
-// runInferenceSimulation simulates LLM inference workload
+// runInferenceSimulation runs the configured inference workload for the specified duration.
 func runInferenceSimulation(ctx context.Context, p *telemetry.Telemetry, config LLMConfig, duration time.Duration) {
 	var wg sync.WaitGroup
 	stopChan := make(chan struct{})
@@ -98,7 +99,7 @@ func runInferenceSimulation(ctx context.Context, p *telemetry.Telemetry, config 
 	wg.Wait()
 }
 
-// generateRequests creates inference requests
+// generateRequests periodically creates inference requests with randomized prompts, token limits, temperatures, and processing locations, then sends them until stopped.
 func generateRequests(requestChan chan<- InferenceRequest, stopChan <-chan struct{}) {
 	ticker := time.NewTicker(200 * time.Millisecond)
 	defer ticker.Stop()
@@ -131,7 +132,7 @@ func generateRequests(requestChan chan<- InferenceRequest, stopChan <-chan struc
 	}
 }
 
-// inferenceWorker processes inference requests
+// inferenceWorker processes inference requests until shutdown or the request channel is closed.
 func inferenceWorker(ctx context.Context, p *telemetry.Telemetry, config LLMConfig, workerID int, requestChan <-chan InferenceRequest, stopChan <-chan struct{}) {
 	for {
 		select {
@@ -146,7 +147,7 @@ func inferenceWorker(ctx context.Context, p *telemetry.Telemetry, config LLMConf
 	}
 }
 
-// processInferenceRequest simulates processing a single inference request
+// processInferenceRequest simulates processing a single inference request through model loading, tokenization, inference, and decoding stages.
 func processInferenceRequest(ctx context.Context, p *telemetry.Telemetry, config LLMConfig, workerID int, req InferenceRequest) {
 	// Stage 1: Model Loading / Cache Lookup
 	p.Profiler.TagWrapper(ctx, map[string]string{

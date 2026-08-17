@@ -23,6 +23,11 @@
     namespace telemetry::platform {
         using Mutex = SemaphoreHandle_t;
 
+        /**
+         * @brief Creates a mutex.
+         *
+         * @return Mutex handle for the newly created mutex.
+         */
         inline Mutex create_mutex() {
             return xSemaphoreCreateMutex();
         }
@@ -51,6 +56,11 @@
     namespace telemetry::platform {
         using Mutex = std::mutex*;
 
+        /**
+         * @brief Creates a mutex.
+         *
+         * @return Mutex Pointer to the newly allocated mutex.
+         */
         inline Mutex create_mutex() {
             return new std::mutex();
         }

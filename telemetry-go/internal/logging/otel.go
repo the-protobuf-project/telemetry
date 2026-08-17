@@ -40,7 +40,7 @@ type OtelLogger struct {
 	ctx    context.Context // Context for OTLP logging
 }
 
-// NewOtelLogger creates a new OtelLogger with context.Background() as default
+// NewOtelLogger creates an OpenTelemetry logger with a background context.
 func NewOtelLogger(logger log.Logger) *OtelLogger {
 	return &OtelLogger{
 		logger: logger,

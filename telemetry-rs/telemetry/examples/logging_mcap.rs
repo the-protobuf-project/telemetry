@@ -1,5 +1,5 @@
-use serde::Serialize;
 use telemetry::{Environment, Telemetry, logger};
+use serde::Serialize;
 
 #[derive(Debug, Serialize)]
 struct ChatMessage {
@@ -12,7 +12,17 @@ struct ChatMessage {
     timestamp: i64,
 }
 
-#[tokio::main]
+/// Runs the chat-service MCAP logging example and writes generated chat messages to the configured MCAP file.
+///
+/// # Examples
+///
+/// ```no_run
+/// // Run the example binary to generate chat messages and write them to MCAP.
+/// ```
+///
+/// # Returns
+///
+/// `Ok(())` after all messages are logged, or an error if telemetry initialization fails.
 async fn main() -> anyhow::Result<()> {
     // Auto-discovers telemetry.toml config file, then override with MCAP
     let _telemetry = Telemetry::new()

@@ -1,7 +1,7 @@
 //! MCAP + optional OTLP (`localhost:6009`).
+use telemetry::{Environment, logger};
 use serde::Serialize;
 use std::path::PathBuf;
-use telemetry::{Environment, logger};
 
 #[derive(Debug, Serialize)]
 struct ChatMessage {
@@ -14,7 +14,20 @@ struct ChatMessage {
     timestamp: i64,
 }
 
-#[tokio::main]
+/// Initializes local telemetry and records a sample chat message.
+///
+/// # Examples
+///
+/// ```
+/// #[tokio::test]
+/// async fn records_sample_message() {
+///     main().await.unwrap();
+/// }
+/// ```
+///
+/// # Errors
+///
+/// Returns an error if telemetry configuration or initialization fails.
 async fn main() -> anyhow::Result<()> {
     let mcap_path = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("target/chat-logs.mcap");
     let _telemetry = telemetry::telemetry_local_otel!()

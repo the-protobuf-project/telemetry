@@ -25,7 +25,19 @@ pub struct LlmMetrics {
     pub cache_hit_rate: f64,
 }
 
-#[tokio::main]
+/// Runs the metrics example, recording sample LLM and API telemetry.
+///
+/// # Examples
+///
+/// Run the example binary to start recording metrics:
+///
+/// ```text
+/// cargo run --example metrics
+/// ```
+///
+/// # Errors
+///
+/// Returns an error if telemetry initialization or metric recording fails.
 async fn main() -> anyhow::Result<()> {
     // Auto-discovers telemetry.toml config file
     let mut telemetry = Telemetry::new()

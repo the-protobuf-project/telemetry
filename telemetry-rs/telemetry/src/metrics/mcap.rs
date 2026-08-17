@@ -20,12 +20,23 @@ pub struct MetricMcapWriter {
 }
 
 impl MetricMcapWriter {
-    /// Creates a new metric MCAP writer.
+    /// Creates a metric MCAP writer for the configured service.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// let writer = MetricMcapWriter::new(&service_opts, writer)?;
+    /// # Ok::<(), anyhow::Error>(())
+    /// ```
     ///
     /// # Arguments
     ///
-    /// * `service_opts` - Service configuration
-    /// * `writer` - Shared MCAP writer instance
+    /// * `service_opts` - Service configuration containing the service name.
+    /// * `writer` - Shared MCAP writer instance.
+    ///
+    /// # Returns
+    ///
+    /// A configured metric MCAP writer.
     pub fn new(
         service_opts: &ServiceOptions,
         writer: Arc<Mutex<UnifiedMcapWriter>>,
@@ -37,37 +48,80 @@ impl MetricMcapWriter {
         })
     }
 
-    /// Writes a counter metric.
+    /// Records a counter metric with its name and value.
     ///
     /// # Arguments
     ///
-    /// * `name` - Metric name
-    /// * `value` - Metric value
+    /// * `name` - Name of the metric.
+    /// * `value` - Value of the metric.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # let mut writer: MetricMcapWriter = unimplemented!();
+    /// let _ = writer.write_counter("requests_total", 42.0);
+    /// ```
     pub fn write_counter(&mut self, name: &str, value: f64) -> Result<()> {
         self.write_metric(name, value)
     }
 
-    /// Writes a histogram metric.
+    /// Records a histogram metric with its name and value.
     ///
     /// # Arguments
     ///
-    /// * `name` - Metric name
-    /// * `value` - Metric value
+    /// * `name` - Name of the metric.
+    /// * `value` - Value of the metric.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # let mut metric_writer = /* configured MetricMcapWriter */ todo!();
+    /// metric_writer.write_histogram("request_duration", 42.0)?;
+    /// # Ok::<(), anyhow::Error>(())
+    /// ```
     pub fn write_histogram(&mut self, name: &str, value: f64) -> Result<()> {
         self.write_metric(name, value)
     }
 
-    /// Writes a gauge metric.
+    /// Records a gauge metric.
     ///
-    /// # Arguments
+    /// # Examples
     ///
-    /// * `name` - Metric name
-    /// * `value` - Metric value
+    /// ```
+    /// # let mut metrics: MetricMcapWriter = todo!();
+    /// metrics.write_gauge("temperature", 21.5)?;
+    /// # Ok::<(), anyhow::Error>(())
+    /// ```
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the metric cannot be serialized or written to the MCAP file.
     pub fn write_gauge(&mut self, name: &str, value: f64) -> Result<()> {
         self.write_metric(name, value)
     }
 
-    /// Internal method to write a metric to MCAP.
+    /// Writes a timestamped metric value to the MCAP output.
+    ///
+    /// # Examples
+    ///
+    /// ```no_run
+    /// # let mut writer = metric_writer;
+    /// writer.write_metric("requests.total", 42.0)?;
+    /// # Ok::<(), anyhow::Error>(())
+    /// ```
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the metric cannot be serialized or written.
+    ///
+    /// # Arguments
+    ///
+    /// * `name` - The metric name.
+    /// * `value` - The metric value.
+    ///
+    /// # Returns
+    ///
+    /// `Ok(())` when the metric is written successfully.
     fn write_metric(&mut self, name: &str, value: f64) -> Result<()> {
         let channel_id = self.get_or_create_channel(name)?;
 
@@ -91,7 +145,22 @@ impl MetricMcapWriter {
         Ok(())
     }
 
-    /// Gets or creates a channel for the metric.
+    /// Retrieves the cached channel for a metric or creates one using the service-qualified metric topic.
+    ///
+    /// Dots in the metric name are converted to path separators when constructing the topic.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # // `writer` is a configured `MetricMcapWriter`.
+    /// let channel_id = writer.get_or_create_channel("requests.total")?;
+    /// assert!(channel_id > 0);
+    /// # Ok::<(), anyhow::Error>(())
+    /// ```
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the channel cannot be created.
     fn get_or_create_channel(&mut self, metric_name: &str) -> Result<u16> {
         if let Some(&channel_id) = self.channels.get(metric_name) {
             return Ok(channel_id);

@@ -2,9 +2,7 @@
 //!
 //! Aggregates all configuration options for the Telemetry library.
 
-use super::{
-    FoxgloveOptions, LoggingOptions, OpenTelemetryOptions, ProfilingOptions, TracingOptions,
-};
+use super::{FoxgloveOptions, LoggingOptions, ProfilingOptions, OpenTelemetryOptions, TracingOptions};
 use serde::{Deserialize, Serialize};
 
 /// Main configuration options for Telemetry.
@@ -38,18 +36,45 @@ pub struct TelemetryOptions {
 }
 
 impl TelemetryOptions {
-    /// Creates new default Telemetry options.
+    /// Creates telemetry options with their default configuration.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// let options = TelemetryOptions::new();
+    /// ```
     pub fn new() -> Self {
         Self::default()
     }
 
-    /// Sets logging configuration.
+    /// Replaces the logging configuration.
+    
+    ///
+    
+    /// # Examples
+    
+    ///
+    
+    /// ```
+    
+    /// let options = TelemetryOptions::new()
+    
+    ///     .with_logging(LoggingOptions::default());
+    
+    /// ```
     pub fn with_logging(mut self, logging: LoggingOptions) -> Self {
         self.logging = logging;
         self
     }
 
-    /// Sets telemetry configuration.
+    /// Replaces the telemetry configuration.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// let telemetry = OpenTelemetryOptions::default();
+    /// let options = TelemetryOptions::new().with_telemetry(telemetry);
+    /// ```
     pub fn with_telemetry(mut self, telemetry: OpenTelemetryOptions) -> Self {
         self.telemetry = telemetry;
         self

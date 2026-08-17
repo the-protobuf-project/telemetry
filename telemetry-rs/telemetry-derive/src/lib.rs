@@ -14,16 +14,11 @@ use proc_macro::TokenStream;
 use quote::quote;
 use syn::{Data, DeriveInput, Expr, ExprLit, Fields, ItemFn, Lit, parse_macro_input};
 
-/// Derives the `RecordMetrics` trait for a struct.
+/// Derives `RecordMetrics` for a struct with named fields annotated using `#[metric(...)]`.
 ///
-/// This macro automatically implements metric recording for structs with fields
-/// annotated with the `#[metric]` attribute.
-///
-/// # Attributes
-///
-/// - `name`: The metric name (required)
-/// - `description`: Metric description (optional)
-/// - `counter`, `histogram`, or `gauge`: Metric type (required, pick one)
+/// Each annotated field must specify a metric `name` and exactly one metric type:
+/// `counter`, `histogram`, or `gauge`. An optional `description` may also be provided.
+/// Fields without a valid name or metric type are excluded.
 ///
 /// # Examples
 ///
@@ -34,14 +29,15 @@ use syn::{Data, DeriveInput, Expr, ExprLit, Fields, ItemFn, Lit, parse_macro_inp
 /// struct MyMetrics {
 ///     #[metric(name = "requests_total", counter, description = "Total requests")]
 ///     requests: u64,
-///
-///     #[metric(name = "request_duration_ms", histogram, description = "Request duration")]
-///     duration: f64,
-///
-///     #[metric(name = "active_connections", gauge, description = "Active connections")]
-///     connections: i32,
 /// }
+///
+/// let metrics = MyMetrics { requests: 42 };
+/// assert_eq!(metrics.metric_fields()[0].name, "requests_total");
 /// ```
+///
+/// # Panics
+///
+/// Panics when applied to a non-struct or a struct without named fields.
 #[proc_macro_derive(Metrics, attributes(metric))]
 pub fn derive_metrics(input: TokenStream) -> TokenStream {
     let input = parse_macro_input!(input as DeriveInput);
@@ -135,28 +131,26 @@ pub fn derive_metrics(input: TokenStream) -> TokenStream {
     TokenStream::from(expanded)
 }
 
-/// Attribute macro for automatic function tracing.
+/// Instruments a function with a tracing span named after the function.
 ///
-/// Instruments a function to automatically create and manage tracing spans
-/// using Telemetry's tracing re-export path. This avoids requiring downstream
-/// applications to depend on the `tracing` crate directly.
+/// Synchronous functions execute within the span, while asynchronous functions
+/// carry the span across the returned future.
 ///
 /// # Examples
 ///
 /// ```ignore
-/// use telemetry::derive::trace;
+/// use telemetry::derive::instrument;
 ///
-/// #[trace]
-/// fn my_function() {
+/// #[instrument]
+/// fn process_request() {
 ///     // Function body
 /// }
 ///
-/// #[trace]
-/// async fn my_async_function() {
-///     // Async function body
+/// #[instrument]
+/// async fn fetch_data() {
+///     // Function body
 /// }
 /// ```
-#[proc_macro_attribute]
 pub fn instrument(_attr: TokenStream, item: TokenStream) -> TokenStream {
     let input = parse_macro_input!(item as ItemFn);
 

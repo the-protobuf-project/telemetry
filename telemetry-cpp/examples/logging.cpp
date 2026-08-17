@@ -36,6 +36,11 @@ struct ChatMessage {
     }
 };
 
+/**
+ * @brief Initializes the chat service, logs sample message activity, and shuts down cleanly.
+ *
+ * @return int Zero on successful completion.
+ */
 int main() {
     auto [otel_host, otel_port] = get_otel_endpoint();
 

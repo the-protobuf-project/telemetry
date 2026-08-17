@@ -38,7 +38,12 @@ from dynaconf import Dynaconf, Validator
 
 # Auto-discover config files
 def _find_config_files() -> list[str]:
-    """Find config files in order of priority."""
+    """
+    Find the first available telemetry configuration file in the current directory or its `.config` subdirectory.
+    
+    Returns:
+        list[str]: A list containing the selected configuration file path, or an empty list when no supported file exists.
+    """
     config_files = []
 
     # Check for telemetry.toml, telemetry.yaml, telemetry.json in current directory
@@ -120,14 +125,15 @@ settings = Dynaconf(
 
 
 def load_config(config_path: Optional[str] = None) -> Dynaconf:
-    """Load configuration from file and environment variables.
-
-    Args:
-        config_path: Optional path to config file. If not provided,
-                    auto-discovers telemetry.toml/yaml/json.
-
+    """
+    Load configuration from an explicit file or the auto-discovered configuration.
+    
+    Parameters:
+        config_path (Optional[str]): Path to a configuration file. When omitted,
+            uses the global settings instance.
+    
     Returns:
-        Dynaconf settings object with loaded configuration.
+        Dynaconf: The loaded configuration settings.
     """
     if config_path:
         # Load from specific path

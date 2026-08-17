@@ -25,6 +25,11 @@ struct ChatMessage {
     }
 };
 
+/**
+ * @brief Generates sample chat messages and writes telemetry logs to an MCAP file.
+ *
+ * @return 0 on successful completion.
+ */
 int main() {
     auto telemetry = telemetry::Telemetry::builder("chat-service-mcap", "1.0.0")
         .description("Chat service with MCAP logging")

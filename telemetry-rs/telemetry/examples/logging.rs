@@ -1,5 +1,5 @@
-use serde::Serialize;
 use telemetry::{Environment, Telemetry, logger};
+use serde::Serialize;
 
 #[derive(Debug, Serialize)]
 struct ChatMessage {
@@ -11,7 +11,19 @@ struct ChatMessage {
     timestamp: i64,
 }
 
+/// Runs the chat service demonstration and emits localized message, status, and processing logs.
+///
+/// # Errors
+///
+/// Returns an error if telemetry initialization fails.
+///
+/// # Examples
+///
+/// ```
+/// main().expect("chat service should start successfully");
+/// ```
 #[tokio::main]
+async fn main() -> anyhow::Result<()> {
 async fn main() -> anyhow::Result<()> {
     // Auto-discovers telemetry.toml config file
     let _telemetry = Telemetry::new()

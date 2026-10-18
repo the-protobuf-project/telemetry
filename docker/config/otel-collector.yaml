@@ -3,8 +3,13 @@ receivers:
     protocols:
       grpc:
         endpoint: 0.0.0.0:4317
+        # One export from a building gateway carries every point it reports:
+        # 16k points with their status flags is tens of MiB, and gRPC's
+        # default 4 MiB rejects it whole, silently on the sender's side.
+        max_recv_msg_size_mib: 64
       http:
         endpoint: 0.0.0.0:4318
+        max_request_body_size: 67108864
 
 processors:
   batch:

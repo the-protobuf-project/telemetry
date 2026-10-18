@@ -391,6 +391,7 @@ pub struct TelemetryBuilder {
     otlp_host: Option<String>,
     otlp_port: Option<u16>,
     otlp_auth_token: Option<String>,
+    metrics_cardinality_limit: Option<usize>,
     otlp_headers: HashMap<String, String>,
     otlp_secure: Option<bool>,
     mcap_path: Option<String>,
@@ -423,6 +424,7 @@ impl TelemetryBuilder {
             otlp_host: None,
             otlp_port: None,
             otlp_auth_token: None,
+            metrics_cardinality_limit: None,
             otlp_headers: HashMap::new(),
             otlp_secure: None,
             mcap_path: None,
@@ -460,6 +462,7 @@ impl TelemetryBuilder {
             otlp_host: None,
             otlp_port: None,
             otlp_auth_token: None,
+            metrics_cardinality_limit: None,
             otlp_headers: HashMap::new(),
             otlp_secure: None,
             mcap_path: None,
@@ -546,6 +549,22 @@ impl TelemetryBuilder {
     /// Sets OTLP authentication token.
     pub fn with_otlp_auth(mut self, token: impl Into<String>) -> Self {
         self.otlp_auth_token = Some(token.into());
+        self
+    }
+
+    /// Sets how many attribute sets each metric instrument keeps before the
+    /// rest overflow into one series (OpenTelemetry's default is 2000).
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use telemetry::TelemetryBuilder;
+    ///
+    /// let _builder = TelemetryBuilder::new("gateway", "1.0.0")
+    ///     .with_metrics_cardinality_limit(50_000);
+    /// ```
+    pub fn with_metrics_cardinality_limit(mut self, limit: usize) -> Self {
+        self.metrics_cardinality_limit = Some(limit);
         self
     }
 
@@ -700,6 +719,10 @@ impl TelemetryBuilder {
 
         if let Some(token) = self.otlp_auth_token {
             telemetry_opts.telemetry.otlp.auth_token = Some(token);
+        }
+
+        if let Some(limit) = self.metrics_cardinality_limit {
+            telemetry_opts.telemetry.metrics.cardinality_limit = limit;
         }
 
         if !self.otlp_headers.is_empty() {

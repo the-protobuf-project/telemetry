@@ -13,7 +13,7 @@ use opentelemetry_otlp::WithExportConfig;
 use opentelemetry_otlp::{LogExporter, MetricExporter, WithHttpConfig, WithTonicConfig};
 use opentelemetry_sdk::Resource;
 use opentelemetry_sdk::logs::SdkLoggerProvider;
-use opentelemetry_sdk::metrics::SdkMeterProvider;
+use opentelemetry_sdk::metrics::{Instrument, SdkMeterProvider, Stream};
 use opentelemetry_sdk::trace::SdkTracerProvider;
 use std::collections::HashMap;
 use std::sync::Arc;
@@ -195,10 +195,16 @@ impl TelemetryProvider {
                 .with_attributes(attrs)
                 .build();
 
+            // One stream per attribute set, up to the configured limit: the
+            // SDK's own default folds everything past 2000 into one series.
+            let limit = telemetry_opts.metrics.cardinality_limit;
             Some(Arc::new(
                 SdkMeterProvider::builder()
                     .with_periodic_exporter(exporter)
                     .with_resource(resource)
+                    .with_view(move |_: &Instrument| {
+                        Stream::builder().with_cardinality_limit(limit).build().ok()
+                    })
                     .build(),
             ))
         } else {

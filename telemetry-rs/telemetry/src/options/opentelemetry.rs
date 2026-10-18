@@ -97,10 +97,20 @@ pub struct MetricsTelemetryOptions {
     /// Export interval in seconds.
     #[serde(default = "default_export_interval")]
     pub export_interval_seconds: u64,
+    /// The most attribute sets one instrument keeps before the rest are
+    /// folded into a single `otel.metric.overflow` series. OpenTelemetry's
+    /// default, 2000, suits a service; a gateway reporting every point of a
+    /// building needs one series per point and raises it.
+    #[serde(default = "default_cardinality_limit")]
+    pub cardinality_limit: usize,
 }
 
 fn default_export_interval() -> u64 {
     10
+}
+
+fn default_cardinality_limit() -> usize {
+    2000
 }
 
 impl Default for MetricsTelemetryOptions {
@@ -108,6 +118,7 @@ impl Default for MetricsTelemetryOptions {
         Self {
             enabled: true,
             export_interval_seconds: 10,
+            cardinality_limit: default_cardinality_limit(),
         }
     }
 }

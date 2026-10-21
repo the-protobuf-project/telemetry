@@ -17,7 +17,6 @@ import (
 	"go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracegrpc"
 	"go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracehttp"
 	"go.opentelemetry.io/otel/log"
-	"go.opentelemetry.io/otel/log/global"
 	"go.opentelemetry.io/otel/propagation"
 	sdklog "go.opentelemetry.io/otel/sdk/log"
 	sdkmetric "go.opentelemetry.io/otel/sdk/metric"
@@ -368,7 +367,7 @@ func (t *Telemetry) initLogging(ctx context.Context, opts options.OpenTelemetryO
 	t.loggerProvider = sdklog.NewLoggerProvider(processorOptions...)
 
 	// Set global logger provider
-	global.SetLoggerProvider(t.loggerProvider)
+	otel.SetLoggerProvider(t.loggerProvider)
 
 	// Add shutdown function
 	t.shutdownFuncs = append(t.shutdownFuncs, t.loggerProvider.Shutdown)

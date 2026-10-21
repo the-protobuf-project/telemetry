@@ -10,6 +10,7 @@ import (
 	"github.com/the-protobuf-project/telemetry/telemetry-go/internal/foxglove"
 	"github.com/the-protobuf-project/telemetry/telemetry-go/options"
 
+	"go.opentelemetry.io/otel/attribute"
 	otellog "go.opentelemetry.io/otel/log"
 )
 
@@ -169,12 +170,12 @@ func (l *Logger) log(level log.Level, msg string, data ...any) {
 		file, line := getCallerInfo(3) // Skip 3 frames: getCallerInfo, log, and the calling function
 
 		// Build attributes with service metadata and caller info
-		attrs := []otellog.KeyValue{
-			otellog.String("service.name", l.serviceName),
-			otellog.String("service.version", l.serviceVersion),
-			otellog.String("service.environment", l.serviceEnvironment),
-			otellog.String("code.filepath", file),
-			otellog.Int("code.lineno", line),
+		attrs := []attribute.KeyValue{
+			attribute.String("service.name", l.serviceName),
+			attribute.String("service.version", l.serviceVersion),
+			attribute.String("service.environment", l.serviceEnvironment),
+			attribute.String("code.filepath", file),
+			attribute.Int("code.lineno", line),
 		}
 
 		// Convert user data to OTLP attributes if present

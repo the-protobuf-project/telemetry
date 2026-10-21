@@ -16,14 +16,14 @@ if(NOT TELEMETRY_FREERTOS)
     FetchContent_Declare(
         spdlog
         GIT_REPOSITORY https://github.com/gabime/spdlog.git
-        GIT_TAG v1.14.1
+        GIT_TAG v1.17.0
     )
     FetchContent_MakeAvailable(spdlog)
 
     FetchContent_Declare(
         mcap
         GIT_REPOSITORY https://github.com/foxglove/mcap.git
-        GIT_TAG releases/cpp/v1.4.1
+        GIT_TAG releases/cpp/v2.2.0
     )
     FetchContent_MakeAvailable(mcap)
 
@@ -85,7 +85,7 @@ if(TELEMETRY_USE_OTEL)
     FetchContent_Declare(
         opentelemetry-cpp
         GIT_REPOSITORY https://github.com/open-telemetry/opentelemetry-cpp.git
-        GIT_TAG v1.18.0
+        GIT_TAG v1.29.0
     )
     FetchContent_MakeAvailable(opentelemetry-cpp)
 

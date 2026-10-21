@@ -9,7 +9,6 @@ import (
 
 	"github.com/the-protobuf-project/telemetry/telemetry-go/options"
 	"go.opentelemetry.io/otel"
-	"go.opentelemetry.io/otel/propagation"
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/exporters/otlp/otlplog/otlploggrpc"
 	"go.opentelemetry.io/otel/exporters/otlp/otlplog/otlploghttp"
@@ -18,7 +17,7 @@ import (
 	"go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracegrpc"
 	"go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracehttp"
 	"go.opentelemetry.io/otel/log"
-	"go.opentelemetry.io/otel/log/global"
+	"go.opentelemetry.io/otel/propagation"
 	sdklog "go.opentelemetry.io/otel/sdk/log"
 	sdkmetric "go.opentelemetry.io/otel/sdk/metric"
 	"go.opentelemetry.io/otel/sdk/resource"
@@ -368,7 +367,7 @@ func (t *Telemetry) initLogging(ctx context.Context, opts options.OpenTelemetryO
 	t.loggerProvider = sdklog.NewLoggerProvider(processorOptions...)
 
 	// Set global logger provider
-	global.SetLoggerProvider(t.loggerProvider)
+	otel.SetLoggerProvider(t.loggerProvider)
 
 	// Add shutdown function
 	t.shutdownFuncs = append(t.shutdownFuncs, t.loggerProvider.Shutdown)

@@ -10,7 +10,7 @@ import (
 
 	"github.com/charmbracelet/log"
 	"github.com/the-protobuf-project/telemetry/telemetry-go/options"
-	otellog "go.opentelemetry.io/otel/log"
+	"go.opentelemetry.io/otel/attribute"
 )
 
 // formatPrefix formats the prefix for the logger.
@@ -103,12 +103,12 @@ func resolveCallerOffset(opts options.LoggingOptions) int {
 // extractStructTagAttributes extracts OpenTelemetry attributes from exported fields
 // tagged with telemetry:"attribute:<name>", including fields in nested structs. It
 // also adds the extraction time and the name of the input struct.
-func extractStructTagAttributes(rv reflect.Value) []otellog.KeyValue {
+func extractStructTagAttributes(rv reflect.Value) []attribute.KeyValue {
 	if rv.Kind() != reflect.Struct {
 		return nil
 	}
 
-	attrs := []otellog.KeyValue{}
+	attrs := []attribute.KeyValue{}
 	rt := rv.Type()
 
 	for i := 0; i < rv.NumField(); i++ {
@@ -144,10 +144,10 @@ func extractStructTagAttributes(rv reflect.Value) []otellog.KeyValue {
 
 	// Add dynamic/computed attributes
 	// Example: Add a timestamp if not present
-	attrs = append(attrs, otellog.Int64("extracted_at", time.Now().Unix()))
+	attrs = append(attrs, attribute.Int64("extracted_at", time.Now().Unix()))
 
 	// Example: Add struct type name
-	attrs = append(attrs, otellog.String("struct_type", rt.Name()))
+	attrs = append(attrs, attribute.String("struct_type", rt.Name()))
 
 	return attrs
 }
@@ -155,7 +155,7 @@ func extractStructTagAttributes(rv reflect.Value) []otellog.KeyValue {
 // dataToOtelAttributes converts various data types to OpenTelemetry KeyValue attributes
 // dataToOtelAttributes converts a value into OpenTelemetry attributes, expanding map entries and preserving complex values under the "data" attribute. Struct values also contribute attributes from `telemetry:"attribute:<name>"` tags.
 // The returned attributes represent the converted value.
-func dataToOtelAttributes(v any) []otellog.KeyValue {
+func dataToOtelAttributes(v any) []attribute.KeyValue {
 	if v == nil {
 		return nil
 	}
@@ -171,7 +171,7 @@ func dataToOtelAttributes(v any) []otellog.KeyValue {
 		v = rv.Interface()
 	}
 
-	attrs := []otellog.KeyValue{}
+	attrs := []attribute.KeyValue{}
 
 	// Extract struct tag attributes if it's a struct
 	if rv.Kind() == reflect.Struct {
@@ -190,18 +190,18 @@ func dataToOtelAttributes(v any) []otellog.KeyValue {
 			}
 			// Also keep full map as a "data" JSON blob for reference
 			if b, err := json.Marshal(convertedMap); err == nil {
-				attrs = append(attrs, otellog.String("data", string(b)))
+				attrs = append(attrs, attribute.String("data", string(b)))
 			} else {
 				// Fallback to string representation if marshal fails
-				attrs = append(attrs, otellog.String("data", fmt.Sprintf("%+v", v)))
+				attrs = append(attrs, attribute.String("data", fmt.Sprintf("%+v", v)))
 			}
 		} else {
 			// For structs, slices, arrays, marshal directly
 			if b, err := json.Marshal(v); err == nil {
-				attrs = append(attrs, otellog.String("data", string(b)))
+				attrs = append(attrs, attribute.String("data", string(b)))
 			} else {
 				// Fallback to string representation if marshal fails
-				attrs = append(attrs, otellog.String("data", fmt.Sprintf("%+v", v)))
+				attrs = append(attrs, attribute.String("data", fmt.Sprintf("%+v", v)))
 			}
 		}
 
@@ -214,9 +214,9 @@ func dataToOtelAttributes(v any) []otellog.KeyValue {
 }
 
 // convertToOtelKeyValue converts a key-value pair to an OpenTelemetry KeyValue
-func convertToOtelKeyValue(key string, value any) otellog.KeyValue {
+func convertToOtelKeyValue(key string, value any) attribute.KeyValue {
 	if value == nil {
-		return otellog.String(key, "<nil>")
+		return attribute.String(key, "<nil>")
 	}
 
 	rv := reflect.ValueOf(value)
@@ -224,7 +224,7 @@ func convertToOtelKeyValue(key string, value any) otellog.KeyValue {
 	// Handle pointers
 	if rv.Kind() == reflect.Pointer {
 		if rv.IsNil() {
-			return otellog.String(key, "<nil>")
+			return attribute.String(key, "<nil>")
 		}
 		rv = rv.Elem()
 		value = rv.Interface()
@@ -232,33 +232,33 @@ func convertToOtelKeyValue(key string, value any) otellog.KeyValue {
 
 	switch rv.Kind() {
 	case reflect.String:
-		return otellog.String(key, rv.String())
+		return attribute.String(key, rv.String())
 	case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64:
-		return otellog.Int64(key, rv.Int())
+		return attribute.Int64(key, rv.Int())
 	case reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64:
-		return otellog.Int64(key, int64(rv.Uint()))
+		return attribute.Int64(key, int64(rv.Uint()))
 	case reflect.Float32, reflect.Float64:
-		return otellog.Float64(key, rv.Float())
+		return attribute.Float64(key, rv.Float())
 	case reflect.Bool:
-		return otellog.Bool(key, rv.Bool())
+		return attribute.Bool(key, rv.Bool())
 	case reflect.Slice, reflect.Array:
 		// Check if it's a byte slice
 		if rv.Type().Elem().Kind() == reflect.Uint8 {
-			return otellog.Bytes(key, value.([]byte))
+			return attribute.ByteSlice(key, value.([]byte))
 		}
 		// For other slices, convert to JSON string
 		if b, err := json.Marshal(value); err == nil {
-			return otellog.String(key, string(b))
+			return attribute.String(key, string(b))
 		}
-		return otellog.String(key, fmt.Sprintf("%+v", value))
+		return attribute.String(key, fmt.Sprintf("%+v", value))
 	case reflect.Map, reflect.Struct:
 		// Convert complex types to JSON string
 		if b, err := json.Marshal(value); err == nil {
-			return otellog.String(key, string(b))
+			return attribute.String(key, string(b))
 		}
-		return otellog.String(key, fmt.Sprintf("%+v", value))
+		return attribute.String(key, fmt.Sprintf("%+v", value))
 	default:
-		return otellog.String(key, fmt.Sprintf("%+v", value))
+		return attribute.String(key, fmt.Sprintf("%+v", value))
 	}
 }
 

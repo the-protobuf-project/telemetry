@@ -4,35 +4,41 @@ import (
 	"context"
 	"fmt"
 
+	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/log"
 )
 
-// Re-export OpenTelemetry log types for convenience
+// Re-export OpenTelemetry attribute types for convenience. Since the stable
+// logs API (otel/log v1.47.0), log records use attribute.KeyValue/Value.
 type (
-	KeyValue = log.KeyValue
-	Value    = log.Value
+	KeyValue = attribute.KeyValue
+	Value    = attribute.Value
 )
 
-// Re-export OpenTelemetry log functions
+// Re-export OpenTelemetry attribute constructors
 var (
-	String       = log.String
-	Int          = log.Int
-	Int64        = log.Int64
-	Float64      = log.Float64
-	Bool         = log.Bool
-	Bytes        = log.Bytes
-	Slice        = log.Slice
-	Map          = log.Map
-	Empty        = log.Empty
-	StringValue  = log.StringValue
-	IntValue     = log.IntValue
-	Int64Value   = log.Int64Value
-	Float64Value = log.Float64Value
-	BoolValue    = log.BoolValue
-	BytesValue   = log.BytesValue
-	SliceValue   = log.SliceValue
-	MapValue     = log.MapValue
+	String       = attribute.String
+	Int          = attribute.Int
+	Int64        = attribute.Int64
+	Float64      = attribute.Float64
+	Bool         = attribute.Bool
+	Bytes        = attribute.ByteSlice
+	Slice        = attribute.Slice
+	Map          = attribute.Map
+	StringValue  = attribute.StringValue
+	IntValue     = attribute.IntValue
+	Int64Value   = attribute.Int64Value
+	Float64Value = attribute.Float64Value
+	BoolValue    = attribute.BoolValue
+	BytesValue   = attribute.ByteSliceValue
+	SliceValue   = attribute.SliceValue
+	MapValue     = attribute.MapValue
 )
+
+// Empty returns a KeyValue with an empty value.
+func Empty(key string) KeyValue {
+	return KeyValue{Key: attribute.Key(key)}
+}
 
 // OtelLogger wraps the telemetry logger with a context-optional API
 type OtelLogger struct {
@@ -59,7 +65,7 @@ func (l *OtelLogger) WithContext(ctx context.Context) *OtelLogger {
 // Info logs an informational message
 func (l *OtelLogger) Info(msg string, attrs ...KeyValue) *OtelLogger {
 	var record log.Record
-	record.SetBody(log.StringValue(msg))
+	record.SetBody(attribute.StringValue(msg))
 	record.SetSeverity(log.SeverityInfo)
 	record.AddAttributes(attrs...)
 	l.logger.Emit(l.ctx, record)
@@ -69,7 +75,7 @@ func (l *OtelLogger) Info(msg string, attrs ...KeyValue) *OtelLogger {
 // Debug logs a debug message
 func (l *OtelLogger) Debug(msg string, attrs ...KeyValue) *OtelLogger {
 	var record log.Record
-	record.SetBody(log.StringValue(msg))
+	record.SetBody(attribute.StringValue(msg))
 	record.SetSeverity(log.SeverityDebug)
 	record.AddAttributes(attrs...)
 	l.logger.Emit(l.ctx, record)
@@ -79,7 +85,7 @@ func (l *OtelLogger) Debug(msg string, attrs ...KeyValue) *OtelLogger {
 // Warn logs a warning message
 func (l *OtelLogger) Warn(msg string, attrs ...KeyValue) *OtelLogger {
 	var record log.Record
-	record.SetBody(log.StringValue(msg))
+	record.SetBody(attribute.StringValue(msg))
 	record.SetSeverity(log.SeverityWarn)
 	record.AddAttributes(attrs...)
 	l.logger.Emit(l.ctx, record)
@@ -89,7 +95,7 @@ func (l *OtelLogger) Warn(msg string, attrs ...KeyValue) *OtelLogger {
 // Error logs an error message
 func (l *OtelLogger) Error(msg string, attrs ...KeyValue) *OtelLogger {
 	var record log.Record
-	record.SetBody(log.StringValue(msg))
+	record.SetBody(attribute.StringValue(msg))
 	record.SetSeverity(log.SeverityError)
 	record.AddAttributes(attrs...)
 	l.logger.Emit(l.ctx, record)
@@ -99,7 +105,7 @@ func (l *OtelLogger) Error(msg string, attrs ...KeyValue) *OtelLogger {
 // Fatal logs a fatal message
 func (l *OtelLogger) Fatal(msg string, attrs ...KeyValue) *OtelLogger {
 	var record log.Record
-	record.SetBody(log.StringValue(msg))
+	record.SetBody(attribute.StringValue(msg))
 	record.SetSeverity(log.SeverityFatal)
 	record.AddAttributes(attrs...)
 	l.logger.Emit(l.ctx, record)

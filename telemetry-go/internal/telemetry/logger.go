@@ -5,6 +5,7 @@ import (
 	"fmt"
 
 	"github.com/the-protobuf-project/telemetry/telemetry-go/options"
+	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/log"
 )
 
@@ -23,27 +24,27 @@ func NewLogger(logger log.Logger, opts options.LoggingTelemetryOptions) *Logger 
 }
 
 // Info logs an informational message
-func (l *Logger) Info(ctx context.Context, msg string, attrs ...log.KeyValue) {
+func (l *Logger) Info(ctx context.Context, msg string, attrs ...attribute.KeyValue) {
 	l.emit(ctx, log.SeverityInfo, msg, attrs...)
 }
 
 // Debug logs a debug message
-func (l *Logger) Debug(ctx context.Context, msg string, attrs ...log.KeyValue) {
+func (l *Logger) Debug(ctx context.Context, msg string, attrs ...attribute.KeyValue) {
 	l.emit(ctx, log.SeverityDebug, msg, attrs...)
 }
 
 // Warn logs a warning message
-func (l *Logger) Warn(ctx context.Context, msg string, attrs ...log.KeyValue) {
+func (l *Logger) Warn(ctx context.Context, msg string, attrs ...attribute.KeyValue) {
 	l.emit(ctx, log.SeverityWarn, msg, attrs...)
 }
 
 // Error logs an error message
-func (l *Logger) Error(ctx context.Context, msg string, attrs ...log.KeyValue) {
+func (l *Logger) Error(ctx context.Context, msg string, attrs ...attribute.KeyValue) {
 	l.emit(ctx, log.SeverityError, msg, attrs...)
 }
 
 // Fatal logs a fatal message
-func (l *Logger) Fatal(ctx context.Context, msg string, attrs ...log.KeyValue) {
+func (l *Logger) Fatal(ctx context.Context, msg string, attrs ...attribute.KeyValue) {
 	l.emit(ctx, log.SeverityFatal, msg, attrs...)
 }
 
@@ -73,9 +74,9 @@ func (l *Logger) Fatalf(ctx context.Context, format string, args ...interface{})
 }
 
 // emit is the internal method that emits log records
-func (l *Logger) emit(ctx context.Context, severity log.Severity, msg string, attrs ...log.KeyValue) {
+func (l *Logger) emit(ctx context.Context, severity log.Severity, msg string, attrs ...attribute.KeyValue) {
 	var record log.Record
-	record.SetBody(log.StringValue(msg))
+	record.SetBody(attribute.StringValue(msg))
 	record.SetSeverity(severity)
 	record.AddAttributes(attrs...)
 
@@ -83,7 +84,7 @@ func (l *Logger) emit(ctx context.Context, severity log.Severity, msg string, at
 }
 
 // WithAttrs returns a new Logger with additional attributes
-func (l *Logger) WithAttrs(attrs ...log.KeyValue) *Logger {
+func (l *Logger) WithAttrs(attrs ...attribute.KeyValue) *Logger {
 	// Create a new logger with attributes
 	// Note: This is a simplified implementation
 	// In production, you might want to implement attribute chaining
@@ -152,18 +153,18 @@ func (l *Logger) Printf(format string, args ...interface{}) {
 	l.Infof(context.Background(), format, args...)
 }
 
-// convertToKeyValues converts variadic interface{} data to log.KeyValue attributes
+// convertToKeyValues converts variadic interface{} data to attribute.KeyValue attributes
 // This is a helper function to bridge the gap between logging.Logger and telemetry.Logger
-func convertToKeyValues(data []interface{}) []log.KeyValue {
+func convertToKeyValues(data []interface{}) []attribute.KeyValue {
 	if len(data) == 0 {
 		return nil
 	}
 
 	// If the first element is already a KeyValue, return as-is
-	if _, ok := data[0].(log.KeyValue); ok {
-		kvs := make([]log.KeyValue, len(data))
+	if _, ok := data[0].(attribute.KeyValue); ok {
+		kvs := make([]attribute.KeyValue, len(data))
 		for i, d := range data {
-			if kv, ok := d.(log.KeyValue); ok {
+			if kv, ok := d.(attribute.KeyValue); ok {
 				kvs[i] = kv
 			}
 		}
@@ -172,7 +173,7 @@ func convertToKeyValues(data []interface{}) []log.KeyValue {
 
 	// Otherwise, treat the first element as structured data
 	// Convert it to a single "data" attribute
-	return []log.KeyValue{
-		log.String("data", fmt.Sprintf("%v", data[0])),
+	return []attribute.KeyValue{
+		attribute.String("data", fmt.Sprintf("%v", data[0])),
 	}
 }

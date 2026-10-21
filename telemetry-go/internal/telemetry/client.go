@@ -9,6 +9,7 @@ import (
 
 	"github.com/the-protobuf-project/telemetry/telemetry-go/options"
 	"go.opentelemetry.io/otel"
+	"go.opentelemetry.io/otel/propagation"
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/exporters/otlp/otlplog/otlploggrpc"
 	"go.opentelemetry.io/otel/exporters/otlp/otlplog/otlploghttp"
@@ -60,6 +61,16 @@ func (n noopErrorHandler) Handle(_ error) {}
 func New(ctx context.Context, serviceOpts options.ServiceOptions, telemetryOpts options.OpenTelemetryOptions) (*Telemetry, error) {
 	// Suppress noisy OTel exporter errors (e.g. connection refused)
 	otel.SetErrorHandler(noopErrorHandler{})
+
+	// Read and write W3C trace context and baggage on every instrumented
+	// boundary. OTel's default propagator is a no-op: without this, a server
+	// starts a fresh trace for each request instead of continuing the
+	// caller's, and an outgoing call carries no context to its callee. It is
+	// set whether or not tracing exports here, so a process that does not
+	// record spans still passes its callers' context through.
+	otel.SetTextMapPropagator(propagation.NewCompositeTextMapPropagator(
+		propagation.TraceContext{}, propagation.Baggage{},
+	))
 
 	t := &Telemetry{
 		serviceName:   serviceOpts.Name,

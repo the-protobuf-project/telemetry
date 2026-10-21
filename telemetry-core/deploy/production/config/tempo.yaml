@@ -26,3 +26,20 @@ storage:
       path: /var/tempo/wal
     local:
       path: /var/tempo/blocks
+
+# The metrics generator, here only for TraceQL metrics (`{...} | rate()`,
+# Grafana's traces drilldown): its local-blocks processor serves them, and
+# without it Tempo answers "localblocks processor not found".
+metrics_generator:
+  processor:
+    local_blocks:
+      filter_server_spans: false
+      flush_to_storage: true
+  storage:
+    path: /var/tempo/generator/wal
+  traces_storage:
+    path: /var/tempo/generator/traces
+
+overrides:
+  metrics_generator_processors:
+    - local-blocks

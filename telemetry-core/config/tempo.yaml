@@ -17,6 +17,13 @@ compactor:
 
 metrics_generator:
   processor:
+    local_blocks:
+      # TraceQL metrics (`{...} | rate()`, Grafana's traces drilldown) are
+      # served from these blocks; without the processor Tempo answers
+      # "localblocks processor not found". Every span counts, not only
+      # root and server spans.
+      filter_server_spans: false
+      flush_to_storage: true
     service_graphs:
       wait: 10s
     span_metrics:
@@ -49,3 +56,4 @@ overrides:
   metrics_generator_processors:
     - service-graphs
     - span-metrics
+    - local-blocks

@@ -5,6 +5,13 @@ global:
 rule_files:
   - /etc/opentelemetry-stack/prometheus-rules.yaml
 
+# The bundled Alertmanager (:9093, and /alertmanager on the ingress port):
+# without this, alerting rules fire into nothing.
+alerting:
+  alertmanagers:
+    - static_configs:
+        - targets: ["localhost:9093"]
+
 scrape_configs:
   - job_name: "prometheus"
     static_configs:

@@ -91,13 +91,8 @@ func LoadConfig(configPath string) (*TelemetryOptions, *ServiceOptions, error) {
 		}
 	}
 
-	// Load environment variables with TELEMETRY_ prefix
-	// TELEMETRY_TELEMETRY_OTLP_HOST -> telemetry.otlp.host
-	if err := k.Load(env.Provider("TELEMETRY_", ".", func(s string) string {
-		return strings.ReplaceAll(
-			strings.ToLower(strings.TrimPrefix(s, "TELEMETRY_")),
-			"_", ".")
-	}), nil); err != nil {
+	// Load environment variables with TELEMETRY_ prefix (see envKey).
+	if err := k.Load(env.Provider("TELEMETRY_", ".", envKey), nil); err != nil {
 		return nil, nil, fmt.Errorf("error loading env vars: %w", err)
 	}
 
@@ -193,4 +188,20 @@ func GetInt(key string) int {
 // GetBool returns a bool value from the loaded config by key path.
 func GetBool(key string) bool {
 	return k.Bool(key)
+}
+
+// envKey maps a TELEMETRY_ environment variable to its configuration key.
+// Levels are separated by a double underscore, so a key holding one keeps it:
+//
+//	TELEMETRY_TELEMETRY__OTLP__USE_HTTP -> telemetry.otlp.use_http
+//
+// A name without a double underscore reads every underscore as a level, as
+// it always has (TELEMETRY_TELEMETRY_OTLP_HOST -> telemetry.otlp.host), which
+// cannot reach a key with an underscore in it.
+func envKey(name string) string {
+	key := strings.ToLower(strings.TrimPrefix(name, "TELEMETRY_"))
+	if strings.Contains(key, "__") {
+		return strings.ReplaceAll(key, "__", ".")
+	}
+	return strings.ReplaceAll(key, "_", ".")
 }

@@ -62,6 +62,7 @@ type Builder struct {
 	serviceOpts   options.ServiceOptions
 	telemetryOpts options.TelemetryOptions
 	configPath    string
+	secureSet     bool // WithOTLPSecure decided TLS; autoConfigureOTLP leaves it
 	err           error
 }
 
@@ -175,8 +176,12 @@ func (b *Builder) WithLogLevel(level LogLevel) *Builder {
 	return b
 }
 
-// WithOTLP configures the OTLP endpoint. Auto-detects if local or remote
-// and configures TLS accordingly.
+// WithOTLP configures the OTLP endpoint. TLS follows the same rule a
+// configured endpoint does (see autoConfigureOTLP): on for a remote host on
+// 443 or 4318, the ports a TLS collector serves, and off otherwise -- so a
+// plaintext collector beside the service, reached by a host name such as a
+// Compose service or a cluster Service, receives what it is sent. Call
+// WithOTLPSecure to decide it explicitly.
 func (b *Builder) WithOTLP(host string, port int) *Builder {
 	if b.err != nil {
 		return b
@@ -184,9 +189,18 @@ func (b *Builder) WithOTLP(host string, port int) *Builder {
 	b.telemetryOpts.Telemetry.OTLP.Host = host //nolint:staticcheck // Deprecated but kept for backward compatibility
 	b.telemetryOpts.Telemetry.OTLP.Port = port
 	b.telemetryOpts.Telemetry.OTLP.Enabled = true
+	b.telemetryOpts.Telemetry.OTLP.Secure = !isLocalHost(host) && (port == 443 || port == 4318)
+	return b
+}
 
-	// Auto-configure based on host
-	b.telemetryOpts.Telemetry.OTLP.Secure = !isLocalHost(host)
+// WithOTLPSecure turns TLS to the OTLP collector on or off, whatever WithOTLP
+// or the configuration inferred.
+func (b *Builder) WithOTLPSecure(secure bool) *Builder {
+	if b.err != nil {
+		return b
+	}
+	b.telemetryOpts.Telemetry.OTLP.Secure = secure
+	b.secureSet = true
 	return b
 }
 
@@ -269,14 +283,25 @@ func (b *Builder) WithLabel(key, value string) *Builder {
 	return b
 }
 
+// otlp is the OTLP configuration Build uses: auto-configured from the host,
+// keeping a TLS choice WithOTLPSecure made.
+func (b *Builder) otlp() options.OTLPOptions {
+	otlp := b.telemetryOpts.Telemetry.OTLP
+	secure := otlp.Secure
+	autoConfigureOTLP(&otlp)
+	if b.secureSet {
+		otlp.Secure = secure
+	}
+	return otlp
+}
+
 // Build creates the Telemetry instance with the configured options.
 func (b *Builder) Build() (*Telemetry, error) {
 	if b.err != nil {
 		return nil, b.err
 	}
 
-	// Auto-configure OTLP settings based on host
-	autoConfigureOTLP(&b.telemetryOpts.Telemetry.OTLP)
+	b.telemetryOpts.Telemetry.OTLP = b.otlp()
 
 	ctx := context.Background()
 

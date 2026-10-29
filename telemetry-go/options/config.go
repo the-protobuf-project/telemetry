@@ -144,12 +144,8 @@ func LoadConfigWithDefaults(configPath string) (*TelemetryOptions, *ServiceOptio
 		}
 	}
 
-	// Load environment variables with TELEMETRY_ prefix
-	if err := k.Load(env.Provider("TELEMETRY_", ".", func(s string) string {
-		return strings.ReplaceAll(
-			strings.ToLower(strings.TrimPrefix(s, "TELEMETRY_")),
-			"_", ".")
-	}), nil); err != nil {
+	// Load environment variables with TELEMETRY_ prefix (see envKey).
+	if err := k.Load(env.Provider("TELEMETRY_", ".", envKey), nil); err != nil {
 		return nil, nil, fmt.Errorf("error loading env vars: %w", err)
 	}
 

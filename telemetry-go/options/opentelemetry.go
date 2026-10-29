@@ -19,6 +19,10 @@ type LoggingTelemetryOptions struct {
 type MetricsTelemetryOptions struct {
 	Enabled               bool `json:"enabled"`                 // Enable metrics (inherits from telemetry.enabled if not set)
 	ExportIntervalSeconds int  `json:"export_interval_seconds"` // Export interval in seconds
+	// Prometheus adds a pull exporter: Telemetry.MetricsHandler serves every
+	// metric in the Prometheus text format, for the application to mount at
+	// /metrics. It works with or without OTLP export.
+	Prometheus bool `json:"prometheus"`
 }
 
 // TracingTelemetryOptions defines the configuration for OpenTelemetry tracing
@@ -32,7 +36,7 @@ type TracingTelemetryOptions struct {
 type OTLPOptions struct {
 	Endpoint  string            `json:"endpoint"`   // OTLP endpoint (e.g., "otel.example.com" or "localhost:4317")
 	AuthToken string            `json:"auth_token"` // Bearer token for authentication (simpler than headers)
-	Enabled   bool              `json:"enabled"`    // Enable OTLP export (if false, uses stdout)
+	Enabled   bool              `json:"enabled"`    // Enable OTLP export; implied by an endpoint or host, overridden by OTEL_EXPORTER_OTLP_ENABLED=false
 	Secure    bool              `json:"secure"`     // Use TLS (auto-detected from endpoint if not set)
 	UseHTTP   bool              `json:"use_http"`   // Use HTTP instead of gRPC (default: false = gRPC)
 	Headers   map[string]string `json:"headers"`    // Custom headers (use auth_token for simple auth)

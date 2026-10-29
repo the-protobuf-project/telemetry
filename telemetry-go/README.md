@@ -740,6 +740,34 @@ export TELEMETRY_TELEMETRY_OTLP_AUTH_TOKEN=your-token
 export TELEMETRY_SERVICE_NAME=my-service
 ```
 
+### When OTLP exports, and Prometheus
+
+OTLP export is **off** unless something asks for it: an endpoint
+(`telemetry.otlp.endpoint`, `OTEL_EXPORTER_OTLP_HOST`, or `WithOTLP`), or
+`OTEL_EXPORTER_OTLP_ENABLED=true`, which on its own exports to
+`localhost:4317`. A process with nothing configured — a test run above all —
+never dials a collector.
+
+Two environment variables turn it off whatever the file or the code says:
+`OTEL_EXPORTER_OTLP_ENABLED=false`, and `OTEL_SDK_DISABLED=true` (which also
+turns the Prometheus exporter off).
+
+`Close` flushes for at most 5 s (`DefaultShutdownTimeout`;
+`WithShutdownTimeout` changes it), so a collector that is not listening
+cannot hold up a process's exit.
+
+For Prometheus to scrape, turn on the pull exporter — `WithPrometheus()`,
+`OTEL_METRICS_EXPORTER=prometheus`, or `telemetry.metrics.prometheus = true` —
+and mount its handler. It runs beside OTLP or without it, and carries the Go
+runtime and process collectors too:
+
+```go
+t, _ := telemetry.New().WithService("my-service", "1.0.0").WithPrometheus().Build()
+if h := t.MetricsHandler(); h != nil {
+    mux.Handle("GET /metrics", h)
+}
+```
+
 ### Builder Pattern API
 
 For programmatic configuration:

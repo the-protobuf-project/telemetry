@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto/tls"
 	"fmt"
+	"net/http"
 	"strings"
 	"time"
 
@@ -42,6 +43,9 @@ type Telemetry struct {
 	Logger  *Logger
 	Metrics *Metrics
 	tracer  *Tracer
+
+	// promHandler serves the metrics to Prometheus; nil when that exporter is off.
+	promHandler http.Handler
 
 	// Shutdown function
 	shutdownFuncs []func(context.Context) error
@@ -250,57 +254,39 @@ func (t *Telemetry) initTracing(ctx context.Context, opts options.OpenTelemetryO
 	return nil
 }
 
-// initMetrics initializes the OpenTelemetry metrics pipeline
+// initMetrics initializes the OpenTelemetry metrics pipeline: a periodic
+// OTLP reader when OTLP export is on, a Prometheus reader when that exporter
+// is, both when both are, and the global (no-op) meter when neither is.
 func (t *Telemetry) initMetrics(ctx context.Context, opts options.OpenTelemetryOptions) error {
-	var exporter sdkmetric.Exporter
-	var err error
+	var readers []sdkmetric.Option
 
 	if opts.OTLP.Enabled {
-		endpoint, headers, secure := resolveOTLPConfig(&opts.OTLP)
-		if opts.OTLP.UseHTTP {
-			// Use HTTP exporter
-			httpOpts := []otlpmetrichttp.Option{
-				otlpmetrichttp.WithEndpoint(endpoint),
-			}
-			if !secure {
-				httpOpts = append(httpOpts, otlpmetrichttp.WithInsecure())
-			}
-			if len(headers) > 0 {
-				httpOpts = append(httpOpts, otlpmetrichttp.WithHeaders(headers))
-			}
-			exporter, err = otlpmetrichttp.New(ctx, httpOpts...)
-		} else {
-			// Use gRPC exporter
-			grpcOpts := []otlpmetricgrpc.Option{
-				otlpmetricgrpc.WithEndpoint(endpoint),
-			}
-			if secure {
-				grpcOpts = append(grpcOpts, otlpmetricgrpc.WithTLSCredentials(credentials.NewTLS(&tls.Config{})))
-			} else {
-				grpcOpts = append(grpcOpts, otlpmetricgrpc.WithInsecure())
-			}
-			if len(headers) > 0 {
-				grpcOpts = append(grpcOpts, otlpmetricgrpc.WithHeaders(headers))
-			}
-			exporter, err = otlpmetricgrpc.New(ctx, grpcOpts...)
+		exporter, err := newOTLPMetricExporter(ctx, &opts.OTLP)
+		if err != nil {
+			return fmt.Errorf("failed to create metric exporter: %w", err)
 		}
-	} else {
-		// No OTLP exporter - use no-op meter to avoid nil panics
+		readers = append(readers, sdkmetric.WithReader(sdkmetric.NewPeriodicReader(exporter,
+			sdkmetric.WithInterval(time.Duration(opts.Metrics.ExportIntervalSeconds)*time.Second),
+		)))
+	}
+
+	if opts.Metrics.Prometheus {
+		reader, handler, err := newPrometheusReader()
+		if err != nil {
+			return err
+		}
+		readers = append(readers, sdkmetric.WithReader(reader))
+		t.promHandler = handler
+	}
+
+	if len(readers) == 0 {
+		// No exporter - use no-op meter to avoid nil panics
 		t.Metrics = NewMetrics(otel.GetMeterProvider().Meter(t.serviceName))
 		return nil
 	}
 
-	if err != nil {
-		return fmt.Errorf("failed to create metric exporter: %w", err)
-	}
-
 	// Create meter provider
-	t.meterProvider = sdkmetric.NewMeterProvider(
-		sdkmetric.WithReader(sdkmetric.NewPeriodicReader(exporter,
-			sdkmetric.WithInterval(time.Duration(opts.Metrics.ExportIntervalSeconds)*time.Second),
-		)),
-		sdkmetric.WithResource(t.resource),
-	)
+	t.meterProvider = sdkmetric.NewMeterProvider(append(readers, sdkmetric.WithResource(t.resource))...)
 
 	// Set global meter provider
 	otel.SetMeterProvider(t.meterProvider)
@@ -312,6 +298,36 @@ func (t *Telemetry) initMetrics(ctx context.Context, opts options.OpenTelemetryO
 	t.Metrics = NewMetrics(t.meterProvider.Meter(t.serviceName))
 
 	return nil
+}
+
+// newOTLPMetricExporter is the OTLP metric exporter otlp describes, over HTTP
+// or gRPC.
+func newOTLPMetricExporter(ctx context.Context, otlp *options.OTLPOptions) (sdkmetric.Exporter, error) {
+	endpoint, headers, secure := resolveOTLPConfig(otlp)
+	if otlp.UseHTTP {
+		httpOpts := []otlpmetrichttp.Option{
+			otlpmetrichttp.WithEndpoint(endpoint),
+		}
+		if !secure {
+			httpOpts = append(httpOpts, otlpmetrichttp.WithInsecure())
+		}
+		if len(headers) > 0 {
+			httpOpts = append(httpOpts, otlpmetrichttp.WithHeaders(headers))
+		}
+		return otlpmetrichttp.New(ctx, httpOpts...)
+	}
+	grpcOpts := []otlpmetricgrpc.Option{
+		otlpmetricgrpc.WithEndpoint(endpoint),
+	}
+	if secure {
+		grpcOpts = append(grpcOpts, otlpmetricgrpc.WithTLSCredentials(credentials.NewTLS(&tls.Config{})))
+	} else {
+		grpcOpts = append(grpcOpts, otlpmetricgrpc.WithInsecure())
+	}
+	if len(headers) > 0 {
+		grpcOpts = append(grpcOpts, otlpmetricgrpc.WithHeaders(headers))
+	}
+	return otlpmetricgrpc.New(ctx, grpcOpts...)
 }
 
 // initLogging initializes the OpenTelemetry logging pipeline

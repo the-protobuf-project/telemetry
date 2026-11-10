@@ -19,6 +19,39 @@ import (
 // Span is a type alias for tracing.Span to avoid exposing internal packages
 type Span = tracing.Span
 
+// SpanKind says what side of an interaction a span records.
+type SpanKind = tracing.SpanKind
+
+// Span kinds, as OpenTelemetry defines them.
+const (
+	SpanKindInternal = tracing.SpanKindInternal
+	SpanKindServer   = tracing.SpanKindServer
+	SpanKindClient   = tracing.SpanKindClient
+	SpanKindProducer = tracing.SpanKindProducer
+	SpanKindConsumer = tracing.SpanKindConsumer
+)
+
+// SpanOption configures one span started with Tracing.StartSpan.
+type SpanOption = tracing.SpanOption
+
+// Span options for Tracing.StartSpan.
+var (
+	WithSpanKind       = tracing.WithSpanKind
+	WithStartTime      = tracing.WithStartTime
+	WithSpanAttributes = tracing.WithSpanAttributes
+	WithLinks          = tracing.WithLinks
+)
+
+// SpanRecorder keeps every span in memory, for tests; see
+// [Builder.WithSpanRecorder].
+type SpanRecorder = tracing.SpanRecorder
+
+// RecordedSpan is one span a SpanRecorder kept.
+type RecordedSpan = tracing.RecordedSpan
+
+// NewSpanRecorder returns an empty SpanRecorder.
+var NewSpanRecorder = tracing.NewSpanRecorder
+
 // LogLevel is a type alias for options.LogLevel so modules can use telemetry.Level1, etc.
 type LogLevel = options.LogLevel
 
@@ -277,6 +310,18 @@ func (b *Builder) WithTracing() *Builder {
 	}
 	b.telemetryOpts.Tracing.Enabled = true
 	b.telemetryOpts.Telemetry.Tracing.Enabled = true
+	return b
+}
+
+// WithSpanRecorder enables tracing and sends every span to r as well,
+// synchronously, so a test reads what was traced from r.Spans() without an
+// exporter or a collector.
+func (b *Builder) WithSpanRecorder(r *SpanRecorder) *Builder {
+	if b.err != nil {
+		return b
+	}
+	b.WithTracing()
+	b.telemetryOpts.Telemetry.Tracing.Exporter = r.Exporter()
 	return b
 }
 

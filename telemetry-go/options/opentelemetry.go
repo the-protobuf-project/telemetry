@@ -1,5 +1,7 @@
 package options
 
+import sdktrace "go.opentelemetry.io/otel/sdk/trace"
+
 // OpenTelemetryOptions defines the configuration for the unified telemetry service
 // that integrates OpenTelemetry for logging, metrics, and tracing.
 type OpenTelemetryOptions struct {
@@ -28,6 +30,10 @@ type MetricsTelemetryOptions struct {
 // TracingTelemetryOptions defines the configuration for OpenTelemetry tracing
 type TracingTelemetryOptions struct {
 	Enabled bool `json:"enabled"` // Enable tracing (inherits from telemetry.enabled if not set)
+
+	// Exporter, when set, also receives every span, synchronously: the
+	// SpanRecorder a test reads. Not configuration, so never read from a file.
+	Exporter sdktrace.SpanExporter `json:"-"`
 }
 
 // OTLPOptions defines the settings for OTLP exporter

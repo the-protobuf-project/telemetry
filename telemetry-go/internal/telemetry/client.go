@@ -225,7 +225,7 @@ func (t *Telemetry) initTracing(ctx context.Context, opts options.OpenTelemetryO
 			}
 			exporter, err = otlptracegrpc.New(ctx, grpcOpts...)
 		}
-	} else {
+	} else if opts.Tracing.Exporter == nil {
 		// No OTLP exporter - use no-op tracer to avoid nil panics
 		t.tracer = NewTracer(otel.GetTracerProvider().Tracer(t.serviceName))
 		return nil
@@ -236,11 +236,17 @@ func (t *Telemetry) initTracing(ctx context.Context, opts options.OpenTelemetryO
 	}
 
 	// Create tracer provider
-	t.tracerProvider = sdktrace.NewTracerProvider(
-		sdktrace.WithBatcher(exporter),
+	providerOpts := []sdktrace.TracerProviderOption{
 		sdktrace.WithResource(t.resource),
 		sdktrace.WithSampler(sdktrace.AlwaysSample()),
-	)
+	}
+	if exporter != nil {
+		providerOpts = append(providerOpts, sdktrace.WithBatcher(exporter))
+	}
+	if opts.Tracing.Exporter != nil {
+		providerOpts = append(providerOpts, sdktrace.WithSyncer(opts.Tracing.Exporter))
+	}
+	t.tracerProvider = sdktrace.NewTracerProvider(providerOpts...)
 
 	// Set global tracer provider
 	otel.SetTracerProvider(t.tracerProvider)

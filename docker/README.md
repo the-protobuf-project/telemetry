@@ -114,7 +114,7 @@ The image ships tuned for high volume: large collector batches, exporter
 queues with retry, a `memory_limiter` that refuses data (retryably) before the
 collector can be OOM-killed, and Loki / Tempo ingest limits raised from their
 defaults (4 MB/s and 10,000 live traces), which refuse almost everything at
-this rate. `bench/stack_bench.py` reproduces the measurements below.
+this rate. `just stack-bench` reproduces the measurements below.
 
 ### Measured: 8 CPUs, 6 GB, one container
 
@@ -206,8 +206,10 @@ Health checks execute in this order:
 ## Build
 
 ```bash
-./build.sh local    # build locally for testing
-./build.sh amd64    # build + push to ECR
+just image local      # build locally for testing
+just image amd64      # build + push linux/amd64 (likewise arm64)
+just image manifest   # join the pushed architectures into one tag
+just image-dev        # build telemetry-stack:dev for `just stack-bench`
 ```
 
 ## Prometheus Flow

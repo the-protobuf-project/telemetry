@@ -47,6 +47,25 @@ class Environment(StrEnum):
 
 
 @dataclass
+class ExportOptions:
+    """How log records and spans queue for OTLP export.
+
+    By default a full queue drops what does not fit, so telemetry never stalls
+    the program; every drop is counted (``Telemetry.stats()``) and reported by
+    ``Telemetry.close()``. With ``lossless`` the writer waits for room instead.
+
+    Attributes:
+        lossless: Wait for room when a queue is full instead of dropping.
+        queue_size: Records each signal may hold awaiting export.
+        batch_size: Records sent per export request.
+    """
+
+    lossless: bool = False
+    queue_size: int = 2048
+    batch_size: int = 512
+
+
+@dataclass
 class OTLPOptions:
     """OpenTelemetry Protocol (OTLP) exporter configuration.
 
@@ -68,6 +87,7 @@ class OTLPOptions:
     secure: bool = False
     use_http: bool = False
     headers: dict = field(default_factory=dict)
+    export: ExportOptions = field(default_factory=ExportOptions)
 
     @property
     def host(self) -> str:

@@ -17,6 +17,11 @@ use opentelemetry_sdk::metrics::{Instrument, SdkMeterProvider, Stream};
 use opentelemetry_sdk::trace::SdkTracerProvider;
 use std::collections::HashMap;
 use std::sync::Arc;
+
+use super::accounting::{
+    AccountedLogProcessor, AccountedSpanProcessor, Counters, CountingLogExporter,
+    CountingSpanExporter,
+};
 use tonic::metadata::{MetadataKey, MetadataMap, MetadataValue};
 
 /// Telemetry provider for OpenTelemetry integration.
@@ -28,6 +33,9 @@ pub struct TelemetryProvider {
     meter_provider: Option<Arc<SdkMeterProvider>>,
     /// Clone shares the same processor pipeline as the global provider (OTEL 0.31+).
     tracer_provider: Option<SdkTracerProvider>,
+    /// What happened to every log record and span sent for export.
+    logs: Arc<Counters>,
+    spans: Arc<Counters>,
 }
 
 impl TelemetryProvider {
@@ -68,6 +76,8 @@ impl TelemetryProvider {
         let logging_enabled = telemetry_enabled && telemetry_opts.logging.enabled;
         let metrics_enabled = telemetry_enabled && telemetry_opts.metrics.enabled;
         let tracing_enabled = telemetry_enabled && telemetry_opts.tracing.enabled;
+        let logs = Arc::new(Counters::default());
+        let spans = Arc::new(Counters::default());
 
         let logger_provider = if logging_enabled {
             let exporter = if telemetry_opts.otlp.use_http {
@@ -127,9 +137,27 @@ impl TelemetryProvider {
                 .with_attributes(attrs)
                 .build();
 
+            let config = opentelemetry_sdk::logs::BatchConfigBuilder::default()
+                .with_max_queue_size(telemetry_opts.export.queue_size)
+                .with_max_export_batch_size(
+                    telemetry_opts
+                        .export
+                        .batch_size
+                        .min(telemetry_opts.export.queue_size),
+                )
+                .build();
+            let batch = opentelemetry_sdk::logs::BatchLogProcessor::builder(
+                CountingLogExporter::new(exporter, Arc::clone(&logs)),
+            )
+            .with_batch_config(config)
+            .build();
             Some(
                 SdkLoggerProvider::builder()
-                    .with_batch_exporter(exporter)
+                    .with_log_processor(AccountedLogProcessor::new(
+                        batch,
+                        Arc::clone(&logs),
+                        &telemetry_opts.export,
+                    ))
                     .with_resource(resource)
                     .build(),
             )
@@ -267,8 +295,26 @@ impl TelemetryProvider {
                 .with_attributes(attrs)
                 .build();
 
+            let config = opentelemetry_sdk::trace::BatchConfigBuilder::default()
+                .with_max_queue_size(telemetry_opts.export.queue_size)
+                .with_max_export_batch_size(
+                    telemetry_opts
+                        .export
+                        .batch_size
+                        .min(telemetry_opts.export.queue_size),
+                )
+                .build();
+            let batch = opentelemetry_sdk::trace::BatchSpanProcessor::builder(
+                CountingSpanExporter::new(exporter, Arc::clone(&spans)),
+            )
+            .with_batch_config(config)
+            .build();
             let provider = SdkTracerProvider::builder()
-                .with_batch_exporter(exporter)
+                .with_span_processor(AccountedSpanProcessor::new(
+                    batch,
+                    Arc::clone(&spans),
+                    &telemetry_opts.export,
+                ))
                 .with_resource(resource)
                 .build();
             opentelemetry::global::set_tracer_provider(provider.clone());
@@ -281,6 +327,8 @@ impl TelemetryProvider {
             logger_provider,
             meter_provider,
             tracer_provider,
+            logs,
+            spans,
         })
     }
 
@@ -298,6 +346,11 @@ impl TelemetryProvider {
     /// Returns the meter provider for creating metrics.
     pub fn meter_provider(&self) -> Option<Arc<SdkMeterProvider>> {
         self.meter_provider.clone()
+    }
+
+    /// Counters for log records and spans, readable after shutdown.
+    pub fn counters(&self) -> (Arc<Counters>, Arc<Counters>) {
+        (Arc::clone(&self.logs), Arc::clone(&self.spans))
     }
 
     /// Returns a tracer for manual span creation.

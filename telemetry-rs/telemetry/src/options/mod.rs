@@ -14,8 +14,8 @@ pub mod tracing;
 pub use foxglove::FoxgloveOptions;
 pub use logging::{LogLevel, LogOptions, LoggingOptions, ModuleOptions, TimeFormat};
 pub use opentelemetry::{
-    LoggingTelemetryOptions, MetricsTelemetryOptions, OTLPOptions, OpenTelemetryOptions,
-    OtelOptions, TracingTelemetryOptions,
+    ExportOptions, LoggingTelemetryOptions, MetricsTelemetryOptions, OTLPOptions,
+    OpenTelemetryOptions, OtelOptions, TracingTelemetryOptions,
 };
 pub use profiling::ProfilingOptions;
 pub use service::{Environment, ServiceOptions};

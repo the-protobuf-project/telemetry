@@ -1,5 +1,6 @@
 // W3C trace-context propagation: a trace a Go, Rust or Python service sent in
 // its headers continues here, and goes on to the next service.
+#include "telemetry/context.hpp"
 #include "telemetry/tracing/tracer.hpp"
 
 #include <catch2/catch_test_macros.hpp>
@@ -54,4 +55,22 @@ TEST_CASE("malformed or missing traceparent starts a new trace") {
         CHECK(span.trace_id() != "4bf92f3577b34da6a3ce929d0e0e4736");
         CHECK(span.parent_span_id().empty());
     }
+}
+
+TEST_CASE("an attached span is the thread's current trace context, and scopes nest") {
+    Tracer tracer(service());
+    CHECK_FALSE(telemetry::current_trace_context().valid());
+    auto outer = tracer.start_span("outer");
+    {
+        auto current = outer.attach();
+        CHECK(telemetry::current_trace_context().span_id == outer.span_id());
+        {
+            telemetry::tracing::ScopedSpan inner(tracer, "inner");
+            CHECK(telemetry::current_trace_context().span_id == inner.span().span_id());
+            CHECK(telemetry::current_trace_context().trace_id == outer.trace_id());
+            CHECK(inner.span().parent_span_id() == outer.span_id());
+        }
+        CHECK(telemetry::current_trace_context().span_id == outer.span_id());
+    }
+    CHECK_FALSE(telemetry::current_trace_context().valid());
 }

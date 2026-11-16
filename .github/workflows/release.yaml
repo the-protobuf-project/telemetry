@@ -30,7 +30,7 @@ concurrency:
 #   Python  telemetry-py 1.3.0 published to PyPI (with PYPI_API_TOKEN)
 #   C++     headers + static library attached to the GitHub release
 #
-# Versions are stamped from the tag (bench/set-version.sh), so the manifests
+# Versions are stamped from the tag (`just set-version`), so the manifests
 # can never disagree with the release.
 jobs:
   version:
@@ -113,8 +113,11 @@ jobs:
         with:
           python-version: '3.12'
 
+      - name: Set up just
+        uses: extractions/setup-just@v3
+
       - name: Stamp the release version
-        run: bench/set-version.sh "${{ needs.version.outputs.version }}"
+        run: just set-version "${{ needs.version.outputs.version }}"
 
       - name: Build sdist and wheel
         working-directory: ./telemetry-py
@@ -144,8 +147,11 @@ jobs:
       - name: Check out code
         uses: actions/checkout@v6
 
+      - name: Set up just
+        uses: extractions/setup-just@v3
+
       - name: Stamp the release version
-        run: bench/set-version.sh "${{ needs.version.outputs.version }}"
+        run: just set-version "${{ needs.version.outputs.version }}"
 
       - name: Set up Bazel
         uses: bazel-contrib/setup-bazel@0.15.0
@@ -182,15 +188,18 @@ jobs:
       - name: Check out code
         uses: actions/checkout@v6
 
+      - name: Set up just
+        uses: extractions/setup-just@v3
+
       - name: Stamp the release version
-        run: bench/set-version.sh "${{ needs.version.outputs.version }}"
+        run: just set-version "${{ needs.version.outputs.version }}"
 
       - name: Set up Rust
         uses: dtolnay/rust-toolchain@stable
 
       - name: Verify crates package cleanly
         working-directory: ./telemetry-rs
-        run: cargo package -p telemetry-derive -p telemetry --no-verify --allow-dirty
+        run: cargo package -p telemetry-derive -p telemetry-rs --no-verify --allow-dirty
 
       - name: Upload crate artifacts
         uses: actions/upload-artifact@v4
@@ -206,7 +215,7 @@ jobs:
         # --allow-dirty: the only change is the version stamped above.
         run: |
           cargo publish -p telemetry-derive --allow-dirty
-          cargo publish -p telemetry --allow-dirty
+          cargo publish -p telemetry-rs --allow-dirty
 
   build-docker:
     name: Build & push observability image (GHCR)
@@ -276,7 +285,7 @@ jobs:
             echo "| Language | |"
             echo "| -------- | - |"
             echo "| Go       | \`go get $MODULE@v$VERSION\` |"
-            echo "| Rust     | \`cargo add telemetry@$VERSION\` |"
+            echo "| Rust     | \`cargo add telemetry-rs@$VERSION\` |"
             echo "| Python   | \`pip install telemetry-py==$VERSION\` |"
             echo "| C++      | \`telemetry-cpp-$VERSION.tar.gz\` below |"
           } > release-notes.md

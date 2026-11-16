@@ -6,7 +6,7 @@ publish = false
 description = "Runnable demos for Telemetry — OTLP to localhost:6009 (gRPC)"
 
 [dependencies]
-telemetry = { path = "../telemetry" }
+telemetry = { package = "telemetry-rs", path = "../telemetry" }
 anyhow.workspace = true
 tokio.workspace = true
 serde.workspace = true

@@ -59,6 +59,8 @@ struct LogEntry {
     uint32_t line;
     uint64_t timestamp_ns;
     std::string data_json;
+    std::string trace_id;  ///< the span in scope when logged (see Span::attach); empty when none
+    std::string span_id;
 };
 
 using LogSink = std::function<void(const LogEntry&)>;

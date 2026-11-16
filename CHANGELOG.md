@@ -26,6 +26,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - C++: spans were written to MCAP only and never exported over OTLP, and child
   spans did not record their parent.
 - Rust: `with_profiling` was stored and never used.
+- Rust, Python: logs and spans beyond the SDK's export queue were dropped
+  silently (87% of 1M Rust spans, 47% of Python's). Every record is now counted
+  (`stats()`), the loss is reported on close, and `with_export` offers a
+  lossless mode, as in Go.
+- Python: a log call took 134 µs, 70% of it `inspect.stack()` reading source
+  files to find the caller; it now takes 37 µs.
+- C++: a span started without an explicit parent always began a new trace, even
+  inside another span.
 - Python: `close()` did not flush pending spans.
 - Single image: Loki's and Tempo's default ingest limits refused almost all of
   a high-volume load; Grafana's trace ↔ log links matched text that OTLP logs
@@ -41,15 +49,28 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Rust, Python, C++: W3C trace-context and baggage propagation
   (`inject` / `extract`), so one trace spans services in any of the four
   languages.
-- Rust: `Span::attach` for logs correlated with a span; Pyroscope profiling.
+- Rust: `Span::attach` for logs correlated with a span; Pyroscope profiling;
+  spans recorded to MCAP.
+- C++: distributed logging — logs written while a span is attached (or inside
+  `TELEMETRY_SPAN`) carry its trace and span id.
 - Python: profiling (`[profiling]` extra).
 - Single image: Pyroscope, a collector sized from the container's limits with a
   `memory_limiter`, and its own metrics scraped by Prometheus.
 - `bench/`: `bench_all.py` (every SDK, OTLP and MCAP), `stack_bench.py` (the
-  single image under load), `crosslang-demo.sh`, and `telemetry-loadgen` with
+  single image under load), `just crosslang`, and `telemetry-loadgen` with
   built-in pprof profiling; `BENCHMARKS.md`.
 - Releases: one `vX.Y.Z` tag releases every SDK at that version, including the
   `telemetry-go/vX.Y.Z` tag Go needs to resolve the module.
+- A `justfile` runs every task — tests, lint, benchmarks, the cross-language
+  check, image builds, releases (`just release 1.3.0`) and deployments — in
+  place of the shell runners.
+
+### Changed
+
+- Rust: the crate is published as `telemetry-rs` (`telemetry` on crates.io is
+  an unrelated project); code still imports it as `telemetry`.
+- Python: log records no longer repeat the service attributes and labels the
+  resource already carries.
 
 ## [1.0.0] - 2025-11-09
 

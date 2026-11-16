@@ -1,12 +1,12 @@
 #!/usr/bin/env python3
-"""Load-tests every SDK the same way and writes BENCHMARKS.md.
+"""Load-tests every SDK the same way and writes docs/BENCHMARKS.md.
 
 Each SDK writes N log records, N spans and N counter increments over OTLP/gRPC
 to one counting collector (telemetry-go's `telemetry-loadgen -serve`), so the
 table compares what each SDK *delivered*, not only how fast it returned.
 
-    bench/bench_all.py                      # 1,000,000 per signal, all SDKs
-    bench/bench_all.py --n 100000 --langs go,rust
+    just bench                                # 1,000,000 per signal, all SDKs
+    just bench 100000 --langs go,rust
 
 Needs go, cargo and uv on PATH. Standard library only.
 """
@@ -157,7 +157,7 @@ def main():
     ap.add_argument("--langs", default="go,rust,python")
     ap.add_argument("--signals", default="logs,spans,metrics")
     ap.add_argument("--timeout", type=int, default=1800, help="seconds per run")
-    ap.add_argument("--out", default=str(ROOT / "BENCHMARKS.md"))
+    ap.add_argument("--out", default=str(ROOT / "docs" / "BENCHMARKS.md"))
     ap.add_argument("--no-mcap", action="store_true", help="skip the MCAP recording runs")
     args = ap.parse_args()
     langs = set(args.langs.split(","))
@@ -207,7 +207,7 @@ def write(args, results, micro, workers, mcap=()):
         "",
         f"Every SDK writes **{n:,}** log records, spans and counter increments over OTLP/gRPC to one",
         "in-process counting collector, so the table shows what each SDK **delivered**, not only how",
-        "fast the calls returned. Regenerate with `bench/bench_all.py`.",
+        "fast the calls returned. Regenerate with `just bench`.",
         "",
         f"Measured {date.today().isoformat()} on {platform.system()} {platform.machine()}, {workers} CPUs,",
         f"Python {platform.python_version()}. Console log output is discarded (Go) or sent to /dev/null",

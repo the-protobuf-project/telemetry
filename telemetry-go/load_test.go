@@ -233,7 +233,7 @@ func TestSpanAttributesKeepTheirKind(t *testing.T) {
 	}
 }
 
-// Benchmarks for the cross-SDK table (see BENCHMARKS.md): the cost a program
+// Benchmarks for the cross-SDK table (see docs/BENCHMARKS.md): the cost a program
 // pays per call, with nothing exported (the pipeline's own overhead) and
 // exporting to an in-process collector.
 

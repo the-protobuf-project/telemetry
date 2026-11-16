@@ -1,3 +1,6 @@
+import warnings
+
+from ._private.accounting import LOGS, SPANS, SignalStats, loss_report
 from ._private.foxglove import UnifiedMcapWriter
 from ._private.logging import TelemetryLogger
 from ._private.metrics import (
@@ -12,6 +15,7 @@ from ._private.tracing import (
 )
 from .options import (
     Environment,
+    ExportOptions,
     LogLevel,
     ModuleOptions,
     ServiceOptions,
@@ -156,6 +160,26 @@ class TelemetryBuilder:
         self._otlp_secure = secure
         return self
 
+    def with_export(
+        self,
+        lossless: bool = False,
+        queue_size: int | None = None,
+        batch_size: int | None = None,
+    ) -> "TelemetryBuilder":
+        """Tune the OTLP export queues for logs and spans.
+
+        By default a full queue drops what does not fit, counted in
+        ``Telemetry.stats()`` and reported by ``close()``. With
+        ``lossless=True`` the writer waits for room instead, and nothing is
+        dropped; the queue then defaults to 65536 records.
+        """
+        self._export = ExportOptions(
+            lossless=lossless,
+            queue_size=queue_size or (65536 if lossless else 2048),
+            batch_size=batch_size or (8192 if lossless else 512),
+        )
+        return self
+
     def with_otlp_http(self, use_http: bool = True) -> "TelemetryBuilder":
         """Use HTTP instead of gRPC for OTLP."""
         self._otlp_use_http = use_http
@@ -251,6 +275,9 @@ class TelemetryBuilder:
             telemetry_opts.telemetry.otlp.enabled = True
 
         # Configure MCAP if specified
+        if getattr(self, "_export", None):
+            telemetry_opts.telemetry.otlp.export = self._export
+
         if self._mcap_path:
             telemetry_opts.foxglove.enabled = True
             telemetry_opts.foxglove.mcap_path = self._mcap_path
@@ -373,3 +400,26 @@ class Telemetry:
         # Close MCAP writer last
         if self.mcap_writer:
             self.mcap_writer.close()
+
+        # Every record that never reached the collector, said once, here.
+        # Shutting the providers down drains their queues first.
+        if self.telemetry_opts.telemetry.otlp.enabled:
+            self._shutdown_providers()
+            report = loss_report(LOGS.stats(), SPANS.stats())
+            if report:
+                warnings.warn(report, RuntimeWarning, stacklevel=2)
+
+    def stats(self) -> dict[str, SignalStats]:
+        """What the export pipeline did with the log records and spans emitted
+        so far (process-wide). After ``close()``, ``pending`` is what was dropped."""
+        return {"logs": LOGS.stats(), "spans": SPANS.stats()}
+
+    @staticmethod
+    def _shutdown_providers() -> None:
+        from opentelemetry import trace
+        from opentelemetry._logs import get_logger_provider
+
+        for provider in (trace.get_tracer_provider(), get_logger_provider()):
+            shutdown = getattr(provider, "shutdown", None)
+            if shutdown:
+                shutdown()

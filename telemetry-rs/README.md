@@ -18,7 +18,7 @@ integration and MCAP recording for Foxglove Studio.
 
 ```toml
 [dependencies]
-telemetry = { git = "https://github.com/the-protobuf-project/telemetry.git" }
+telemetry = { package = "telemetry-rs", git = "https://github.com/the-protobuf-project/telemetry.git" }
 tokio = { version = "1", features = ["macros", "rt-multi-thread"] }
 anyhow = "1.0"
 serde = { version = "1.0", features = ["derive"] }
@@ -59,7 +59,7 @@ async fn main() -> anyhow::Result<()> {
     let _telemetry = telemetry::telemetry_local_otel!()
         .with_service("my-service", "1.0.0")
         .environment(Environment::Development)
-        .with_tracing() // traces + logs + metrics → collector
+        .with_tracing() // spans; telemetry_local_otel! sends everything to the collector
         .build()?;
 
     logger::info!("flushes on drop");

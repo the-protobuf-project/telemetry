@@ -25,6 +25,53 @@ pub struct OpenTelemetryOptions {
     /// OTLP exporter options.
     #[serde(default)]
     pub otlp: OTLPOptions,
+    /// Export queues: size, batching, and dropping or waiting when full.
+    #[serde(default)]
+    pub export: ExportOptions,
+}
+
+/// How log records and spans queue for OTLP export, and what happens when a
+/// program produces them faster than the collector takes them.
+///
+/// By default a full queue drops what does not fit, so telemetry can never
+/// stall the program; every drop is counted ([`crate::Telemetry::stats`]) and
+/// reported by [`crate::Telemetry::close`]. With `lossless`, the writer waits
+/// for room instead, and nothing is dropped.
+///
+/// ```
+/// use telemetry::options::ExportOptions;
+///
+/// let export = ExportOptions { lossless: true, queue_size: 65_536, ..Default::default() };
+/// ```
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ExportOptions {
+    /// Wait for room when a queue is full instead of dropping.
+    #[serde(default)]
+    pub lossless: bool,
+    /// Records each signal may hold awaiting export.
+    #[serde(default = "default_queue_size")]
+    pub queue_size: usize,
+    /// Records sent per export request.
+    #[serde(default = "default_batch_size")]
+    pub batch_size: usize,
+}
+
+fn default_queue_size() -> usize {
+    2048
+}
+
+fn default_batch_size() -> usize {
+    512
+}
+
+impl Default for ExportOptions {
+    fn default() -> Self {
+        Self {
+            lossless: false,
+            queue_size: default_queue_size(),
+            batch_size: default_batch_size(),
+        }
+    }
 }
 
 /// Provides a default enabled value.
@@ -53,6 +100,7 @@ impl Default for OpenTelemetryOptions {
             metrics: MetricsTelemetryOptions::default(),
             tracing: TracingTelemetryOptions::default(),
             otlp: OTLPOptions::default(),
+            export: ExportOptions::default(),
         }
     }
 }

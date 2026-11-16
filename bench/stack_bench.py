@@ -5,8 +5,8 @@ Loki / Tempo / Prometheus, while the container's CPU and memory are sampled
 and the collector's own counters say what it accepted, refused, sent and
 failed.
 
-    docker build -t telemetry-stack:dev docker/
-    bench/stack_bench.py --cpus 8 --memory 6g --n 1000000
+    just stack-bench                 # builds the image, then 1M per signal on 8 CPUs / 6 GB
+    just stack-bench 1000000 16 12g  # n, cpus, memory
 
 Standard library only; needs docker and go.
 """

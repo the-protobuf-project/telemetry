@@ -17,6 +17,9 @@ Typical usage example:
     formatted = format_data({"key": "value", "count": 42})
 """
 
+import functools
+import os
+import sys
 import threading
 from typing import Any
 
@@ -119,40 +122,42 @@ def format_data(data: dict[str, Any]) -> str:
     return "\n  data=\n  │ " + "\n  │ ".join(lines)
 
 
+# The telemetry package's own directory: frames inside it are the SDK, not the
+# caller. Resolved from the installed location, so it holds whether the
+# package runs from a checkout or from site-packages.
+_PACKAGE_DIR = (
+    os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+    + os.sep
+)
+
+
+@functools.lru_cache(maxsize=1024)
+def _display_path(filename: str) -> str:
+    """The caller's path relative to the working directory, or its basename
+    when it lies outside it. Cached: a program logs from few files."""
+    try:
+        rel_path = os.path.relpath(filename)
+    except (ValueError, TypeError):
+        return os.path.basename(filename)
+    return os.path.basename(filename) if rel_path.startswith("..") else rel_path
+
+
 def get_caller_info():
     """
     Identify the external caller's source file and line number.
+
+    Walks frame objects directly: ``inspect.stack()`` built every frame on the
+    stack and read source files from disk on each call, which was 70% of the
+    cost of a log call.
 
     Returns:
         tuple[str, int]: The caller's relative path or basename and line number,
         or ``("unknown", 0)`` when no suitable caller is found.
     """
-    import inspect
-    import os
-
-    # Walk up the stack to find the first frame outside telemetry module
-    for frame_info in inspect.stack()[
-        2:
-    ]:  # Skip this method and the calling log method
-        filename = frame_info.filename
-
-        # Skip frames from telemetry package itself
-        if (
-            "/telemetry-py/telemetry/" in filename
-            or filename.endswith("/telemetry/logging.py")
-            or filename.endswith("/telemetry/telemetry.py")
-        ):
-            continue
-
-        # This is the actual user code - return it
-        try:
-            rel_path = os.path.relpath(filename)
-            if not rel_path.startswith(".."):
-                return rel_path, frame_info.lineno
-            else:
-                return os.path.basename(filename), frame_info.lineno
-        except (ValueError, TypeError):
-            return os.path.basename(filename), frame_info.lineno
-
-    # Fallback
+    frame = sys._getframe(2)  # skip this function and the calling log method
+    while frame is not None:
+        filename = frame.f_code.co_filename
+        if not filename.startswith(_PACKAGE_DIR):
+            return _display_path(filename), frame.f_lineno
+        frame = frame.f_back
     return "unknown", 0

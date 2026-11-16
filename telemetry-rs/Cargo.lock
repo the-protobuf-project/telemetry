@@ -2376,7 +2376,30 @@ dependencies = [
 ]
 
 [[package]]
-name = "telemetry"
+name = "telemetry-derive"
+version = "1.0.0"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "syn 2.0.119",
+]
+
+[[package]]
+name = "telemetry-examples"
+version = "1.0.0"
+dependencies = [
+ "anyhow",
+ "chrono",
+ "opentelemetry",
+ "opentelemetry_sdk",
+ "serde",
+ "serde_json",
+ "telemetry-rs",
+ "tokio",
+]
+
+[[package]]
+name = "telemetry-rs"
 version = "1.0.0"
 dependencies = [
  "anyhow",
@@ -2400,29 +2423,6 @@ dependencies = [
  "tracing",
  "tracing-opentelemetry",
  "tracing-subscriber",
-]
-
-[[package]]
-name = "telemetry-derive"
-version = "1.0.0"
-dependencies = [
- "proc-macro2",
- "quote",
- "syn 2.0.119",
-]
-
-[[package]]
-name = "telemetry-examples"
-version = "1.0.0"
-dependencies = [
- "anyhow",
- "chrono",
- "opentelemetry",
- "opentelemetry_sdk",
- "serde",
- "serde_json",
- "telemetry",
- "tokio",
 ]
 
 [[package]]

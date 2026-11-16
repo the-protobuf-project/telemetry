@@ -51,7 +51,7 @@ CHANGED_TEXT_FILES = [
     "buf.yaml",
     "docker/Dockerfile",
     "docker/README.md",
-    "docker/build.sh",
+    "justfile",
     "docs/configuration.md",
     "telemetry-core/deploy/production/local-webhook/go.mod",
     "telemetry-cpp/examples/bazel/CMakeLists.txt",
@@ -225,15 +225,18 @@ class TestReleaseWorkflow(unittest.TestCase):
         self.assertIn("working-directory: ./telemetry-cpp", self.content)
         self.assertIn("bazel build -c opt //src:telemetry", self.content)
         self.assertIn("libtelemetry.a", self.content)
-        self.assertIn("telemetry-cpp.tar.gz", self.content)
+        # Versioned since one tag releases every SDK at one version.
+        self.assertIn("telemetry-cpp-${{ needs.version.outputs.version }}.tar.gz", self.content)
 
     def test_rust_package_names_renamed(self):
         self.assertIn("working-directory: ./telemetry-rs", self.content)
+        # Published as telemetry-rs: "telemetry" on crates.io is an unrelated
+        # crate. The library is still imported as `telemetry`.
         self.assertIn(
-            "cargo package -p telemetry-derive -p telemetry --no-verify", self.content
+            "cargo package -p telemetry-derive -p telemetry-rs --no-verify", self.content
         )
         self.assertIn("cargo publish -p telemetry-derive", self.content)
-        self.assertIn("cargo publish -p telemetry", self.content)
+        self.assertIn("cargo publish -p telemetry-rs", self.content)
 
 
 class TestGitignore(unittest.TestCase):

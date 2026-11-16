@@ -1,5 +1,5 @@
 """
-A hop of the cross-language tracing demo (bench/crosslang-demo.sh): continues,
+A hop of the cross-language tracing demo (`just crosslang`): continues,
 in Python, the trace an upstream service started, from the W3C headers it
 sent, and hands it on.
 

@@ -1,9 +1,13 @@
 #include "telemetry/logging/logger.hpp"
 #include "telemetry/logging/formatter.hpp"
+#include "telemetry/context.hpp"
 #include "telemetry/mcap/writer.hpp"
 
 #if TELEMETRY_USE_OTEL
 #include "telemetry/otel/exporter.hpp"
+#include <opentelemetry/trace/span_id.h>
+#include <opentelemetry/trace/trace_flags.h>
+#include <opentelemetry/trace/trace_id.h>
 #include <opentelemetry/logs/severity.h>
 #endif
 
@@ -206,6 +210,10 @@ void Logger::log(Level level, const char* message, const char* file, uint32_t li
     entry.line = line;
     entry.timestamp_ns = platform::get_timestamp_ns();
     entry.data_json = data_json;
+    if (const auto& current = ::telemetry::current_trace_context(); current.valid()) {
+        entry.trace_id = current.trace_id;
+        entry.span_id = current.span_id;
+    }
 
     log_to_console(entry);
     log_to_mcap(entry);
@@ -279,6 +287,21 @@ void Logger::log_to_otel(const LogEntry& entry) {
         default: severity = logs_api::Severity::kInfo; break;
     }
 
+    if (entry.trace_id.size() == 32 && entry.span_id.size() == 16) {
+        // Distributed logging: the record names the span it was written
+        // under, so Grafana links it to its trace.
+        uint8_t tid[16];
+        uint8_t sid[8];
+        for (size_t i = 0; i < 16; ++i) tid[i] = static_cast<uint8_t>(std::stoul(entry.trace_id.substr(2 * i, 2), nullptr, 16));
+        for (size_t i = 0; i < 8; ++i) sid[i] = static_cast<uint8_t>(std::stoul(entry.span_id.substr(2 * i, 2), nullptr, 16));
+        otel_logger_->EmitLogRecord(
+            severity,
+            entry.message,
+            opentelemetry::trace::TraceId(tid),
+            opentelemetry::trace::SpanId(sid),
+            opentelemetry::trace::TraceFlags(opentelemetry::trace::TraceFlags::kIsSampled));
+        return;
+    }
     otel_logger_->EmitLogRecord(
         severity,
         entry.message

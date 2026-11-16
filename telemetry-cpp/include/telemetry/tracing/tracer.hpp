@@ -2,6 +2,7 @@
 
 #include "telemetry/platform.hpp"
 #include "telemetry/config.hpp"
+#include "telemetry/context.hpp"
 
 #include <string>
 #include <memory>
@@ -97,6 +98,14 @@ public:
     const std::map<std::string, std::string>& baggage() const { return baggage_; }
     bool is_ended() const { return ended_; }
 
+    /// Makes this span current on this thread until the guard is destroyed:
+    /// log records written meanwhile carry its trace and span id.
+    ///
+    ///     auto span = tracer.start_span("reserve", parent, SpanKind::Server);
+    ///     auto current = span.attach();
+    ///     logger.info("reserved");  // correlated with the span
+    [[nodiscard]] ScopedTraceContext attach() const { return ScopedTraceContext({trace_id_, span_id_}); }
+
 private:
     friend class Tracer;
     struct OtelState;  // the OpenTelemetry span this one exports through, when OTLP is on
@@ -143,6 +152,8 @@ public:
     Tracer(Tracer&&) noexcept;
     Tracer& operator=(Tracer&&) noexcept;
 
+    /// Starts a span under the one in scope on this thread (see
+    /// Span::attach), or a new trace when none is.
     Span start_span(const std::string& name);
     Span start_span(const std::string& name, SpanKind kind);
     Span start_span(const std::string& name, const Span& parent, SpanKind kind = SpanKind::Internal);
@@ -213,6 +224,7 @@ public:
 
 private:
     Span span_;
+    ScopedTraceContext current_;  // logs inside the scope are correlated with span_
 };
 
 }  // namespace telemetry::tracing

@@ -65,6 +65,7 @@ class TelemetryLogger:
                 endpoint=otlp_opts.endpoint,
                 auth_token=otlp_opts.auth_token,
                 secure=otlp_opts.secure,
+                export=otlp_opts.export,
             )
 
         # Initialize MCAP logging if enabled

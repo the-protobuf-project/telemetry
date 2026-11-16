@@ -32,6 +32,18 @@ async fn main() -> anyhow::Result<()> {
     if let Ok(path) = std::env::var("LOADGEN_MCAP") {
         builder = builder.with_mcap(path);
     }
+    // LOADGEN_LOSSLESS=1 waits for room instead of dropping; LOADGEN_QUEUE
+    // sets the export queue size.
+    let lossless = std::env::var("LOADGEN_LOSSLESS").is_ok_and(|v| v == "1");
+    let queue_size = std::env::var("LOADGEN_QUEUE")
+        .ok()
+        .and_then(|v| v.parse().ok())
+        .unwrap_or(if lossless { 65_536 } else { 2048 });
+    builder = builder.with_export(telemetry::options::ExportOptions {
+        lossless,
+        queue_size,
+        batch_size: if lossless { 8192 } else { 512 },
+    });
     let mut telemetry = builder.build()?;
 
     let start = Instant::now();
@@ -81,13 +93,19 @@ async fn main() -> anyhow::Result<()> {
     let start = Instant::now();
     let close_err = telemetry.close().err().map(|e| e.to_string());
     let close = start.elapsed();
+    let stats = telemetry.stats();
+    let dropped = match signal {
+        "logs" | "correlated" => stats.logs.dropped(),
+        "spans" => stats.spans.dropped(),
+        _ => 0,
+    };
 
     println!(
         "{}",
         serde_json::json!({
             "lang": "rust", "signal": signal, "n": n, "workers": 1,
             "emit_s": emit.as_secs_f64(), "close_s": close.as_secs_f64(),
-            "close_error": close_err,
+            "dropped_reported": dropped, "close_error": close_err,
         })
     );
     Ok(())

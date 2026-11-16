@@ -22,13 +22,30 @@ Typical usage example:
 """
 
 import logging
+import time
 from typing import Any
 
-from opentelemetry._logs import get_logger_provider, set_logger_provider
+from opentelemetry._logs import (
+    LogRecord,
+    SeverityNumber,
+    get_logger_provider,
+    set_logger_provider,
+)
 from opentelemetry.exporter.otlp.proto.grpc._log_exporter import OTLPLogExporter
 from opentelemetry.sdk._logs import LoggerProvider, LoggingHandler
 from opentelemetry.sdk._logs.export import BatchLogRecordProcessor
 from opentelemetry.sdk.resources import Resource
+
+from ...options import ExportOptions
+from ..accounting import AccountedLogProcessor, CountingLogExporter
+
+_SEVERITY = {
+    "DEBUG": SeverityNumber.DEBUG,
+    "INFO": SeverityNumber.INFO,
+    "WARNING": SeverityNumber.WARN,
+    "ERROR": SeverityNumber.ERROR,
+    "CRITICAL": SeverityNumber.FATAL,
+}
 
 
 class OTLPLogger:
@@ -55,6 +72,7 @@ class OTLPLogger:
         secure: bool = False,
         service_description: str = "",
         service_labels: dict[str, str] = None,
+        export=None,
     ):
         """Configure an OpenTelemetry logger for a service.
 
@@ -105,7 +123,17 @@ class OTLPLogger:
             headers=headers if headers else None,
         )
 
-        logger_provider.add_log_record_processor(BatchLogRecordProcessor(otlp_exporter))
+        # Counted, and lossless when asked: the SDK's batch processor alone
+        # drops what overflows its queue with no more than a single warning.
+        export = export or ExportOptions()
+        batch = BatchLogRecordProcessor(
+            CountingLogExporter(otlp_exporter),
+            max_queue_size=export.queue_size,
+            max_export_batch_size=min(export.batch_size, export.queue_size),
+        )
+        logger_provider.add_log_record_processor(
+            AccountedLogProcessor(batch, export.lossless, export.queue_size)
+        )
 
         # Only set the global logger provider once to avoid override warnings.
         # Each service still gets its own LoggerProvider with correct service.name resource.
@@ -114,6 +142,8 @@ class OTLPLogger:
 
         # Determine log level based on service environment
         log_level = self._get_log_level_for_environment(service_environment)
+
+        self._min_level = log_level
 
         # Setup Python logging bridge to OTEL
         handler = LoggingHandler(
@@ -179,19 +209,17 @@ class OTLPLogger:
             "CRITICAL": std_logging.CRITICAL,
         }
 
-        # Build extra attributes with service metadata, code location, and service labels
+        std_level = level_map.get(level, std_logging.INFO)
+        if std_level < self._min_level:
+            return
+
+        # Service name, version, environment, description and labels are on
+        # the resource every record carries; repeating them per record doubled
+        # the attributes the SDK validates and encodes for each log.
         extra_attrs = {
-            "service.name": self.service_name,
-            "service.version": self.service_version,
-            "service.environment": self.service_environment,
-            "service.description": self.service_description,
             "code.filepath": caller_file,
             "code.lineno": caller_line,
         }
-
-        # Add service labels as direct attributes
-        if self.service_labels:
-            extra_attrs.update(self.service_labels)
 
         # Add structured data as a nested 'data' attribute
         if data:
@@ -227,7 +255,17 @@ class OTLPLogger:
                 else:
                     extra_attrs[attr_key] = value
 
-        # Emit to service-specific logger instead of root logger
-        service_logger = logging.getLogger(f"{self.service_name}")
-        std_level = level_map.get(level, std_logging.INFO)
-        service_logger.log(std_level, message, extra=extra_attrs)
+        # Straight to the OpenTelemetry logger: going through the stdlib
+        # logger built a logging.LogRecord only for LoggingHandler to translate
+        # it back. The current span, if any, is picked up from the context.
+        now = time.time_ns()
+        self.logger.emit(
+            LogRecord(
+                timestamp=now,
+                observed_timestamp=now,
+                severity_text=level,
+                severity_number=_SEVERITY.get(level, SeverityNumber.INFO),
+                body=message,
+                attributes=extra_attrs,
+            )
+        )

@@ -184,7 +184,7 @@ See the [Python SDK documentation](telemetry-py/README.md).
 
 ```toml
 [dependencies]
-telemetry = { git = "https://github.com/the-protobuf-project/telemetry.git" }
+telemetry = { package = "telemetry-rs", git = "https://github.com/the-protobuf-project/telemetry.git" }
 tokio = { version = "1", features = ["macros", "rt-multi-thread"] }
 anyhow = "1.0"
 ```
@@ -337,6 +337,7 @@ C++,Metrics,1
 C++,Logs,1
 C++,Trace propagation,1
 C++,Baggage,1
+C++,Distributed logging,1
 C++,MCAP,1
 ```
 
@@ -347,13 +348,19 @@ C++,MCAP,1
 | Logs → OTLP | Yes | Yes | Yes | Yes |
 | Trace context across services (W3C `traceparent`) | Yes: `Inject` / `Extract` | Yes: `inject` / `extract` | Yes: `inject` / `extract` | Yes: `inject` / `extract` |
 | Baggage | Yes: `SetBaggage` / `Baggage` | Yes: `set_baggage` / `baggage` | Yes: `set_baggage` / `get_baggage` | Yes: carried through `extract` → `inject` |
-| Distributed logging (logs carry the trace id) | Yes: `InfoContext(ctx, …)`, `Logger.WithContext` | Yes: inside `span.attach()` | Yes: inside `start_span` | No (not yet) |
-| Profiles → Pyroscope | Yes: `WithProfiling` | Yes: `with_profiling` (`profiling` feature) | Yes: `with_profiling` (`[profiling]` extra) | No (not yet) |
-| MCAP recording | logs, metrics, spans | logs, metrics | logs, metrics, spans | logs, metrics, spans |
-| Drops counted and reported | Yes: `Stats()`, `Close` error | No (silent) | No (silent) | No (silent) |
+| Distributed logging (logs carry the trace id) | Yes: `InfoContext(ctx, …)`, `Logger.WithContext` | Yes: inside `span.attach()` | Yes: inside `start_span` | Yes: inside `span.attach()` / `TELEMETRY_SPAN` |
+| Profiles → Pyroscope | Yes: `WithProfiling` | Yes: `with_profiling` (`profiling` feature) | Yes: `with_profiling` (`[profiling]` extra) | Through an eBPF profiler (no Pyroscope C++ client exists; see below) |
+| MCAP recording | logs, metrics, spans | logs, metrics, spans | logs, metrics, spans | logs, metrics, spans |
+| Drops counted and reported, lossless mode | Yes: `WithExport`, `Stats()`, `Close` error | Yes: `with_export`, `stats()`, `close` error | Yes: `with_export`, `stats()`, warning on `close` | No (silent) |
 
-`bench/crosslang-demo.sh` checks one trace across all four (Go → Rust →
+`just crosslang` checks one trace across all four (Go → Rust →
 Python → C++), and CI runs it on every change.
+
+C++ profiles come from outside the process: Pyroscope has no C++ client
+library, so the supported route is an eBPF profiler — Grafana Alloy's
+`pyroscope.ebpf` component or the OpenTelemetry eBPF profiler — running beside
+the service on Linux, which profiles native code without changes to it and
+sends to the same Pyroscope.
 
 ## Tracing across languages
 
@@ -432,7 +439,7 @@ Try it locally. One trace through four services, each written with a
 different SDK:
 
 ```bash
-bench/crosslang-demo.sh
+just crosslang
 # go     (orders-go)       trace cd3b5eda…  span ef132842…
 # rust   (inventory-rs)    trace cd3b5eda…  span 70f84c9e…  parent ef132842…
 # python (billing-py)      trace cd3b5eda…  span 0585d24b…  parent 70f84c9e…
@@ -450,7 +457,7 @@ propagation fails the build. With the stack running
 Logs and spans are exported asynchronously: each call puts the record in a
 bounded queue, and a background exporter sends it to the collector in
 batches. When a program writes faster than the collector accepts, the queue
-fills, and something has to give. The Go SDK lets you choose what:
+fills, and something has to give. Go, Rust and Python let you choose what:
 
 ```go
 tel, err := telemetry.New().
@@ -463,8 +470,19 @@ tel, err := telemetry.New().
     Build()
 ```
 
-Either way nothing is lost silently. Every drop is counted, warned about while
-it happens, and returned by `Close`:
+```rust
+let telemetry = Telemetry::builder("ingest", "1.0.0")
+    .with_export(ExportOptions { lossless: true, queue_size: 65_536, ..Default::default() })
+    .build()?;
+```
+
+```python
+t = Telemetry.new().with_service("ingest", "1.0.0").with_export(lossless=True).build()
+```
+
+Either way nothing is lost silently. Every drop is counted, and reported when
+the program closes telemetry (an error from `Close` in Go and `close` in Rust,
+a warning in Python):
 
 ```text
 telemetry: 935442 of 1000000 log records dropped (export queue full);
@@ -488,7 +506,7 @@ go tool pprof -http=: cpu.out
 
 It reports emitted vs. delivered per signal, against an in-process collector
 or a real one (`-endpoint host:4317`). Results for every SDK are in
-[BENCHMARKS.md](BENCHMARKS.md).
+[BENCHMARKS.md](docs/BENCHMARKS.md).
 
 ## Observability stack
 
@@ -559,7 +577,7 @@ git push origin v1.3.0
 | SDK    | Published as | Install |
 | ------ | ------------ | ------- |
 | Go     | tag `telemetry-go/v1.3.0`, pushed by the workflow | `go get github.com/the-protobuf-project/telemetry/telemetry-go@v1.3.0` |
-| Rust   | crates.io | `cargo add telemetry@1.3.0` |
+| Rust   | crates.io | `cargo add telemetry-rs@1.3.0` |
 | Python | PyPI | `pip install telemetry-py==1.3.0` |
 | C++    | GitHub release asset | `telemetry-cpp-1.3.0.tar.gz` |
 
@@ -568,7 +586,7 @@ prefixed with that directory (`telemetry-go/v1.3.0`), not from the repository's
 `v1.3.0`. The release workflow creates that tag on the same commit and asks
 the Go proxy for it, so `go get` and pkg.go.dev see the release at once.
 The workflow stamps the version into `Cargo.toml`, `pyproject.toml` and the C++
-build files from the tag ([`bench/set-version.sh`](bench/set-version.sh)),
+build files from the tag (`just set-version`, in the [`justfile`](justfile)),
 so the manifests cannot disagree with the release. Publishing to crates.io and
 PyPI needs the `CARGO_REGISTRY_TOKEN` and `PYPI_API_TOKEN` repository secrets.
 
@@ -587,5 +605,7 @@ changes, and open a pull request. Please ensure the relevant SDK builds and its
 tests and linters pass before submitting.
 
 ## License
+
+Copyright &copy; 2026 The Protobuf Project.
 
 Licensed under the [Apache License, Version 2.0](LICENSE).

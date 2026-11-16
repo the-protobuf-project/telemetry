@@ -29,6 +29,7 @@ from opentelemetry.sdk.trace.export import BatchSpanProcessor
 from opentelemetry.trace import SpanKind
 
 from ...options import OTLPOptions, ServiceOptions, TracingOptions
+from ..accounting import AccountedSpanProcessor, CountingSpanExporter
 from ..foxglove import UnifiedMcapWriter
 from .context import get_current_span_id, get_current_trace_id
 from .decorator import create_trace_decorator
@@ -107,7 +108,17 @@ class TelemetryTracing:
             insecure=True,
         )
 
-        provider.add_span_processor(BatchSpanProcessor(exporter))
+        # Counted, and lossless when asked: the SDK's batch processor alone
+        # drops what overflows its queue with no more than a single warning.
+        export = otlp_opts.export
+        batch = BatchSpanProcessor(
+            CountingSpanExporter(exporter),
+            max_queue_size=export.queue_size,
+            max_export_batch_size=min(export.batch_size, export.queue_size),
+        )
+        provider.add_span_processor(
+            AccountedSpanProcessor(batch, export.lossless, export.queue_size)
+        )
         trace.set_tracer_provider(provider)
         self._provider = provider
 

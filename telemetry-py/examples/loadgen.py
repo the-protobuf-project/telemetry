@@ -29,6 +29,9 @@ def main() -> None:
         b = b.with_otlp(host, int(port))
     if os.environ.get("LOADGEN_MCAP"):
         b = b.with_mcap(os.environ["LOADGEN_MCAP"])
+    # LOADGEN_LOSSLESS=1 waits for room instead of dropping.
+    if os.environ.get("LOADGEN_LOSSLESS") == "1":
+        b = b.with_export(lossless=True)
     t = b.build()
 
     start = time.perf_counter()
@@ -49,6 +52,10 @@ def main() -> None:
     start = time.perf_counter()
     t.close()
     close = time.perf_counter() - start
+    stats = t.stats()
+    dropped = {"logs": stats["logs"].dropped, "spans": stats["spans"].dropped}.get(
+        signal, 0
+    )
 
     print(
         json.dumps(
@@ -59,6 +66,7 @@ def main() -> None:
                 "workers": 1,
                 "emit_s": emit,
                 "close_s": close,
+                "dropped_reported": dropped,
             }
         )
     )

@@ -4,6 +4,7 @@ cc_library(
     name = "core",
     hdrs = [
         "config.hpp",
+        "context.hpp",
         "platform.hpp",
     ],
     defines = ["TELEMETRY_USE_OTEL=1"],

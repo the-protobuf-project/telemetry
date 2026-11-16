@@ -1,4 +1,4 @@
-"""Functional tests for docker/build.sh.
+"""Functional tests for `just image`, the stack image build (was docker/build.sh).
 
 This PR renamed the default `IMAGE_NAME` (and the corresponding usage text)
 from the "opentelementry" brand to "ghcr.io/the-protobuf-project/telemetry".
@@ -10,6 +10,7 @@ exit codes, image/tag name computation, env var overrides).
 """
 
 import os
+import shutil
 import stat
 import subprocess
 import tempfile
@@ -17,7 +18,7 @@ import unittest
 from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
-BUILD_SCRIPT = REPO_ROOT / "docker" / "build.sh"
+JUSTFILE = REPO_ROOT / "justfile"
 
 FAKE_DOCKER_SCRIPT = """#!/bin/bash
 # Fake docker CLI: just echo what it was called with and succeed.
@@ -26,11 +27,12 @@ exit 0
 """
 
 
+@unittest.skipUnless(shutil.which("just"), "just is not installed")
 class BuildScriptTestCase(unittest.TestCase):
     def setUp(self):
-        self.assertTrue(BUILD_SCRIPT.is_file(), "docker/build.sh not found")
+        self.assertTrue(JUSTFILE.is_file(), "justfile not found")
         # Create a directory containing a stub `docker` binary and prepend it
-        # to PATH so build.sh's docker invocations don't require a real
+        # to PATH so the recipe's docker invocations don't require a real
         # Docker installation/daemon.
         self._tmpdir = tempfile.TemporaryDirectory()
         fake_docker = Path(self._tmpdir.name) / "docker"
@@ -47,13 +49,17 @@ class BuildScriptTestCase(unittest.TestCase):
         self._tmpdir.cleanup()
 
     def run_script(self, args=(), env=None):
-        return subprocess.run(
-            ["bash", str(BUILD_SCRIPT), *args],
+        result = subprocess.run(
+            ["just", "image", *args],
             cwd=REPO_ROOT,
             env=env if env is not None else self.env,
             capture_output=True,
             text=True,
         )
+        # just echoes recipe errors on stderr; the recipe's own output is on
+        # stdout. Assert on both, as one stream.
+        result.stdout = result.stdout + result.stderr
+        return result
 
 
 class TestUsage(BuildScriptTestCase):

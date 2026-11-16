@@ -2,7 +2,7 @@
 
 Every SDK writes **1,000,000** log records, spans and counter increments over OTLP/gRPC to one
 in-process counting collector, so the table shows what each SDK **delivered**, not only how
-fast the calls returned. Regenerate with `bench/bench_all.py`.
+fast the calls returned. Regenerate with `just bench`.
 
 Measured 2026-11-16 on Darwin arm64, 14 CPUs,
 Python 3.15.2. Console log output is discarded (Go) or sent to /dev/null

@@ -66,7 +66,20 @@ pub struct Telemetry {
     mcap_writer: Option<Arc<Mutex<foxglove::UnifiedMcapWriter>>>,
     telemetry: Option<telemetry::TelemetryProvider>,
     profiler: Option<profiling::Profiler>,
+    // What happened to every log record and span: outlive the provider, so
+    // they can be read after close.
+    log_counts: Arc<telemetry::accounting::Counters>,
+    span_counts: Arc<telemetry::accounting::Counters>,
     closed: bool,
+}
+
+/// What the export pipeline did with the program's log records and spans;
+/// see [`Telemetry::stats`]. Metrics are aggregated before export, so they
+/// have nothing to drop.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+pub struct Stats {
+    pub logs: telemetry::SignalStats,
+    pub spans: telemetry::SignalStats,
 }
 
 impl Telemetry {
@@ -244,8 +257,28 @@ impl Telemetry {
             tracing::init_tokio_tracing(tracer)?;
         }
 
+        // Spans need real ids even when nothing exports them over OTLP — for
+        // propagation to the next service and for MCAP: give TelemetryTracing
+        // a local tracer then.
+        let tracing_tracer = match (tracing_tracer, &mcap_writer) {
+            (None, _) if telemetry_opts.telemetry.tracing.enabled => {
+                use opentelemetry::trace::TracerProvider as _;
+                Some(
+                    opentelemetry_sdk::trace::SdkTracerProvider::builder()
+                        .build()
+                        .tracer(service_opts.name.clone()),
+                )
+            }
+            (tracer, _) => tracer,
+        };
+
         // Initialize TelemetryTracing for manual span management.
-        let tracing_instance = Some(tracing::TelemetryTracing::new(tracing_tracer));
+        let mut tracing_instance = tracing::TelemetryTracing::new(tracing_tracer);
+        if let Some(writer) = &mcap_writer {
+            tracing_instance =
+                tracing_instance.with_mcap(Arc::clone(writer), &service_opts.name)?;
+        }
+        let tracing_instance = Some(tracing_instance);
 
         // Initialize metrics
         let metrics = metrics::Metrics::new(
@@ -254,6 +287,8 @@ impl Telemetry {
             telemetry.as_ref().and_then(|t| t.meter_provider()),
         )?;
 
+        let (log_counts, span_counts) =
+            telemetry.as_ref().map(|t| t.counters()).unwrap_or_default();
         let profiler = profiling::Profiler::start(&service_opts, &telemetry_opts.profiling)?;
 
         Ok(Self {
@@ -263,6 +298,8 @@ impl Telemetry {
             mcap_writer,
             telemetry,
             profiler,
+            log_counts,
+            span_counts,
             closed: false,
         })
     }
@@ -322,6 +359,15 @@ impl Telemetry {
     /// telemetry.close()?;
     /// # Ok::<(), anyhow::Error>(())
     /// ```
+    /// What the export pipeline did with the log records and spans emitted so
+    /// far. After [`Telemetry::close`], `pending` is what was dropped.
+    pub fn stats(&self) -> Stats {
+        Stats {
+            logs: self.log_counts.stats(),
+            spans: self.span_counts.stats(),
+        }
+    }
+
     pub fn close(&mut self) -> Result<()> {
         if self.closed {
             return Ok(());
@@ -339,6 +385,13 @@ impl Telemetry {
             && let Err(err) = t.shutdown()
         {
             errors.push(format!("telemetry shutdown: {err}"));
+        }
+
+        // Every record that never reached the collector, said once, here.
+        if let Some(report) =
+            telemetry::accounting::loss_report(self.log_counts.stats(), self.span_counts.stats())
+        {
+            errors.push(report);
         }
 
         if let Some(writer) = self.mcap_writer.take() {
@@ -406,6 +459,7 @@ pub struct TelemetryBuilder {
     otlp_port: Option<u16>,
     otlp_auth_token: Option<String>,
     metrics_cardinality_limit: Option<usize>,
+    export: Option<options::ExportOptions>,
     otlp_headers: HashMap<String, String>,
     otlp_secure: Option<bool>,
     mcap_path: Option<String>,
@@ -439,6 +493,7 @@ impl TelemetryBuilder {
             otlp_port: None,
             otlp_auth_token: None,
             metrics_cardinality_limit: None,
+            export: None,
             otlp_headers: HashMap::new(),
             otlp_secure: None,
             mcap_path: None,
@@ -477,6 +532,7 @@ impl TelemetryBuilder {
             otlp_port: None,
             otlp_auth_token: None,
             metrics_cardinality_limit: None,
+            export: None,
             otlp_headers: HashMap::new(),
             otlp_secure: None,
             mcap_path: None,
@@ -563,6 +619,23 @@ impl TelemetryBuilder {
     /// Sets OTLP authentication token.
     pub fn with_otlp_auth(mut self, token: impl Into<String>) -> Self {
         self.otlp_auth_token = Some(token.into());
+        self
+    }
+
+    /// Tunes the OTLP export queues for logs and spans. By default a full
+    /// queue drops what does not fit — counted in [`Telemetry::stats`] and
+    /// reported by [`Telemetry::close`] — so telemetry never slows the
+    /// program; with `lossless` the writer waits for room instead.
+    ///
+    /// ```
+    /// use telemetry::TelemetryBuilder;
+    /// use telemetry::options::ExportOptions;
+    ///
+    /// let _builder = TelemetryBuilder::new("ingest", "1.0.0")
+    ///     .with_export(ExportOptions { lossless: true, queue_size: 65_536, ..Default::default() });
+    /// ```
+    pub fn with_export(mut self, export: options::ExportOptions) -> Self {
+        self.export = Some(export);
         self
     }
 
@@ -760,10 +833,11 @@ impl TelemetryBuilder {
                 .insert(service_opts.name.clone(), options::ModuleOptions { level });
         }
 
-        // Tracing export: match telemetry-go — app tracing + OTLP must not disagree
+        // Tracing and export are separate, as in telemetry-go: with_tracing
+        // records spans; with_otlp (or the config file) decides whether they
+        // leave the process.
         if self.tracing_enabled {
             telemetry_opts.telemetry.enabled = true;
-            telemetry_opts.telemetry.otlp.enabled = true;
             telemetry_opts.telemetry.tracing.enabled = true;
         }
 
@@ -771,6 +845,10 @@ impl TelemetryBuilder {
         if let Some(path) = self.mcap_path {
             telemetry_opts.foxglove.enabled = true;
             telemetry_opts.foxglove.mcap_path = path;
+        }
+
+        if let Some(export) = self.export {
+            telemetry_opts.telemetry.export = export;
         }
 
         // Profiling: with_profiling used to be stored and never read.

@@ -5,6 +5,8 @@
 
 use std::borrow::Cow;
 use std::collections::HashMap;
+use std::sync::{Arc, Mutex};
+use std::time::{SystemTime, UNIX_EPOCH};
 
 use anyhow::Result;
 use opentelemetry::baggage::BaggageExt;
@@ -125,6 +127,48 @@ pub fn init_tokio_tracing(tracer: opentelemetry_sdk::trace::Tracer) -> Result<()
 /// ```
 pub struct TelemetryTracing {
     tracer: Option<opentelemetry_sdk::trace::Tracer>,
+    // Records every ended span to MCAP when recording; None otherwise.
+    mcap: Option<Arc<SpanMcap>>,
+}
+
+/// Writes ended spans to the MCAP file, one message per span on
+/// `/traces/<service>` in the `the-protobuf-project.trace` schema — the same
+/// record telemetry-go and telemetry-py write, so Foxglove shows spans from
+/// every SDK alike.
+struct SpanMcap {
+    writer: Arc<Mutex<crate::foxglove::UnifiedMcapWriter>>,
+    channel: u16,
+}
+
+impl SpanMcap {
+    fn write(
+        &self,
+        name: &str,
+        start: SystemTime,
+        trace_id: String,
+        span_id: String,
+        parent_span_id: String,
+    ) {
+        let since = start.duration_since(UNIX_EPOCH).unwrap_or_default();
+        let record = serde_json::json!({
+            "timestamp": {"sec": since.as_secs(), "nsec": since.subsec_nanos()},
+            "trace_id": trace_id,
+            "span_id": span_id,
+            "parent_span_id": parent_span_id,
+            "name": name,
+            "attributes": {},
+            "duration_ns": start.elapsed().map(|d| d.as_nanos() as u64).unwrap_or(0),
+        });
+        let now = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .unwrap_or_default()
+            .as_nanos() as u64;
+        if let Ok(mut w) = self.writer.lock()
+            && !w.is_closed()
+        {
+            let _ = w.write_message(self.channel, record.to_string().as_bytes(), now, now);
+        }
+    }
 }
 
 impl TelemetryTracing {
@@ -141,7 +185,21 @@ impl TelemetryTracing {
     /// assert!(!tracing.is_enabled());
     /// ```
     pub fn new(tracer: Option<opentelemetry_sdk::trace::Tracer>) -> Self {
-        Self { tracer }
+        Self { tracer, mcap: None }
+    }
+
+    /// Also records every ended span to `writer`, on `/traces/<service>`.
+    pub fn with_mcap(
+        mut self,
+        writer: Arc<Mutex<crate::foxglove::UnifiedMcapWriter>>,
+        service: &str,
+    ) -> Result<Self> {
+        let channel = writer
+            .lock()
+            .map_err(|e| anyhow::anyhow!("mcap lock poisoned: {e}"))?
+            .create_channel(&format!("/traces/{service}"), "the-protobuf-project.trace")?;
+        self.mcap = Some(Arc::new(SpanMcap { writer, channel }));
+        Ok(self)
     }
 
     /// Starts a new span.
@@ -150,7 +208,24 @@ impl TelemetryTracing {
     ///
     /// * `name` - Span name
     pub fn start_span(&self, name: &'static str) -> Span {
-        Span::new(self.tracer.as_ref(), name)
+        let mut span = Span::new(self.tracer.as_ref(), name);
+        span.record = self.recording(name, &Context::new());
+        span
+    }
+
+    fn recording(&self, name: &str, parent: &Context) -> Option<SpanRecord> {
+        let mcap = self.mcap.as_ref()?;
+        let parent_span_id = if parent.has_active_span() {
+            parent.span().span_context().span_id().to_string()
+        } else {
+            String::new()
+        };
+        Some(SpanRecord {
+            mcap: Arc::clone(mcap),
+            name: name.to_string(),
+            start: SystemTime::now(),
+            parent_span_id,
+        })
     }
 
     /// Starts a span of `kind` as a child of `parent`: a context from
@@ -174,13 +249,20 @@ impl TelemetryTracing {
         kind: SpanKind,
         parent: Option<&Context>,
     ) -> Span {
+        let name = name.into();
+        let span_name = name.to_string();
         let parent = parent.cloned().unwrap_or_default();
         let span = self.tracer.as_ref().map(|t| {
             t.span_builder(name)
                 .with_kind(kind)
                 .start_with_context(t, &parent)
         });
-        Span { span, parent }
+        let record = self.recording(&span_name, &parent);
+        Span {
+            span,
+            parent,
+            record,
+        }
     }
 
     /// Returns `cx` with `key=value` added to its W3C baggage: it travels with
@@ -243,6 +325,15 @@ pub struct Span {
     span: Option<opentelemetry_sdk::trace::Span>,
     // The context the span started under: its baggage goes on with the trace.
     parent: Context,
+    // Written to MCAP when the span ends, when recording.
+    record: Option<SpanRecord>,
+}
+
+struct SpanRecord {
+    mcap: Arc<SpanMcap>,
+    name: String,
+    start: SystemTime,
+    parent_span_id: String,
 }
 
 impl Span {
@@ -256,6 +347,7 @@ impl Span {
         Self {
             span,
             parent: Context::new(),
+            record: None,
         }
     }
 
@@ -337,18 +429,36 @@ impl Span {
 
     /// Ends the span with success status.
     pub fn end(mut self) {
-        if let Some(mut span) = self.span.take() {
+        if let Some(span) = self.span.as_mut() {
             span.set_status(Status::Ok);
+        }
+        self.finish();
+    }
+
+    /// Ends the span once: exports it and, when recording, writes it to MCAP.
+    fn finish(&mut self) {
+        let ids = self.span.as_ref().map(|s| {
+            let sc = s.span_context();
+            (sc.trace_id().to_string(), sc.span_id().to_string())
+        });
+        if let Some(mut span) = self.span.take() {
             span.end();
+        }
+        if let (Some(record), Some((trace_id, span_id))) = (self.record.take(), ids) {
+            record.mcap.write(
+                &record.name,
+                record.start,
+                trace_id,
+                span_id,
+                record.parent_span_id,
+            );
         }
     }
 }
 
 impl Drop for Span {
     fn drop(&mut self) {
-        if let Some(mut span) = self.span.take() {
-            span.end();
-        }
+        self.finish();
     }
 }
 

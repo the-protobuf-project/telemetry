@@ -11,6 +11,7 @@ from ._private.metrics import (
 from ._private.tracing import TracedOperation, trace, trace_step, traced
 from .options import (
     Environment,
+    ExportOptions,
     FoxgloveOptions,
     LoggingOptions,
     LogLevel,
@@ -33,6 +34,7 @@ __all__ = [
     "ServiceOptions",
     "TelemetryOptions",
     "Environment",
+    "ExportOptions",
     "LogLevel",
     "ModuleOptions",
     "LoggingOptions",

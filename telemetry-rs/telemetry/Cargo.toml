@@ -1,7 +1,19 @@
 [package]
-name = "telemetry"
+# Published as telemetry-rs: "telemetry" on crates.io belongs to an unrelated
+# project. The library keeps its name, so code still says `use telemetry::...`.
+name = "telemetry-rs"
+description = "One framework, every signal: logs, metrics, traces, baggage and profiles over OpenTelemetry, with MCAP recording"
 version.workspace = true
 edition.workspace = true
+license.workspace = true
+repository.workspace = true
+homepage.workspace = true
+readme = "../README.md"
+keywords = ["opentelemetry", "observability", "tracing", "metrics", "logging"]
+categories = ["development-tools::debugging", "development-tools::profiling"]
+
+[lib]
+name = "telemetry"
 
 [dependencies]
 telemetry-derive.workspace = true

@@ -3,6 +3,8 @@ name = "telemetry-derive"
 version.workspace = true
 edition.workspace = true
 description = "Derive macros for telemetry-rs"
+license.workspace = true
+repository.workspace = true
 
 [lib]
 proc-macro = true

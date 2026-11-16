@@ -196,8 +196,11 @@ jobs:
           disk-cache: ${{ github.workflow }}-crosslang
           repository-cache: true
 
+      - name: Set up just
+        uses: extractions/setup-just@v3
+
       - name: One trace through Go, Rust, Python and C++
-        run: bench/crosslang-demo.sh
+        run: just crosslang
 
   build-python:
     name: Build Python SDK

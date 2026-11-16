@@ -678,9 +678,9 @@ The C++ module goes to the Bazel Central Registry as a pull request, made by
 [publish-to-bcr](https://github.com/bazel-contrib/publish-to-bcr) from the
 templates in [`.bcr/`](.bcr). It needs, once:
 
-1. A fork of [bazelbuild/bazel-central-registry](https://github.com/bazelbuild/bazel-central-registry)
-   (by default `oh-tarnished/bazel-central-registry`; the `BCR_FORK`
-   repository variable names another).
+1. A fork of [bazelbuild/bazel-central-registry](https://github.com/bazelbuild/bazel-central-registry):
+   [the-protobuf-project/bazel-central-registry](https://github.com/the-protobuf-project/bazel-central-registry)
+   (the `BCR_FORK` repository variable names another).
 2. A classic personal access token with the `repo` and `workflow` scopes,
    saved as the `BCR_PUBLISH_TOKEN` repository secret.
 

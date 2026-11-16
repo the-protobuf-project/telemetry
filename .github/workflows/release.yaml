@@ -346,7 +346,7 @@ jobs:
     with:
       tag_name: ${{ needs.version.outputs.tag }}
       # The fork the pull request comes from; set the BCR_FORK variable to use another.
-      registry_fork: ${{ vars.BCR_FORK || 'oh-tarnished/bazel-central-registry' }}
+      registry_fork: ${{ vars.BCR_FORK || 'the-protobuf-project/bazel-central-registry' }}
       attest: false
     permissions:
       contents: write

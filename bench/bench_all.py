@@ -255,7 +255,12 @@ def write(args, results, micro, workers, mcap=()):
                 f"| {lang} | {r['signal']} | {r['recorded']:,} | {n / r['emit_s']:,.0f}/s | "
                 f"{1e9 * r['emit_s'] / n:,.0f} ns | {r['size'] / 1048576:,.1f} MiB | {per:,.0f} |"
             )
-        lines.append("")
+        lines += [
+            "",
+            "A row with 0 recorded is a missing feature, not a loss: the Rust SDK records logs and",
+            "metrics to MCAP but has no MCAP path for spans yet.",
+            "",
+        ]
     if micro:
         lines += [
             "## Go: cost per call",

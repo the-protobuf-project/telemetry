@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- C++: the Bazel module is `tpp_telemetry.cpp` (was `tpp_telemetry_cpp` in
+  1.3.1). Every module The Protobuf Project publishes to the Bazel Central
+  Registry is named with a `tpp_` prefix.
+
 ## [1.3.1] - 2026-11-16
 
 ### Fixed
@@ -138,7 +144,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   span they were written in.
 - `bench/bench_all.py` runs each SDK head to head against its official SDK
   tuned to drop nothing (`--rounds` sets the runs per configuration).
-- C++: published to the Bazel Central Registry as `tpp_telemetry_cpp` by the
+- C++: published to the Bazel Central Registry as `telemetry.cpp` by the
   release workflow (`.bcr/`, with a `BCR_PUBLISH_TOKEN` secret); a CMake
   build with `find_package(telemetry)` and `FetchContent`; baggage
   (`Span::set_baggage`) and in-process CPU profiling (`with_profiling`).

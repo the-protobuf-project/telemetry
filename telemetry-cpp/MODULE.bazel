@@ -3,7 +3,7 @@ Bazel Project for Telemetry Cpp SDK
 """
 
 module(
-    name = "tpp_telemetry_cpp",
+    name = "tpp_telemetry.cpp",
     version = "1.3.1",
     compatibility_level = 1,
 )

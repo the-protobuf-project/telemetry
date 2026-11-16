@@ -29,7 +29,7 @@ concurrency:
 #   Rust    the .crate files attached to the GitHub release
 #   Python  the wheel and sdist attached to the GitHub release
 #   C++     the source archive attached to the GitHub release, and published
-#           to the Bazel Central Registry as tpp_telemetry_cpp when a
+#           to the Bazel Central Registry as tpp_telemetry.cpp when a
 #           BCR_PUBLISH_TOKEN secret is set (see .bcr/)
 #
 # Release with `just release 1.3.0`: it stamps the version into every
@@ -290,9 +290,9 @@ jobs:
             echo "### C++ with Bazel"
             echo
             echo '```starlark'
-            echo "bazel_dep(name = \"tpp_telemetry_cpp\", version = \"$VERSION\")"
+            echo "bazel_dep(name = \"tpp_telemetry.cpp\", version = \"$VERSION\")"
             echo "archive_override("
-            echo "    module_name = \"tpp_telemetry_cpp\","
+            echo "    module_name = \"tpp_telemetry.cpp\","
             echo "    urls = [\"$url/telemetry-cpp-$VERSION.tar.gz\"],"
             echo "    strip_prefix = \"telemetry-cpp-$VERSION\","
             echo "    integrity = \"sha256-$(echo "$sha" | xxd -r -p | base64)\","

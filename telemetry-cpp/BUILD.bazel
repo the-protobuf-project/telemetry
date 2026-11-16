@@ -3,7 +3,7 @@
 # gazelle:cc_strip_include_prefix /include
 
 # The SDK, for modules that depend on this one:
-#   deps = ["@tpp_telemetry_cpp//:telemetry"]
+#   deps = ["@tpp_telemetry.cpp//:telemetry"]
 alias(
     name = "telemetry",
     actual = "//src:telemetry",

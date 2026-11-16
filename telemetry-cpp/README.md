@@ -52,16 +52,16 @@ an OpenTelemetry collector, to an MCAP file for Foxglove Studio, or both.
 From the Bazel Central Registry, in your `MODULE.bazel`:
 
 ```starlark
-bazel_dep(name = "tpp_telemetry_cpp", version = "1.3.0")
+bazel_dep(name = "tpp_telemetry.cpp", version = "1.3.0")
 ```
 
 Before a version reaches the registry, take it from the GitHub release (each
 release's notes give the `integrity` value):
 
 ```starlark
-bazel_dep(name = "tpp_telemetry_cpp", version = "1.3.0")
+bazel_dep(name = "tpp_telemetry.cpp", version = "1.3.0")
 archive_override(
-    module_name = "tpp_telemetry_cpp",
+    module_name = "tpp_telemetry.cpp",
     urls = ["https://github.com/the-protobuf-project/telemetry/releases/download/v1.3.0/telemetry-cpp-1.3.0.tar.gz"],
     strip_prefix = "telemetry-cpp-1.3.0",
     integrity = "sha256-...",
@@ -74,7 +74,7 @@ and in a `BUILD.bazel`:
 cc_binary(
     name = "service",
     srcs = ["main.cpp"],
-    deps = ["@tpp_telemetry_cpp//:telemetry"],
+    deps = ["@tpp_telemetry.cpp//:telemetry"],
 )
 ```
 
@@ -432,7 +432,7 @@ From the repository root, `just test-cpp` runs the Bazel build and tests.
 
 ```text
 telemetry-cpp/
-├── MODULE.bazel          # Bazel module "tpp_telemetry_cpp" and its dependencies
+├── MODULE.bazel          # Bazel module "tpp_telemetry.cpp" and its dependencies
 ├── CMakeLists.txt        # the same library for CMake
 ├── BUILD.bazel           # //:telemetry, the library for other modules
 ├── include/telemetry/    # public headers

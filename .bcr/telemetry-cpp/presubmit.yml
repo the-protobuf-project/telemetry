@@ -7,4 +7,4 @@ tasks:
     platform: ${{ platform }}
     bazel: ${{ bazel }}
     build_targets:
-      - "@tpp_telemetry_cpp//:telemetry"
+      - "@tpp_telemetry.cpp//:telemetry"

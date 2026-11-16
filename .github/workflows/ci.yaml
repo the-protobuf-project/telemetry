@@ -208,8 +208,9 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        # The t builds are free-threaded: no GIL, and no grpcio, so they export over HTTP.
-        python-version: ['3.12', '3.13', '3.14', '3.14t', '3.15', '3.15t']
+        # 3.14t is free-threaded: no GIL, and no grpcio, so it exports over HTTP.
+        # 3.15 waits on dynaconf, whose 3.3 releases declare Python < 3.15.
+        python-version: ['3.12', '3.13', '3.14', '3.14t']
 
     steps:
       - name: Check out code

@@ -32,7 +32,7 @@ pip install git+https://github.com/the-protobuf-project/telemetry.git#subdirecto
 cd telemetry-py && uv sync
 ```
 
-**Requirements:** Python 3.12 to 3.15, including the free-threaded builds (`3.14t`, `3.15t`),
+**Requirements:** Python 3.12 to 3.14, including free-threaded 3.14 (`3.14t`),
 which development uses.
 
 OTLP goes over HTTP out of the box. For gRPC, install the `grpc` extra

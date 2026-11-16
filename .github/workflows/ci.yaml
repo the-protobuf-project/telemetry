@@ -251,6 +251,10 @@ jobs:
         working-directory: ./telemetry-cpp
         run: bazel build //...
 
+      - name: Test
+        working-directory: ./telemetry-cpp
+        run: bazel test //tests/...
+
   docker-compose:
     name: Test Docker Compose Stack
     runs-on: blacksmith-4vcpu-ubuntu-2404

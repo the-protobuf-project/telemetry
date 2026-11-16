@@ -34,7 +34,8 @@ if(NOT TELEMETRY_FREERTOS)
         FetchContent_MakeAvailable(spdlog)
     endif()
 
-    # mcap is header-only; the writer is built without compression.
+    # mcap is header-only, and public: telemetry/mcap/writer.hpp includes it.
+    # The writer is built without compression.
     FetchContent_Declare(mcap
         GIT_REPOSITORY https://github.com/foxglove/mcap.git
         GIT_TAG releases/cpp/v2.1.3
@@ -101,7 +102,7 @@ target_link_libraries(telemetry PUBLIC Threads::Threads)
 if(TELEMETRY_FREERTOS)
     target_compile_definitions(telemetry PUBLIC TELEMETRY_FREERTOS=1)
 else()
-    target_link_libraries(telemetry PUBLIC spdlog::spdlog PRIVATE $<BUILD_INTERFACE:telemetry_mcap>)
+    target_link_libraries(telemetry PUBLIC spdlog::spdlog $<BUILD_INTERFACE:telemetry_mcap>)
 endif()
 
 if(TELEMETRY_USE_OTEL)
@@ -159,6 +160,9 @@ if(TELEMETRY_INSTALL)
         ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR}
         RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR})
     install(DIRECTORY include/telemetry DESTINATION ${CMAKE_INSTALL_INCLUDEDIR})
+    if(NOT TELEMETRY_FREERTOS)
+        install(DIRECTORY ${mcap_SOURCE_DIR}/cpp/mcap/include/mcap DESTINATION ${CMAKE_INSTALL_INCLUDEDIR})
+    endif()
     install(EXPORT telemetry-targets
         FILE telemetry-targets.cmake
         NAMESPACE telemetry::

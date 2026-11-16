@@ -49,15 +49,22 @@ an OpenTelemetry collector, to an MCAP file for Foxglove Studio, or both.
 
 ### Bazel (bzlmod)
 
-In your `MODULE.bazel`:
+From the Bazel Central Registry, in your `MODULE.bazel`:
 
 ```starlark
-bazel_dep(name = "telemetry.cpp", version = "1.0.0")
-git_override(
+bazel_dep(name = "telemetry.cpp", version = "1.3.0")
+```
+
+Before a version reaches the registry, take it from the GitHub release (each
+release's notes give the `integrity` value):
+
+```starlark
+bazel_dep(name = "telemetry.cpp", version = "1.3.0")
+archive_override(
     module_name = "telemetry.cpp",
-    remote = "https://github.com/the-protobuf-project/telemetry.git",
-    commit = "<commit>",
-    strip_prefix = "telemetry-cpp",
+    urls = ["https://github.com/the-protobuf-project/telemetry/releases/download/v1.3.0/telemetry-cpp-1.3.0.tar.gz"],
+    strip_prefix = "telemetry-cpp-1.3.0",
+    integrity = "sha256-...",
 )
 ```
 
@@ -76,15 +83,13 @@ it from the Bazel Central Registry.
 
 ### CMake
 
-With `FetchContent`:
+With `FetchContent`, from the release archive:
 
 ```cmake
 include(FetchContent)
 FetchContent_Declare(
     telemetry
-    GIT_REPOSITORY https://github.com/the-protobuf-project/telemetry.git
-    GIT_TAG        <commit-or-tag>
-    SOURCE_SUBDIR  telemetry-cpp
+    URL https://github.com/the-protobuf-project/telemetry/releases/download/v1.3.0/telemetry-cpp-1.3.0.tar.gz
 )
 FetchContent_MakeAvailable(telemetry)
 

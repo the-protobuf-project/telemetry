@@ -1,0 +1,3 @@
+# Publishes the C++ SDK, a Bazel module in telemetry-cpp/, to the Bazel
+# Central Registry (bazel-contrib/publish-to-bcr, run by release.yaml).
+moduleRoots: ["telemetry-cpp"]

@@ -95,6 +95,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   span they were written in.
 - `bench/bench_all.py` runs each SDK head to head against its official SDK
   tuned to drop nothing (`--rounds` sets the runs per configuration).
+- C++: published to the Bazel Central Registry as `telemetry.cpp` by the
+  release workflow (`.bcr/`, with a `BCR_PUBLISH_TOKEN` secret); a CMake
+  build with `find_package(telemetry)` and `FetchContent`; baggage
+  (`Span::set_baggage`) and in-process CPU profiling (`with_profiling`).
+- C++: the release asset is the source archive, for Bazel's
+  `archive_override` and CMake's `FetchContent`; the static library it
+  replaced held only one of the SDK's object files.
 - Releases: one `vX.Y.Z` tag releases every SDK at that version, including the
   `telemetry-go/vX.Y.Z` tag Go needs to resolve the module.
 - A `justfile` runs every task — tests, lint, benchmarks, the cross-language
@@ -103,6 +110,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- Releases no longer publish to crates.io or PyPI: the Rust crates and Python
+  wheel are attached to the GitHub release, and install from it or the tag.
 - Python: gRPC export is the `grpc` extra (`telemetry-py[grpc]`), since grpcio
   cannot be installed on free-threaded Python; without it, gRPC export falls
   back to OTLP/HTTP, from port 4317 to 4318, and warns once.

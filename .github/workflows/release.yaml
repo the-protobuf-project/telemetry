@@ -26,9 +26,15 @@ concurrency:
 #           `go get github.com/the-protobuf-project/telemetry/telemetry-go@v1.3.0`
 #           resolve (a module in a subdirectory is versioned by tags prefixed
 #           with its directory; a bare v1.3.0 tag versions nothing Go can see)
-#   Rust    crates published to crates.io at 1.3.0 (with CARGO_REGISTRY_TOKEN)
-#   Python  telemetry-py 1.3.0 published to PyPI (with PYPI_API_TOKEN)
-#   C++     headers + static library attached to the GitHub release
+#   Rust    the .crate files attached to the GitHub release
+#   Python  the wheel and sdist attached to the GitHub release
+#   C++     the source archive attached to the GitHub release, and published
+#           to the Bazel Central Registry as telemetry.cpp when a
+#           BCR_PUBLISH_TOKEN secret is set (see .bcr/)
+#
+# Release with `just release 1.3.0`: it stamps the version into every
+# manifest and commits it before tagging, which the BCR needs (the module's
+# MODULE.bazel at the tag must name the version being published).
 #
 # Versions are stamped from the tag (`just set-version`), so the manifests
 # can never disagree with the release.
@@ -102,8 +108,6 @@ jobs:
     name: Build Python distribution
     runs-on: blacksmith-4vcpu-ubuntu-2404
     needs: version
-    env:
-      PYPI_API_TOKEN: ${{ secrets.PYPI_API_TOKEN }}
     steps:
       - name: Check out code
         uses: actions/checkout@v6
@@ -131,13 +135,6 @@ jobs:
           name: python-dist
           path: telemetry-py/dist/*
 
-      # Opt-in: publishes to PyPI only when a PYPI_API_TOKEN secret is configured.
-      - name: Publish to PyPI
-        if: ${{ startsWith(github.ref, 'refs/tags/') && env.PYPI_API_TOKEN != '' }}
-        uses: pypa/gh-action-pypi-publish@release/v1
-        with:
-          password: ${{ env.PYPI_API_TOKEN }}
-          packages-dir: telemetry-py/dist
 
   build-cpp:
     name: Build C++ artifact
@@ -160,30 +157,34 @@ jobs:
           disk-cache: ${{ github.workflow }}
           repository-cache: true
 
-      - name: Build release library
+      - name: Build and test
         working-directory: ./telemetry-cpp
-        run: bazel build -c opt //src:telemetry
+        run: bazel test //tests/...
 
-      - name: Package headers and static library
-        working-directory: ./telemetry-cpp
+      # The source, version stamped: what Bazel's archive_override and CMake's
+      # FetchContent take. A prebuilt static library would hold one of the
+      # SDK's libraries and none of opentelemetry-cpp, which it links against.
+      - name: Package the source
+        env:
+          VERSION: ${{ needs.version.outputs.version }}
         run: |
-          mkdir -p dist/telemetry-cpp
-          cp -r include dist/telemetry-cpp/
-          cp bazel-bin/src/libtelemetry.a dist/telemetry-cpp/
-          tar -czf "dist/telemetry-cpp-${{ needs.version.outputs.version }}.tar.gz" -C dist telemetry-cpp
+          mkdir -p telemetry-cpp/dist
+          tar -czf "telemetry-cpp/dist/telemetry-cpp-$VERSION.tar.gz" \
+            --exclude='telemetry-cpp/bazel-*' --exclude='telemetry-cpp/dist' \
+            --exclude='.DS_Store' --exclude='telemetry-cpp/.env*' \
+            --transform "s,^telemetry-cpp,telemetry-cpp-$VERSION," telemetry-cpp
+          cd telemetry-cpp/dist && sha256sum "telemetry-cpp-$VERSION.tar.gz" > "telemetry-cpp-$VERSION.tar.gz.sha256"
 
       - name: Upload C++ artifact
         uses: actions/upload-artifact@v4
         with:
           name: cpp-dist
-          path: telemetry-cpp/dist/telemetry-cpp-*.tar.gz
+          path: telemetry-cpp/dist/telemetry-cpp-*
 
   package-rust:
     name: Package Rust crate
     runs-on: blacksmith-4vcpu-ubuntu-2404
     needs: version
-    env:
-      CARGO_REGISTRY_TOKEN: ${{ secrets.CARGO_REGISTRY_TOKEN }}
     steps:
       - name: Check out code
         uses: actions/checkout@v6
@@ -207,15 +208,6 @@ jobs:
           name: rust-dist
           path: telemetry-rs/target/package/*.crate
 
-      # Opt-in: publishes to crates.io only when a CARGO_REGISTRY_TOKEN secret is configured.
-      # Order matters — the derive crate must be published before the crates that depend on it.
-      - name: Publish to crates.io
-        if: ${{ startsWith(github.ref, 'refs/tags/') && env.CARGO_REGISTRY_TOKEN != '' }}
-        working-directory: ./telemetry-rs
-        # --allow-dirty: the only change is the version stamped above.
-        run: |
-          cargo publish -p telemetry-derive --allow-dirty
-          cargo publish -p telemetry-rs --allow-dirty
 
   build-docker:
     name: Build & push observability image (GHCR)
@@ -277,17 +269,44 @@ jobs:
       - name: Write install notes
         env:
           VERSION: ${{ needs.version.outputs.version }}
+          TAG: ${{ github.event.inputs.tag || github.ref_name }}
+          REPO: ${{ github.repository }}
           MODULE: github.com/${{ github.repository }}/telemetry-go
         run: |
+          url="https://github.com/$REPO/releases/download/$TAG"
+          sha="$(cut -d' ' -f1 "artifacts/cpp-dist/telemetry-cpp-$VERSION.tar.gz.sha256")"
+          py="\`pip install $url/telemetry_py-$VERSION-py3-none-any.whl\`"
+          rs="\`telemetry-rs = { git = \"https://github.com/$REPO\", tag = \"$TAG\" }\`"
           {
             echo "## Install $VERSION"
             echo
             echo "| Language | |"
             echo "| -------- | - |"
             echo "| Go       | \`go get $MODULE@v$VERSION\` |"
-            echo "| Rust     | \`cargo add telemetry-rs@$VERSION\` |"
-            echo "| Python   | \`pip install telemetry-py==$VERSION\` |"
-            echo "| C++      | \`telemetry-cpp-$VERSION.tar.gz\` below |"
+            echo "| Rust     | $rs |"
+            echo "| Python   | $py |"
+            echo "| C++      | \`telemetry-cpp-$VERSION.tar.gz\`, for Bazel or CMake (below) |"
+            echo
+            echo "### C++ with Bazel"
+            echo
+            echo '```starlark'
+            echo "bazel_dep(name = \"telemetry.cpp\", version = \"$VERSION\")"
+            echo "archive_override("
+            echo "    module_name = \"telemetry.cpp\","
+            echo "    urls = [\"$url/telemetry-cpp-$VERSION.tar.gz\"],"
+            echo "    strip_prefix = \"telemetry-cpp-$VERSION\","
+            echo "    integrity = \"sha256-$(echo "$sha" | xxd -r -p | base64)\","
+            echo ")"
+            echo '```'
+            echo
+            echo "### C++ with CMake"
+            echo
+            echo '```cmake'
+            echo "FetchContent_Declare(telemetry"
+            echo "    URL $url/telemetry-cpp-$VERSION.tar.gz"
+            echo "    URL_HASH SHA256=$sha)"
+            echo "FetchContent_MakeAvailable(telemetry)"
+            echo '```'
           } > release-notes.md
 
       - name: Create release
@@ -300,3 +319,38 @@ jobs:
             artifacts/python-dist/*
             artifacts/cpp-dist/*
             artifacts/rust-dist/*
+
+  # The C++ module to the Bazel Central Registry: a pull request from a fork
+  # of bazelbuild/bazel-central-registry, made with the BCR_PUBLISH_TOKEN
+  # secret (a classic token with repo and workflow scopes). Skipped until
+  # that secret is set.
+  bcr-enabled:
+    name: Check BCR publishing
+    runs-on: blacksmith-4vcpu-ubuntu-2404
+    needs: release
+    outputs:
+      enabled: ${{ steps.check.outputs.enabled }}
+    steps:
+      - id: check
+        env:
+          TOKEN: ${{ secrets.BCR_PUBLISH_TOKEN }}
+        run: |
+          if [[ -n "$TOKEN" ]]; then echo "enabled=true" >> "$GITHUB_OUTPUT"
+          else echo "enabled=false" >> "$GITHUB_OUTPUT"; echo "::notice::BCR_PUBLISH_TOKEN is not set; not publishing to the BCR"; fi
+
+  publish-bcr:
+    name: Publish C++ to the Bazel Central Registry
+    needs: [version, bcr-enabled]
+    if: ${{ needs.bcr-enabled.outputs.enabled == 'true' }}
+    uses: bazel-contrib/publish-to-bcr/.github/workflows/publish.yaml@v1.7.0
+    with:
+      tag_name: ${{ needs.version.outputs.tag }}
+      # The fork the pull request comes from; set the BCR_FORK variable to use another.
+      registry_fork: ${{ vars.BCR_FORK || 'oh-tarnished/bazel-central-registry' }}
+      attest: false
+    permissions:
+      contents: write
+      id-token: write
+      attestations: write
+    secrets:
+      publish_token: ${{ secrets.BCR_PUBLISH_TOKEN }}

@@ -1,0 +1,5 @@
+{
+  "integrity": "",
+  "strip_prefix": "telemetry-cpp-{VERSION}",
+  "url": "https://github.com/{OWNER}/{REPO}/releases/download/{TAG}/telemetry-cpp-{VERSION}.tar.gz"
+}

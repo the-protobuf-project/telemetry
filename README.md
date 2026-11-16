@@ -653,28 +653,41 @@ release pipelines.
 
 ## Releases
 
-One tag releases every SDK at one version:
+One command releases every SDK at one version:
 
 ```bash
-git tag v1.3.0
-git push origin v1.3.0
+just release 1.3.0
 ```
+
+It stamps the version into every manifest (`just set-version`), commits it,
+tags `v1.3.0` and pushes; the release workflow does the rest.
 
 | SDK    | Published as | Install |
 | ------ | ------------ | ------- |
 | Go     | tag `telemetry-go/v1.3.0`, pushed by the workflow | `go get github.com/the-protobuf-project/telemetry/telemetry-go@v1.3.0` |
-| Rust   | crates.io | `cargo add telemetry-rs@1.3.0` |
-| Python | PyPI | `pip install telemetry-py==1.3.0` |
-| C++    | GitHub release asset | `telemetry-cpp-1.3.0.tar.gz` |
+| Rust   | `.crate` files on the GitHub release, and the git tag | `telemetry-rs = { git = "https://github.com/the-protobuf-project/telemetry", tag = "v1.3.0" }` |
+| Python | wheel and sdist on the GitHub release | `pip install https://github.com/the-protobuf-project/telemetry/releases/download/v1.3.0/telemetry_py-1.3.0-py3-none-any.whl` |
+| C++    | source archive on the GitHub release, and the Bazel Central Registry | `bazel_dep(name = "telemetry.cpp", version = "1.3.0")`, or CMake `FetchContent` |
 
 The Go module lives in a subdirectory, so Go resolves its versions from tags
 prefixed with that directory (`telemetry-go/v1.3.0`), not from the repository's
 `v1.3.0`. The release workflow creates that tag on the same commit and asks
 the Go proxy for it, so `go get` and pkg.go.dev see the release at once.
-The workflow stamps the version into `Cargo.toml`, `pyproject.toml` and the C++
-build files from the tag (`just set-version`, in the [`justfile`](justfile)),
-so the manifests cannot disagree with the release. Publishing to crates.io and
-PyPI needs the `CARGO_REGISTRY_TOKEN` and `PYPI_API_TOKEN` repository secrets.
+
+The C++ module goes to the Bazel Central Registry as a pull request, made by
+[publish-to-bcr](https://github.com/bazel-contrib/publish-to-bcr) from the
+templates in [`.bcr/`](.bcr). It needs, once:
+
+1. A fork of [bazelbuild/bazel-central-registry](https://github.com/bazelbuild/bazel-central-registry)
+   (by default `oh-tarnished/bazel-central-registry`; the `BCR_FORK`
+   repository variable names another).
+2. A classic personal access token with the `repo` and `workflow` scopes,
+   saved as the `BCR_PUBLISH_TOKEN` repository secret.
+
+Without the secret, the release skips this step. The first version of a new
+module waits for a BCR maintainer to review its pull request; until it is
+merged, `archive_override` takes the release archive (the release notes show
+how).
 
 ## Use cases
 

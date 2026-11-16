@@ -67,7 +67,7 @@ if(TELEMETRY_USE_OTEL)
         set(OPENTELEMETRY_INSTALL ${TELEMETRY_INSTALL} CACHE BOOL "" FORCE)
         FetchContent_Declare(opentelemetry-cpp
             GIT_REPOSITORY https://github.com/open-telemetry/opentelemetry-cpp.git
-            GIT_TAG v1.29.0
+            GIT_TAG v1.30.0
             GIT_SHALLOW TRUE)
         FetchContent_MakeAvailable(opentelemetry-cpp)
         set(TELEMETRY_OTEL_PREFIX "")

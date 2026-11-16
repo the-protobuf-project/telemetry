@@ -17,6 +17,6 @@ bazel_dep(name = "catch2", version = "3.15.1", dev_dependency = True)  # tests
 bazel_dep(name = "rules_cc", version = "0.2.26")
 bazel_dep(name = "platforms", version = "1.1.0", dev_dependency = True)  # tests
 bazel_dep(name = "hermetic_cc_toolchain", version = "4.3.0", dev_dependency = True)
-bazel_dep(name = "opentelemetry-cpp", version = "1.29.0")
+bazel_dep(name = "opentelemetry-cpp", version = "1.30.0")
 bazel_dep(name = "spdlog", version = "1.17.0")
 bazel_dep(name = "mcap", version = "2.1.3")

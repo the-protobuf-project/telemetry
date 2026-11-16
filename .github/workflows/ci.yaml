@@ -233,8 +233,14 @@ jobs:
         run: pip install pytest && pytest -q tests
 
   build-cpp:
-    name: Build C++ SDK
-    runs-on: blacksmith-4vcpu-ubuntu-2404
+    name: Build C++ SDK (${{ matrix.os }})
+    # ubuntu-latest is what bazel-contrib's release_ruleset builds the
+    # release on; its newer GCC has to pass here before a tag does.
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [blacksmith-4vcpu-ubuntu-2404, ubuntu-latest]
+    runs-on: ${{ matrix.os }}
 
     steps:
       - name: Check out code

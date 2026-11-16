@@ -224,7 +224,7 @@ See the [Rust SDK documentation](telemetry-rs/README.md).
 Add the module dependency in your `MODULE.bazel`:
 
 ```starlark
-bazel_dep(name = "telemetry.cpp", version = "1.0.0")
+bazel_dep(name = "tpp_telemetry_cpp", version = "1.0.0")
 ```
 
 ```cpp
@@ -667,7 +667,7 @@ tags `v1.3.0` and pushes; the release workflow does the rest.
 | Go     | tag `telemetry-go/v1.3.0`, pushed by the workflow | `go get github.com/the-protobuf-project/telemetry/telemetry-go@v1.3.0` |
 | Rust   | `.crate` files on the GitHub release, and the git tag | `telemetry-rs = { git = "https://github.com/the-protobuf-project/telemetry", tag = "v1.3.0" }` |
 | Python | wheel and sdist on the GitHub release | `pip install https://github.com/the-protobuf-project/telemetry/releases/download/v1.3.0/telemetry_py-1.3.0-py3-none-any.whl` |
-| C++    | source archive on the GitHub release, and the Bazel Central Registry | `bazel_dep(name = "telemetry.cpp", version = "1.3.0")`, or CMake `FetchContent` |
+| C++    | source archive on the GitHub release, and the Bazel Central Registry | `bazel_dep(name = "tpp_telemetry_cpp", version = "1.3.0")`, or CMake `FetchContent` |
 
 The Go module lives in a subdirectory, so Go resolves its versions from tags
 prefixed with that directory (`telemetry-go/v1.3.0`), not from the repository's

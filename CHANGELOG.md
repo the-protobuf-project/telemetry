@@ -43,6 +43,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   the library's ABI.
 - Python: if this `Telemetry` created the global meter provider, `close()`
   shuts it down.
+- C++: the Bazel module is `tpp_telemetry_cpp` (was `telemetry.cpp`, which
+  the Bazel Central Registry found too generic); its test and example
+  dependencies are dev dependencies, and the unused grpc, fmt and freertos
+  dependencies are gone, so a module that depends on it resolves less.
 
 ## [1.3.0] - 2026-11-16
 
@@ -134,7 +138,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   span they were written in.
 - `bench/bench_all.py` runs each SDK head to head against its official SDK
   tuned to drop nothing (`--rounds` sets the runs per configuration).
-- C++: published to the Bazel Central Registry as `telemetry.cpp` by the
+- C++: published to the Bazel Central Registry as `tpp_telemetry_cpp` by the
   release workflow (`.bcr/`, with a `BCR_PUBLISH_TOKEN` secret); a CMake
   build with `find_package(telemetry)` and `FetchContent`; baggage
   (`Span::set_baggage`) and in-process CPU profiling (`with_profiling`).

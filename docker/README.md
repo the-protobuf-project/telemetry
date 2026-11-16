@@ -124,7 +124,7 @@ this rate. `bench/stack_bench.py` reproduces the measurements below.
 | Signal | 1M records | Collector accepted / refused | Reached the backend | Peak memory | Verdict |
 | ------ | ---------- | ---------------------------- | ------------------- | ----------- | ------- |
 | Logs   | 834k/s from the SDK | 1,000,000 / 0 | 987,568 in Loki when counters settled, rest draining | 1.7 GB | **Holds 1M/s on 4–5 cores** |
-| Spans (1M *separate* traces) | 376k/s from the SDK | — | Tempo kept up, but held 3.3 GB and saturated the CPUs for minutes after; Prometheus and the collector's own metrics stopped answering | 4.2 GB | **Does not fit in one 8-core box** |
+| Spans (1M *separate* traces) | 376k/s from the SDK, flushed in 0.4 s | all 1M taken into the collector's queue (none dropped by the SDK) | **376,832 in Tempo minutes later**, 0 discarded, 369,721 traces live in Tempo's memory (3.3 GB); the rest still queued in the collector. The CPUs stayed saturated, so Prometheus and the collector's own metrics stopped answering | 4.2 GB | **Does not fit in one 8-core box** |
 | Metrics | 10.5M increments/s in-process | a few hundred points per export | all | — | **Trivial**: aggregated before export |
 
 What the numbers say:

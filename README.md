@@ -292,6 +292,23 @@ export TELEMETRY_LOGGING_MODULES_VISION_LEVEL=3
 | Profiling   | Continuous CPU/memory profiling delivered to Pyroscope. |
 | MCAP        | Unified recording of signals to an MCAP file for Foxglove Studio. |
 
+### Every signal, every language
+
+| Signal | Go | Rust | Python | C++ |
+| ------ | -- | ---- | ------ | --- |
+| Traces → OTLP | ✅ | ✅ | ✅ | ✅ (OTLP export added; was MCAP-only) |
+| Metrics → OTLP | ✅ | ✅ | ✅ | ✅ |
+| Logs → OTLP | ✅ | ✅ | ✅ | ✅ |
+| Trace context across services (W3C `traceparent`) | ✅ `Inject` / `Extract` | ✅ `inject` / `extract` | ✅ `inject` / `extract` | ✅ `inject` / `extract` |
+| Baggage | ✅ `SetBaggage` / `Baggage` | ✅ `set_baggage` / `baggage` | ✅ `set_baggage` / `get_baggage` | ✅ carried through `extract` → `inject` |
+| Distributed logging (logs carry the trace id) | ✅ `InfoContext(ctx, …)`, `Logger.WithContext` | ✅ inside `span.attach()` | ✅ inside `start_span` | ❌ not yet |
+| Profiles → Pyroscope | ✅ `WithProfiling` | ✅ `with_profiling` (`profiling` feature) | ✅ `with_profiling` (`[profiling]` extra) | ❌ not yet |
+| MCAP recording | logs, metrics, spans | logs, metrics | logs, metrics, spans | logs, metrics, spans |
+| Drops counted and reported | ✅ `Stats()`, `Close` error | ❌ silent | ❌ silent | ❌ silent |
+
+`bench/crosslang-demo.sh` checks one trace across all four (Go → Rust →
+Python → C++), and CI runs it on every change.
+
 ## Tracing across languages
 
 A trace crosses a service boundary in three headers defined by the

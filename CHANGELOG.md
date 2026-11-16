@@ -5,6 +5,52 @@ All notable changes to Telemetry will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Fixed
+
+- Go: logs and spans written faster than the collector accepted them were
+  dropped silently once the SDK's 2048-record queue filled (63% of 1M logs and
+  3% of 1M spans arrived). Every record is now counted; drops are warned about
+  while they happen and returned by `Close`, and `ExportOptions.Lossless` makes
+  producers wait instead of dropping.
+- Go: export errors were discarded by a no-op error handler; they are reported,
+  rate-limited.
+- Go: struct-tag histograms lost their labels; struct-tag gauges summed every
+  value recorded instead of reporting the last.
+- Go: span attributes of types such as `int32` were recorded as the string
+  `"<int32 Value>"`.
+- Go: `Warnf` and the other formatted log methods reported the wrong caller.
+- Go: config files loaded one after another leaked keys into each other; a
+  broken auto-discovered config file was ignored.
+- C++: spans were written to MCAP only and never exported over OTLP, and child
+  spans did not record their parent.
+- Rust: `with_profiling` was stored and never used.
+- Python: `close()` did not flush pending spans.
+- Single image: Loki's and Tempo's default ingest limits refused almost all of
+  a high-volume load; Grafana's trace ↔ log links matched text that OTLP logs
+  do not contain.
+
+### Added
+
+- Go: logging rebuilt on `log/slog`: `WithLogHandler` / `WithLogger` bring your
+  own logger, `Telemetry.Slog()` and `InfoContext` & co. correlate with traces.
+- Go: `WithExport(ExportOptions{...})` (queue, batch, lossless, sharded
+  exporters), `Telemetry.Stats()`, `Tracing.SetBaggage` / `Baggage`; spans are
+  recorded to MCAP.
+- Rust, Python, C++: W3C trace-context and baggage propagation
+  (`inject` / `extract`), so one trace spans services in any of the four
+  languages.
+- Rust: `Span::attach` for logs correlated with a span; Pyroscope profiling.
+- Python: profiling (`[profiling]` extra).
+- Single image: Pyroscope, a collector sized from the container's limits with a
+  `memory_limiter`, and its own metrics scraped by Prometheus.
+- `bench/`: `bench_all.py` (every SDK, OTLP and MCAP), `stack_bench.py` (the
+  single image under load), `crosslang-demo.sh`, and `telemetry-loadgen` with
+  built-in pprof profiling; `BENCHMARKS.md`.
+- Releases: one `vX.Y.Z` tag releases every SDK at that version, including the
+  `telemetry-go/vX.Y.Z` tag Go needs to resolve the module.
+
 ## [1.0.0] - 2025-11-09
 
 ### Added

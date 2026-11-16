@@ -303,6 +303,8 @@ table below gives the API for each, and what is still missing.
 config:
   sankey:
     showValues: false
+    linkColor: source
+    nodeAlignment: justify
 ---
 sankey-beta
 

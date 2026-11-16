@@ -18,6 +18,11 @@
   <img src="https://img.shields.io/badge/C%2B%2B-17-00599C?logo=cplusplus&logoColor=white" alt="C++">
 </p>
 
+> The Protobuf Project is not affiliated with, endorsed by, or sponsored by
+> Google LLC. Protocol Buffers, FlatBuffers, and the Google AIP standards are
+> Google's work; gRPC is a Cloud Native Computing Foundation project. See
+> [Trademarks and attribution](https://the-protobuf-project.org/license#attribution).
+
 ## Contents
 
 - [Overview](#overview)

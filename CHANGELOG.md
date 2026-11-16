@@ -9,6 +9,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- The READMEs open with The Protobuf Project's independence disclaimer: it is
+  not affiliated with, endorsed by, or sponsored by Google LLC.
 - C++ releases are built by bazel-contrib's `release_ruleset` and carry SLSA
   build provenance; the Bazel Central Registry entry ships with
   `attestations.json` for its source archive, `MODULE.bazel` and

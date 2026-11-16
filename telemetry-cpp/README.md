@@ -1,5 +1,10 @@
 # Telemetry - C++ SDK
 
+> The Protobuf Project is not affiliated with, endorsed by, or sponsored by
+> Google LLC. Protocol Buffers, FlatBuffers, and the Google AIP standards are
+> Google's work; gRPC is a Cloud Native Computing Foundation project. See
+> [Trademarks and attribution](https://the-protobuf-project.org/license#attribution).
+
 Logging, metrics, distributed tracing and continuous profiling for C++ services,
 on the same model as the Go, Rust and Python SDKs: build one `Telemetry` and use
 the logger, metrics, tracer and profiler it holds. Records go over OTLP/HTTP to

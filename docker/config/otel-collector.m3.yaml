@@ -1,0 +1,33 @@
+# M3 (https://m3db.io) as a second metrics backend, merged over
+# otel-collector.yaml when M3_URL is set (entrypoint.sh adds it as another
+# --config; the collector merges maps and replaces lists).
+#
+# M3 takes metrics, not logs or traces, and not OTLP: its coordinator accepts
+# Prometheus remote write, the same protocol the stack already uses for its
+# own Prometheus, so every metric the SDKs send — and the span metrics the
+# collector derives — is written to both. Grafana gets an "M3" datasource
+# querying the coordinator with PromQL.
+#
+#   M3_URL   the m3coordinator base URL, e.g. http://m3:7201
+
+exporters:
+  prometheusremotewrite/m3:
+    endpoint: ${env:M3_URL}/api/v1/prom/remote/write
+    tls:
+      insecure: true
+    remote_write_queue:
+      enabled: true
+      num_consumers: ${env:OTELCOL_EXPORT_CONSUMERS:-16}
+      queue_size: 100000
+    retry_on_failure:
+      enabled: true
+      initial_interval: 200ms
+      max_interval: 5s
+      max_elapsed_time: 120s
+
+service:
+  pipelines:
+    metrics:
+      exporters:
+        - prometheusremotewrite
+        - prometheusremotewrite/m3

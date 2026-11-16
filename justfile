@@ -16,7 +16,7 @@ image_tag := env("IMAGE_TAG", "1.0.0")
 default:
     @just --list --unsorted
 
-# ── test and lint ────────────────────────────────────────────────────────
+# Test and lint
 
 # Test every SDK.
 test: test-go test-rust test-py test-cpp
@@ -50,7 +50,7 @@ fmt:
     cd telemetry-rs && cargo fmt
     cd telemetry-py && uv run ruff format .
 
-# ── tracing across languages ─────────────────────────────────────────────
+# Tracing across languages
 
 # One trace through four services, one per SDK, handed on in W3C headers:
 # orders (Go) → inventory (Rust) → billing (Python) → shipping (C++). Fails if
@@ -101,7 +101,7 @@ crosslang:
       exit 1
     fi
 
-# ── load and benchmarks ──────────────────────────────────────────────────
+# Load and benchmarks
 
 # Every SDK writes n records per signal over OTLP and to MCAP; writes docs/BENCHMARKS.md.
 bench n="1000000" *args:
@@ -130,7 +130,7 @@ collector addr="127.0.0.1:4317" counts="127.0.0.1:4320":
 mcap-count file:
     uv run -q --project telemetry-py python bench/mcap_count.py {{ file }}
 
-# ── the single-image stack ───────────────────────────────────────────────
+# The single-image stack
 
 # Build the stack image for local use as telemetry-stack:dev.
 image-dev:
@@ -183,7 +183,40 @@ stack-up:
 stack-down:
     cd telemetry-core && docker compose down
 
-# ── releases ─────────────────────────────────────────────────────────────
+# M3 (optional metrics backend)
+
+# Start a single-node M3 (m3dbnode with its embedded coordinator) on the
+# docker network `telemetry`, with the `default` namespace the coordinator
+# writes to. Run the stack beside it with `just stack-m3`.
+[doc("Start a single-node M3 and create its namespace")]
+m3-up port="7201":
+    #!/usr/bin/env bash
+    set -euo pipefail
+    docker network inspect telemetry >/dev/null 2>&1 || docker network create telemetry >/dev/null
+    docker rm -f m3 >/dev/null 2>&1 || true
+    # The image is published for linux/amd64 only; elsewhere it runs emulated.
+    docker run -d --name m3 --network telemetry --platform linux/amd64 \
+      -p "127.0.0.1:{{ port }}:7201" -v m3-data:/var/lib/m3db quay.io/m3db/m3dbnode:v1.5.0 >/dev/null
+    echo "waiting for the M3 coordinator on :{{ port }}"
+    until curl -sf "http://127.0.0.1:{{ port }}/health" >/dev/null; do sleep 2; done
+    curl -sf -X POST "http://127.0.0.1:{{ port }}/api/v1/database/create" \
+      -d '{"type":"local","namespaceName":"default","retentionTime":"48h"}' >/dev/null
+    until curl -sf -X POST "http://127.0.0.1:{{ port }}/api/v1/services/m3db/namespace/ready" \
+      -d '{"name":"default"}' >/dev/null; do sleep 2; done
+    echo "M3 ready: remote write http://m3:7201/api/v1/prom/remote/write, PromQL http://127.0.0.1:{{ port }}"
+
+# Stop M3 (its data stays in the m3-data volume).
+m3-down:
+    docker rm -f m3
+
+# Run the single-image stack with metrics also written to M3 (after `just m3-up`).
+stack-m3 port="6009": image-dev
+    docker rm -f telemetry-stack >/dev/null 2>&1 || true
+    docker run -d --name telemetry-stack --network telemetry -p "127.0.0.1:{{ port }}:6009" \
+      -e M3_URL=http://m3:7201 telemetry-stack:dev
+    @echo "stack on :{{ port }}, metrics also in M3; Grafana has an M3 datasource"
+
+# Releases
 
 # Stamp one release version into every SDK (Rust, Python, C++); Go's version
 # is the telemetry-go/vX.Y.Z tag the release workflow pushes.
@@ -219,7 +252,7 @@ release version: (set-version version)
     git tag "v{{ trim_start_match(version, 'v') }}"
     git push origin HEAD "v{{ trim_start_match(version, 'v') }}"
 
-# ── production deployment (telemetry-core/deploy/production) ─────────────
+# Production deployment (telemetry-core/deploy/production)
 # These drive real AWS/EKS/Terraform deployments; the recipes run the
 # scripts, which stay the source of truth (the nix shell documents them too).
 

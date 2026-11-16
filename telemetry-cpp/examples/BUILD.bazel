@@ -31,6 +31,26 @@ cc_binary(
 )
 
 cc_binary(
+    name = "loadgen",
+    srcs = ["loadgen.cpp"],
+    deps = ["//src:telemetry"],
+)
+
+# The upstream OpenTelemetry C++ SDK alone, for comparison with loadgen.
+cc_binary(
+    name = "otel_baseline",
+    srcs = ["otel_baseline.cpp"],
+    deps = [
+        "@opentelemetry-cpp//exporters/otlp:otlp_http_exporter",
+        "@opentelemetry-cpp//exporters/otlp:otlp_http_log_record_exporter",
+        "@opentelemetry-cpp//exporters/otlp:otlp_http_metric_exporter",
+        "@opentelemetry-cpp//sdk/src/logs",
+        "@opentelemetry-cpp//sdk/src/metrics",
+        "@opentelemetry-cpp//sdk/src/trace",
+    ],
+)
+
+cc_binary(
     name = "crosslang",
     srcs = ["crosslang.cpp"],
     deps = [

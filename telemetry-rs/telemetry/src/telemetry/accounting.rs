@@ -11,7 +11,7 @@
 use std::fmt::Debug;
 use std::future::Future;
 use std::sync::Arc;
-use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicU64, AtomicUsize, Ordering};
 use std::time::Duration;
 
 use opentelemetry::Context;
@@ -93,6 +93,9 @@ struct Gate {
 }
 
 impl Gate {
+    // Sized by one exporter's queue even when there are several: records are
+    // dealt round robin, but one exporter may drain slower than the rest, and
+    // its queue must never overflow while the others have room.
     fn new(opts: &ExportOptions) -> Self {
         let queue = opts.queue_size as u64;
         Self {
@@ -267,6 +270,79 @@ impl<P: LogProcessor> LogProcessor for AccountedLogProcessor<P> {
 
     fn set_resource(&mut self, resource: &Resource) {
         self.inner.set_resource(resource);
+    }
+}
+
+/// Spreads records over several processors, each with its own exporter,
+/// round robin: one exporter sends one batch at a time, so n of them send n
+/// batches at once.
+#[derive(Debug)]
+pub struct Shards<P> {
+    shards: Vec<P>,
+    next: AtomicUsize,
+}
+
+impl<P> Shards<P> {
+    pub fn new(shards: Vec<P>) -> Self {
+        assert!(!shards.is_empty(), "at least one shard");
+        Self {
+            shards,
+            next: AtomicUsize::new(0),
+        }
+    }
+
+    fn pick(&self) -> &P {
+        &self.shards[self.next.fetch_add(1, Ordering::Relaxed) % self.shards.len()]
+    }
+
+    fn each(&self, f: impl Fn(&P) -> OTelSdkResult) -> OTelSdkResult {
+        self.shards.iter().map(f).fold(Ok(()), |acc, r| acc.and(r))
+    }
+}
+
+impl<P: SpanProcessor> SpanProcessor for Shards<P> {
+    fn on_start(&self, _span: &mut Span, _cx: &Context) {}
+
+    fn on_end(&self, span: SpanData) {
+        self.pick().on_end(span);
+    }
+
+    fn force_flush(&self) -> OTelSdkResult {
+        self.each(|p| p.force_flush())
+    }
+
+    fn shutdown_with_timeout(&self, timeout: Duration) -> OTelSdkResult {
+        self.each(|p| p.shutdown_with_timeout(timeout))
+    }
+
+    fn set_resource(&mut self, resource: &Resource) {
+        for p in &mut self.shards {
+            p.set_resource(resource);
+        }
+    }
+}
+
+impl<P: LogProcessor> LogProcessor for Shards<P> {
+    fn emit(&self, data: &mut SdkLogRecord, instrumentation: &InstrumentationScope) {
+        self.pick().emit(data, instrumentation);
+    }
+
+    fn force_flush(&self) -> OTelSdkResult {
+        self.each(|p| p.force_flush())
+    }
+
+    fn shutdown_with_timeout(&self, timeout: Duration) -> OTelSdkResult {
+        self.each(|p| p.shutdown_with_timeout(timeout))
+    }
+
+    fn event_enabled(&self, level: Severity, target: &str, name: Option<&str>) -> bool {
+        self.shards[0].event_enabled(level, target, name)
+    }
+
+    fn set_resource(&mut self, resource: &Resource) {
+        for p in &mut self.shards {
+            p.set_resource(resource);
+        }
     }
 }
 

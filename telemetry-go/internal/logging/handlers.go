@@ -9,6 +9,7 @@ import (
 	"reflect"
 	"runtime"
 	"strings"
+	"sync"
 	"time"
 
 	"go.opentelemetry.io/otel/attribute"
@@ -38,8 +39,8 @@ func (h *otelHandler) Handle(ctx context.Context, r slog.Record) error {
 	attrs := make([]attribute.KeyValue, 0, len(h.attrs)+r.NumAttrs()+2)
 	attrs = append(attrs, h.attrs...)
 	if r.PC != 0 {
-		f, _ := runtime.CallersFrames([]uintptr{r.PC}).Next()
-		attrs = append(attrs, attribute.String("code.filepath", filepath.Base(f.File)), attribute.Int("code.lineno", f.Line))
+		file, line := callSite(r.PC)
+		attrs = append(attrs, attribute.String("code.filepath", file), attribute.Int("code.lineno", line))
 	}
 	r.Attrs(func(a slog.Attr) bool {
 		attrs = appendOtel(attrs, h.group, a)
@@ -48,6 +49,26 @@ func (h *otelHandler) Handle(ctx context.Context, r slog.Record) error {
 	rec.AddAttributes(attrs...)
 	h.logger.Emit(ctx, rec)
 	return nil
+}
+
+// callSites caches each log call's file and line by program counter: a
+// program logs from a fixed set of places, and resolving a PC every time was
+// a tenth of a log call.
+var callSites sync.Map // uintptr -> site
+
+type site struct {
+	file string
+	line int
+}
+
+func callSite(pc uintptr) (string, int) {
+	if s, ok := callSites.Load(pc); ok {
+		return s.(site).file, s.(site).line
+	}
+	f, _ := runtime.CallersFrames([]uintptr{pc}).Next()
+	s := site{filepath.Base(f.File), f.Line}
+	callSites.Store(pc, s)
+	return s.file, s.line
 }
 
 func (h *otelHandler) WithAttrs(as []slog.Attr) slog.Handler {

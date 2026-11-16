@@ -119,7 +119,7 @@ impl Drop for LogBuilder {
         if let Some(logger) = super::get() {
             logger.log_with_location(
                 self.level,
-                self.message.clone(),
+                std::mem::take(&mut self.message),
                 self.data.take(),
                 self.file,
                 self.line,

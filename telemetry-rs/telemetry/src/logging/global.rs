@@ -29,8 +29,12 @@ use colored::Colorize;
 use opentelemetry::KeyValue;
 use opentelemetry::logs::Severity;
 use serde_json::Value;
+use std::cell::RefCell;
+use std::fmt::Write as _;
+use std::io::Write as _;
 use std::sync::Arc;
 use std::sync::OnceLock;
+use std::time::{SystemTime, UNIX_EPOCH};
 
 use super::{LogMcapWriter, OtelLogger, formatter};
 
@@ -47,9 +51,17 @@ static GLOBAL_LOGGER: OnceLock<Arc<GlobalLogger>> = OnceLock::new();
 pub struct GlobalLogger {
     mcap_writer: Option<Arc<LogMcapWriter>>,
     otel_logger: Option<Arc<OtelLogger>>,
-    service_name: String,
-    service_version: String,
-    service_environment: String,
+    // "name (version | environment)", colored once rather than on every line.
+    service_info: String,
+    console: bool,
+}
+
+thread_local! {
+    // The console line being written, reused across calls.
+    static LINE: RefCell<String> = const { RefCell::new(String::new()) };
+    // The console timestamp and the second it shows: formatting a local time
+    // looks up the time zone, so it is done once a second, not once a line.
+    static STAMP: RefCell<(u64, String)> = const { RefCell::new((u64::MAX, String::new())) };
 }
 
 impl GlobalLogger {
@@ -83,24 +95,35 @@ impl GlobalLogger {
         mcap_writer: Option<Arc<LogMcapWriter>>,
         otel_logger: Option<Arc<OtelLogger>>,
     ) -> Self {
+        let service_info = format!("{service_name} ({service_version} | {service_environment})")
+            .cyan()
+            .to_string();
         Self {
             mcap_writer,
             otel_logger,
-            service_name,
-            service_version,
-            service_environment,
+            service_info,
+            console: true,
         }
     }
 
-    /// Creates OpenTelemetry attributes for a log entry.
-    fn otel_attributes(&self, data: Option<&Value>, file: &str, line: u32) -> Vec<KeyValue> {
-        let mut attrs = vec![
-            KeyValue::new("service.name", self.service_name.clone()),
-            KeyValue::new("service.version", self.service_version.clone()),
-            KeyValue::new("deployment.environment", self.service_environment.clone()),
-            KeyValue::new("code.filepath", file.to_string()),
-            KeyValue::new("code.lineno", line as i64),
-        ];
+    /// Prints each line to stdout, or not; on by default.
+    pub fn with_console(mut self, console: bool) -> Self {
+        self.console = console;
+        self
+    }
+
+    /// Creates OpenTelemetry attributes for a log entry. The service name,
+    /// version and environment are not repeated here: they are resource
+    /// attributes, sent once per batch.
+    fn otel_attributes(
+        &self,
+        data: Option<&Value>,
+        file: &'static str,
+        line: u32,
+    ) -> Vec<KeyValue> {
+        let mut attrs = Vec::with_capacity(3);
+        attrs.push(KeyValue::new("code.filepath", file));
+        attrs.push(KeyValue::new("code.lineno", line as i64));
 
         if let Some(v) = data {
             attrs.push(KeyValue::new("data", v.to_string()));
@@ -156,38 +179,8 @@ impl GlobalLogger {
             _ => "info",
         };
 
-        let timestamp = Local::now().format("%Y-%m-%dT%H:%M::%S");
-        let relative_path = if let Some(idx) = file.rfind("/telemetry-rs/") {
-            &file[idx + 10..]
-        } else if let Some(idx) = file.rfind("/src/") {
-            &file[idx + 1..]
-        } else if let Some(idx) = file.rfind("/examples/") {
-            &file[idx + 1..]
-        } else {
-            file
-        };
-
-        let level_colored = match level {
-            Severity::Error | Severity::Fatal => "ERROR".red().bold(),
-            Severity::Warn => "WARNING".yellow().bold(),
-            Severity::Info => "INFO".green().bold(),
-            Severity::Debug => "DEBUG".blue().bold(),
-            _ => "INFO".green().bold(),
-        };
-
-        let service_info = format!(
-            "{} ({} | {})",
-            self.service_name, self.service_version, self.service_environment
-        )
-        .cyan();
-
-        println!(
-            "{} {}: <{}:{}> {}: {}",
-            timestamp, level_colored, relative_path, line, service_info, message
-        );
-
-        if let Some(ref value) = data {
-            print!("{}", formatter::format_data_output(value));
+        if self.console {
+            self.print(level, &message, data.as_ref(), file, line);
         }
 
         if let Some(ref mcap) = self.mcap_writer {
@@ -201,6 +194,50 @@ impl GlobalLogger {
                 self.otel_attributes(data.as_ref(), file, line),
             );
         }
+    }
+
+    /// Writes one line to stdout in a single write, formatted into a reused
+    /// buffer.
+    fn print(&self, level: Severity, message: &str, data: Option<&Value>, file: &str, line: u32) {
+        let relative_path = if let Some(idx) = file.rfind("/telemetry-rs/") {
+            &file[idx + 10..]
+        } else if let Some(idx) = file.rfind("/src/") {
+            &file[idx + 1..]
+        } else if let Some(idx) = file.rfind("/examples/") {
+            &file[idx + 1..]
+        } else {
+            file
+        };
+        let level_colored = match level {
+            Severity::Error | Severity::Fatal => "ERROR".red().bold(),
+            Severity::Warn => "WARNING".yellow().bold(),
+            Severity::Info => "INFO".green().bold(),
+            Severity::Debug => "DEBUG".blue().bold(),
+            _ => "INFO".green().bold(),
+        };
+        LINE.with_borrow_mut(|out| {
+            out.clear();
+            STAMP.with_borrow_mut(|(second, stamp)| {
+                let now = SystemTime::now()
+                    .duration_since(UNIX_EPOCH)
+                    .map_or(0, |d| d.as_secs());
+                if *second != now {
+                    *second = now;
+                    stamp.clear();
+                    let _ = write!(stamp, "{}", Local::now().format("%Y-%m-%dT%H:%M:%S"));
+                }
+                out.push_str(stamp);
+            });
+            let _ = writeln!(
+                out,
+                " {level_colored}: <{relative_path}:{line}> {}: {message}",
+                self.service_info
+            );
+            if let Some(value) = data {
+                out.push_str(&formatter::format_data_output(value));
+            }
+            let _ = std::io::stdout().lock().write_all(out.as_bytes());
+        });
     }
 }
 

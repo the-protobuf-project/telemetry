@@ -54,6 +54,17 @@ pub struct ExportOptions {
     /// Records sent per export request.
     #[serde(default = "default_batch_size")]
     pub batch_size: usize,
+    /// Exporters sharing each signal's records, each with its own queue and
+    /// connection. One exporter sends one batch at a time, which caps how fast
+    /// records leave the process; n of them send n batches at once. Records
+    /// from different exporters may reach the collector out of order; each
+    /// keeps its timestamp.
+    #[serde(default = "default_exporters")]
+    pub exporters: usize,
+}
+
+fn default_exporters() -> usize {
+    1
 }
 
 fn default_queue_size() -> usize {
@@ -70,6 +81,7 @@ impl Default for ExportOptions {
             lossless: false,
             queue_size: default_queue_size(),
             batch_size: default_batch_size(),
+            exporters: default_exporters(),
         }
     }
 }

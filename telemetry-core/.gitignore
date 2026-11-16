@@ -2,13 +2,13 @@
 # Telemetry Observability Stack - Git Ignore
 # ===========================================
 
-# ----- Environment & Secrets -----
+# Environment & Secrets
 .env
 .env.local
 .env.*.local
 *.env
 
-# ----- Terraform -----
+# Terraform
 # Local .terraform directories
 **/.terraform/*
 
@@ -37,14 +37,14 @@ terraform.rc
 # Lock file (optional - some prefer to commit this)
 .terraform.lock.hcl
 
-# ----- TLS Certificates -----
+# TLS Certificates
 *.pem
 *.key
 *.crt
 *.csr
 certs/
 
-# ----- OS Files -----
+# OS Files
 .DS_Store
 .DS_Store?
 ._*
@@ -53,18 +53,18 @@ certs/
 ehthumbs.db
 Thumbs.db
 
-# ----- IDE -----
+# IDE
 .idea/
 .vscode/
 *.swp
 *.swo
 *~
 
-# ----- Logs -----
+# Logs
 *.log
 logs/
 
-# ----- Build artifacts -----
+# Build artifacts
 dist/
 build/
 *.exe
@@ -72,11 +72,11 @@ build/
 *.so
 *.dylib
 
-# ----- Go -----
+# Go
 vendor/
 go.sum
 
-# ----- Python -----
+# Python
 __pycache__/
 *.py[cod]
 *$py.class

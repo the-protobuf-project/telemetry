@@ -10,9 +10,7 @@
 #   TELEMETRY_TELEMETRY_OTLP_ENDPOINT=localhost:4317
 #   TELEMETRY_TELEMETRY_OTLP_AUTH_TOKEN=your-token
 
-# -----------------------------------------------------------------------------
 # Service Configuration
-# -----------------------------------------------------------------------------
 service:
   name: my-service              # Your service name
   version: "1.0.0"              # Service version
@@ -26,9 +24,7 @@ service:
     # fleet_id: fleet-alpha
     # region: us-west-2
 
-# -----------------------------------------------------------------------------
 # Telemetry Configuration (OpenTelemetry)
-# -----------------------------------------------------------------------------
 telemetry:
   enabled: true                 # Master switch: enables logging, metrics, tracing
 
@@ -43,33 +39,25 @@ telemetry:
   metrics:
     export_interval_seconds: 10
 
-# -----------------------------------------------------------------------------
 # Logging Configuration
-# -----------------------------------------------------------------------------
 logging:
   log:
     report_caller: true         # Include file:line in logs
     report_timestamp: true      # Include timestamp in logs
     caller_offset: 3            # Stack frame offset for caller info
 
-# -----------------------------------------------------------------------------
 # Foxglove MCAP Recording (Optional)
-# -----------------------------------------------------------------------------
 foxglove:
   enabled: false
   file_path: ""                 # e.g., ./recordings/session.mcap
 
-# -----------------------------------------------------------------------------
 # Continuous Profiling (Optional)
-# -----------------------------------------------------------------------------
 profiling:
   enabled: false
   server_address: http://localhost:4040
   # basic_auth_user: ""         # For Grafana Cloud
   # basic_auth_password: ""
 
-# -----------------------------------------------------------------------------
 # Distributed Tracing
-# -----------------------------------------------------------------------------
 tracing:
   enabled: true

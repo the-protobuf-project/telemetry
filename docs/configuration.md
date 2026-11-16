@@ -243,11 +243,11 @@ Environment variables provide runtime configuration without modifying files.
 
 Environment variable names are transformed to config paths:
 
-```text
-TELEMETRY_SERVICE_NAME        → service.name
-TELEMETRY_TELEMETRY_OTLP_HOST → telemetry.otlp.host
-TELEMETRY_FOXGLOVE_ENABLED    → foxglove.enabled
-```
+| Environment variable | Config path |
+| -------------------- | ----------- |
+| `TELEMETRY_SERVICE_NAME` | `service.name` |
+| `TELEMETRY_TELEMETRY_OTLP_HOST` | `telemetry.otlp.host` |
+| `TELEMETRY_FOXGLOVE_ENABLED` | `foxglove.enabled` |
 
 ### Common Environment Variables
 
@@ -376,7 +376,7 @@ export TELEMETRY_LOGGING_MODULES_VISION_MODULE_LEVEL=1
 ```
 
 > **Note:** Hyphens in service names are replaced with underscores in
-> environment variable names (e.g., `nats-module` → `NATS_MODULE`).
+> environment variable names (e.g., `nats-module` becomes `NATS_MODULE`).
 
 ### Code-Level Usage
 

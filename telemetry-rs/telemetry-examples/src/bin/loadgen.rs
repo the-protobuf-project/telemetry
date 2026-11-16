@@ -29,11 +29,15 @@ async fn main() -> anyhow::Result<()> {
     if args.get(3).map(String::as_str) != Some("none") {
         builder = builder.with_otlp(host, port);
     }
+    // LOADGEN_CONSOLE=1 also prints every log line, as a service watched in a
+    // terminal would; off by default, like telemetry-loadgen, to measure the
+    // pipeline.
+    builder = builder.with_console(std::env::var("LOADGEN_CONSOLE").is_ok_and(|v| v == "1"));
     if let Ok(path) = std::env::var("LOADGEN_MCAP") {
         builder = builder.with_mcap(path);
     }
     // LOADGEN_LOSSLESS=1 waits for room instead of dropping; LOADGEN_QUEUE
-    // sets the export queue size.
+    // sets the export queue size and LOADGEN_EXPORTERS the exporters per signal.
     let lossless = std::env::var("LOADGEN_LOSSLESS").is_ok_and(|v| v == "1");
     let queue_size = std::env::var("LOADGEN_QUEUE")
         .ok()
@@ -43,25 +47,34 @@ async fn main() -> anyhow::Result<()> {
         lossless,
         queue_size,
         batch_size: if lossless { 8192 } else { 512 },
+        exporters: std::env::var("LOADGEN_EXPORTERS")
+            .ok()
+            .and_then(|v| v.parse().ok())
+            .unwrap_or(1),
     });
     let mut telemetry = builder.build()?;
 
+    // LOADGEN_WORKERS threads write concurrently (default 1).
+    let workers: usize = std::env::var("LOADGEN_WORKERS")
+        .ok()
+        .and_then(|v| v.parse().ok())
+        .unwrap_or(1)
+        .max(1);
+
     let start = Instant::now();
     match signal {
-        "logs" => {
-            for i in 0..n {
-                logger::info!("load {i}");
-            }
-        }
+        "logs" => fan_out(n, workers, |i| {
+            logger::info!("load {i}");
+        }),
         "spans" => {
             let tracing = telemetry.tracing.as_ref().expect("tracing enabled");
             if !tracing.is_enabled() {
                 anyhow::bail!("spans: the Rust SDK has no tracer without OTLP export");
             }
-            for _ in 0..n {
+            fan_out(n, workers, |_| {
                 let span = tracing.start_span("load.op");
                 span.end();
-            }
+            });
         }
         "metrics" => {
             for _ in 0..n {
@@ -103,10 +116,26 @@ async fn main() -> anyhow::Result<()> {
     println!(
         "{}",
         serde_json::json!({
-            "lang": "rust", "signal": signal, "n": n, "workers": 1,
+            "lang": "rust", "signal": signal, "n": n, "workers": workers,
             "emit_s": emit.as_secs_f64(), "close_s": close.as_secs_f64(),
             "dropped_reported": dropped, "close_error": close_err,
         })
     );
     Ok(())
+}
+
+/// Calls `f` n times across `workers` threads.
+fn fan_out(n: usize, workers: usize, f: impl Fn(usize) + Sync) {
+    let per = n / workers;
+    std::thread::scope(|scope| {
+        for w in 0..workers {
+            let count = if w == workers - 1 {
+                n - per * (workers - 1)
+            } else {
+                per
+            };
+            let f = &f;
+            scope.spawn(move || (0..count).for_each(f));
+        }
+    });
 }

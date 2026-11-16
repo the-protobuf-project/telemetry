@@ -78,11 +78,12 @@ func run() error {
 		jsonOut      = flag.Bool("json", false, "print one JSON line per signal instead of the table (for bench/bench_all.py)")
 		serve        = flag.String("serve", "", "only run the counting collector on this OTLP gRPC address (for other SDKs' load tests)")
 		countsAddr   = flag.String("counts", "127.0.0.1:4320", "with -serve: HTTP address answering GET /counts (JSON) and POST /reset")
+		httpAddr     = flag.String("http", "", "with -serve: also receive OTLP/HTTP on this address, e.g. 127.0.0.1:4318")
 	)
 	flag.Parse()
 
 	if *serve != "" {
-		return serveCollector(*serve, *countsAddr, *delay)
+		return serveCollector(*serve, *countsAddr, *httpAddr, *delay)
 	}
 
 	want := map[string]bool{}
@@ -231,13 +232,17 @@ func run() error {
 
 // serveCollector runs the counting collector alone until interrupted, so a
 // load test in any language can export to it and read back what arrived.
-func serveCollector(addr, countsAddr string, delay time.Duration) error {
+func serveCollector(addr, countsAddr, httpAddr string, delay time.Duration) error {
 	col, err := loadtest.StartAt(addr)
 	if err != nil {
 		return err
 	}
 	defer col.Stop()
 	col.Delay = delay
+	if httpAddr != "" {
+		go func() { _ = http.ListenAndServe(httpAddr, col.HTTPHandler()) }()
+		fmt.Fprintf(os.Stderr, "collector: OTLP/HTTP on %s\n", httpAddr)
+	}
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /counts", func(w http.ResponseWriter, _ *http.Request) {
 		w.Header().Set("Content-Type", "application/json")

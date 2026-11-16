@@ -14,6 +14,8 @@ chrono.workspace = true
 serde_json.workspace = true
 opentelemetry.workspace = true
 opentelemetry_sdk.workspace = true
+# Upstream exporters alone, for the otel_baseline comparison.
+opentelemetry-otlp.workspace = true
 
 [[bin]]
 name = "logging"
@@ -42,3 +44,7 @@ path = "src/bin/crosslang.rs"
 [[bin]]
 name = "loadgen"
 path = "src/bin/loadgen.rs"
+
+[[bin]]
+name = "otel_baseline"
+path = "src/bin/otel_baseline.rs"

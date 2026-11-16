@@ -49,6 +49,15 @@ Every SDK shares the same mental model: build an `Telemetry` instance from a
 config file or code, then use the logger, metrics, and tracer it exposes. The same
 `telemetry.toml` drives all four languages.
 
+Why not the official OpenTelemetry SDK alone? Given a burst of 1,000,000 log
+records, the official Go, Rust, Python and C++ SDKs delivered between 11% and
+34% of them and dropped the rest without an error, warning or count. This SDK
+counts every drop and reports it, and in lossless mode delivers all 1,000,000.
+With parallel exporters, Go delivers every log at the official SDK's rate and
+every span at twice its rate. See
+[Writing at high volume](#writing-at-high-volume) for each step and what it
+costs.
+
 ## Features
 
 - **Structured logging** — context-aware logging with automatic trace correlation.
@@ -260,8 +269,12 @@ level = 2                        # Global log level (1=Error, 2=Info, 3=Debug)
 level = 1                        # Override: Error only for this module
 ```
 
-**Precedence** (lowest to highest): Defaults → `telemetry.toml` → `.env` /
-`TELEMETRY_*` environment variables → code.
+**Precedence**, lowest to highest; each source overrides the ones above it:
+
+1. Built-in defaults
+2. `telemetry.toml`
+3. `.env` and `TELEMETRY_*` environment variables
+4. Settings made in code
 
 See the full [Configuration Guide](docs/configuration.md).
 
@@ -343,18 +356,18 @@ C++,MCAP,1
 
 | Signal | Go | Rust | Python | C++ |
 | ------ | -- | ---- | ------ | --- |
-| Traces → OTLP | Yes | Yes | Yes | Yes (OTLP export added; was MCAP-only) |
-| Metrics → OTLP | Yes | Yes | Yes | Yes |
-| Logs → OTLP | Yes | Yes | Yes | Yes |
+| Traces over OTLP | Yes | Yes | Yes | Yes (OTLP export added; was MCAP-only) |
+| Metrics over OTLP | Yes | Yes | Yes | Yes |
+| Logs over OTLP | Yes | Yes | Yes | Yes |
 | Trace context across services (W3C `traceparent`) | Yes: `Inject` / `Extract` | Yes: `inject` / `extract` | Yes: `inject` / `extract` | Yes: `inject` / `extract` |
-| Baggage | Yes: `SetBaggage` / `Baggage` | Yes: `set_baggage` / `baggage` | Yes: `set_baggage` / `get_baggage` | Yes: carried through `extract` → `inject` |
+| Baggage | Yes: `SetBaggage` / `Baggage` | Yes: `set_baggage` / `baggage` | Yes: `set_baggage` / `get_baggage` | Yes: carried from `extract` to `inject` |
 | Distributed logging (logs carry the trace id) | Yes: `InfoContext(ctx, …)`, `Logger.WithContext` | Yes: inside `span.attach()` | Yes: inside `start_span` | Yes: inside `span.attach()` / `TELEMETRY_SPAN` |
-| Profiles → Pyroscope | Yes: `WithProfiling` | Yes: `with_profiling` (`profiling` feature) | Yes: `with_profiling` (`[profiling]` extra) | Through an eBPF profiler (no Pyroscope C++ client exists; see below) |
+| Profiles to Pyroscope | Yes: `WithProfiling` | Yes: `with_profiling` (`profiling` feature) | Yes: `with_profiling` (`[profiling]` extra) | Through an eBPF profiler (no Pyroscope C++ client exists; see below) |
 | MCAP recording | logs, metrics, spans | logs, metrics, spans | logs, metrics, spans | logs, metrics, spans |
 | Drops counted and reported, lossless mode | Yes: `WithExport`, `Stats()`, `Close` error | Yes: `with_export`, `stats()`, `close` error | Yes: `with_export`, `stats()`, warning on `close` | No (silent) |
 
-`just crosslang` checks one trace across all four (Go → Rust →
-Python → C++), and CI runs it on every change.
+`just crosslang` checks one trace across all four, passed from Go to Rust to
+Python to C++, and CI runs it on every change.
 
 C++ profiles come from outside the process: Pyroscope has no C++ client
 library, so the supported route is an eBPF profiler — Grafana Alloy's
@@ -454,10 +467,83 @@ propagation fails the build. With the stack running
 
 ## Writing at high volume
 
-Logs and spans are exported asynchronously: each call puts the record in a
-bounded queue, and a background exporter sends it to the collector in
-batches. When a program writes faster than the collector accepts, the queue
-fills, and something has to give. Go, Rust and Python let you choose what:
+### The starting point: the official SDKs
+
+Every OpenTelemetry SDK exports logs and spans the same way. Each call puts
+the record in a bounded queue (2048 slots by default), and a background
+exporter sends batches to the collector. When a program writes faster than the
+collector accepts, the queue fills and the SDK throws the overflow away. It
+does not return an error, log a warning or keep a count.
+
+We gave each language's official SDK the same burst of 1,000,000 records,
+on one thread, with its default settings:
+
+| Official SDK | Logs delivered | Spans delivered |
+| ------------ | -------------: | --------------: |
+| Go | 272,896 (27%) | 418,816 (42%) |
+| Rust | 110,180 (11%) | 149,536 (15%) |
+| Python | 335,581 (34%) | 499,200 (50%) |
+| C++ | 216,760 (22%) | 841,406 (84%) |
+
+The calls returned quickly, and between 16% and 89% of the records never
+arrived. Nothing in the program said so.
+
+### What this SDK changes
+
+This SDK keeps the OpenTelemetry data model and OTLP wire format and replaces
+the part that loses data. Each step below changes one thing, measured in Go
+with the same 1,000,000-record burst:
+
+| Step | Logs delivered | Logs per second | Spans delivered | Spans per second |
+| ---- | -------------: | --------------: | --------------: | ---------------: |
+| 1. Official Go SDK alone | 272,896 | 1,684,187 | 418,816 | 1,958,812 |
+| 2. This SDK, default mode | 569,955 | 552,613 | 588,575 | 1,729,006 |
+| 3. Lossless mode | 1,000,000 | 324,539 | 1,000,000 | 1,065,046 |
+| 4. Lossless, 14 goroutines, batch 8192 | 1,000,000 | 379,073 | 1,000,000 | 1,451,022 |
+| 5. Lossless, plus 4 parallel exporters | 1,000,000 | 1,698,293 | 1,000,000 | 4,370,134 |
+
+1. **Official SDK.** This is the baseline: fast calls, most records dropped,
+   and no sign of it.
+2. **Count every drop.** In default mode this SDK still drops when the queue
+   is full, but it counts every record it drops and reports the total when the
+   program closes telemetry. Lost data becomes a number you can alert on.
+3. **Lossless mode.** The writer waits for room in the queue instead of
+   dropping. All 1,000,000 records arrive. A single writer is slower because it
+   now runs at the speed of the export rather than the speed of the queue.
+4. **Bigger batches, more writers.** A larger queue and 8192-record batches
+   mean fewer export requests, and writers on every core keep the queue full.
+5. **Parallel exporters.** One exporter was the bottleneck: it sends a batch
+   and waits for the reply before sending the next. Four exporters send
+   batches concurrently, while the queue stays lossless.
+
+At step 5, logs arrive in full at the same rate the official SDK reached while
+it was losing 73% of them, and spans arrive at more than twice its rate. The
+official numbers come from one thread, so this is not a like-for-like speed
+contest. The point is that the official SDK cannot be configured to deliver
+everything, while this SDK delivers everything and scales with exporters.
+
+### What it costs per call
+
+Per call, this SDK does more work than the official one: console output, MCAP
+recording, caller lookup and drop accounting. On one thread, in default mode,
+it runs at this fraction of the official SDK's call rate:
+
+| Signal | Go | Rust | Python | C++ |
+| ------ | -: | ---: | -----: | --: |
+| Logs | 0.33x | 0.07x | 0.24x | 0.16x |
+| Spans | 0.88x | 0.56x | 0.87x | 1.0x |
+| Metrics | 0.43x | 0.25x | 0.70x | 0.04x |
+
+Spans cost about the same as upstream. The gaps in logs and metrics are where
+the next improvements go. Rust's log macro formats every message even when
+console output is discarded. C++ counters are looked up by name under a lock
+on every call. Go's struct-tag metrics inspect the struct on every call. The
+official SDK's speed numbers count the records it dropped; this SDK's numbers
+count only records that were delivered or reported.
+
+### Configuring it
+
+Go, Rust and Python take the same export options:
 
 ```go
 tel, err := telemetry.New().
@@ -529,8 +615,8 @@ docker compose up -d
 Grafana is then available at `http://localhost:3000` with all datasources
 pre-configured.
 
-**[Observability stack →](telemetry-core/README.md)** ·
-**[Production deployment →](telemetry-core/deploy/production/README.md)**
+Read more: [Observability stack](telemetry-core/README.md) ·
+[Production deployment](telemetry-core/deploy/production/README.md)
 
 ## Repository layout
 

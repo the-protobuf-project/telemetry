@@ -2391,6 +2391,7 @@ dependencies = [
  "anyhow",
  "chrono",
  "opentelemetry",
+ "opentelemetry-otlp",
  "opentelemetry_sdk",
  "serde",
  "serde_json",

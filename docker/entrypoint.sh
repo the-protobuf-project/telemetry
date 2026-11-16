@@ -34,7 +34,7 @@ fi
 mkdir -p /data/loki /data/tempo /data/prometheus /data/pyroscope \
     /data/grafana /data/alertmanager /tmp/loki /tmp/tempo
 
-# ── OTel Collector sizing (docker/README.md, "Sizing for 1M records/s") ──
+# OTel Collector sizing (docker/README.md, "Sizing for 1M records/s")
 # The collector shares the container with Loki, Tempo, Prometheus and the
 # rest, so it gets a fixed share of the container's memory and cores rather
 # than all of them. OTELCOL_MEMORY_MIB / OTELCOL_CPUS set the share outright.
@@ -67,6 +67,32 @@ export OTELCOL_MEMORY_SPIKE_MIB="${OTELCOL_MEMORY_SPIKE_MIB:-$(( OTELCOL_MEMORY_
 export OTELCOL_GOMEMLIMIT="${OTELCOL_GOMEMLIMIT:-$(( OTELCOL_MEMORY_LIMIT_MIB ))MiB}"
 export OTELCOL_GOMAXPROCS="$OTELCOL_CPUS"
 echo "OTel Collector: ${OTELCOL_CPUS} of ${total_cpus} CPUs, ${OTELCOL_MEMORY_MIB} of ${total_mib} MiB (refuses above ${OTELCOL_MEMORY_LIMIT_MIB} MiB)"
+
+# M3 (optional): M3_URL=http://<m3coordinator>:7201
+# Metrics are also remote-written to M3 (otel-collector.m3.yaml, merged over
+# the main config), and Grafana gets an "M3" PromQL datasource. Logs and
+# traces stay in Loki and Tempo: M3 stores metrics only.
+export OTELCOL_EXTRA_ARGS=""
+export GRAFANA_PROVISIONING="${STACK_CONFIG_DIR}/grafana/provisioning"
+if [ -n "${M3_URL:-}" ]; then
+    export M3_URL="${M3_URL%/}"
+    export OTELCOL_EXTRA_ARGS="--config=${STACK_CONFIG_DIR}/otel-collector.m3.yaml"
+    # The mounted config may be read-only: provision from a writable copy.
+    GRAFANA_PROVISIONING=/tmp/grafana-provisioning
+    rm -rf "$GRAFANA_PROVISIONING"
+    cp -r "${STACK_CONFIG_DIR}/grafana/provisioning" "$GRAFANA_PROVISIONING"
+    cat > "$GRAFANA_PROVISIONING/datasources/m3.yaml" <<M3DS
+apiVersion: 1
+datasources:
+  - name: M3
+    type: prometheus
+    uid: m3
+    access: proxy
+    url: ${M3_URL}
+    editable: true
+M3DS
+    echo "M3: metrics also written to ${M3_URL}"
+fi
 
 echo "Starting OpenTelemetry stack via supervisord..."
 exec /usr/bin/supervisord -c "$SUPERVISOR_CONF"

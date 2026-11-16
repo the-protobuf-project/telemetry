@@ -46,7 +46,7 @@ All configs are embedded in the image under `/etc/opentelemetry-stack`.
 At runtime, the stack uses:
 
 - `STACK_CONFIG_DIR=/config` (default)
-- if `/config` is not mounted, entrypoint auto-links `/config -> /etc/opentelemetry-stack`
+- if `/config` is not mounted, entrypoint auto-links `/config` to `/etc/opentelemetry-stack`
 - optional override: mount your own folder and set `STACK_CONFIG_DIR`
 
 ### Environment Variables
@@ -118,8 +118,9 @@ this rate. `just stack-bench` reproduces the measurements below.
 
 ### Measured: 8 CPUs, 6 GB, one container
 
-`docker run --cpus 8 --memory 6g`, Go SDK through Envoy (`:6009`) → collector
-→ backends, `ExportOptions{Lossless: true, Exporters: 4, BatchSize: 8192}`:
+`docker run --cpus 8 --memory 6g`. The Go SDK sends through Envoy (`:6009`) to the
+collector, which writes to the backends, with
+`ExportOptions{Lossless: true, Exporters: 4, BatchSize: 8192}`:
 
 | Signal | 1M records | Collector accepted / refused | Reached the backend | Peak memory | Verdict |
 | ------ | ---------- | ---------------------------- | ------------------- | ----------- | ------- |
@@ -173,6 +174,28 @@ Refused climbing means the collector needs memory or cores; send-failed
 climbing means the backend does (Loki 429s, Tempo `LIVE_TRACES_EXCEEDED`).
 On the SDK side, `Telemetry.Stats()` and the error `Close` returns say what
 never left the process.
+
+## M3 as a metrics backend
+
+[M3](https://m3db.io) can store the stack's metrics alongside (or instead of
+querying) Prometheus. Set `M3_URL` to an m3coordinator and the collector
+remote-writes every metric there too, including the span metrics it derives;
+Grafana gets an **M3** datasource that queries it with PromQL. Logs and traces
+stay in Loki and Tempo: M3 stores metrics only, and accepts Prometheus remote
+write rather than OTLP, which is why the collector translates.
+
+```bash
+docker run -d -p 6009:6009 -e M3_URL=http://m3coordinator:7201 \
+  ghcr.io/the-protobuf-project/telemetry:latest
+```
+
+Locally, `just m3-up` starts a single-node M3 (its namespace created) and
+`just stack-m3` runs the stack beside it. Checked end to end: 100,000 counter
+increments from the Go SDK read back as `loadgen_ops_total = 100000` from both
+Prometheus and M3.
+
+The M3 image is published for linux/amd64 only (it runs emulated on Apple
+silicon), and its last release, v1.5.0, dates from 2022.
 
 ## Data Volume
 

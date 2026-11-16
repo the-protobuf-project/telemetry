@@ -3,10 +3,10 @@
 //! This module provides a wrapper around the OpenTelemetry SDK logger
 //! for sending logs to OpenTelemetry collectors.
 
-use opentelemetry::KeyValue;
 use opentelemetry::logs::Logger as _;
 use opentelemetry::logs::Severity;
 use opentelemetry::logs::{AnyValue, LogRecord as _};
+use opentelemetry::{KeyValue, Value};
 use opentelemetry_sdk::logs::SdkLogger;
 use std::sync::Arc;
 use std::time::SystemTime;
@@ -62,13 +62,14 @@ impl OtelLogger {
     pub fn log(&self, severity: Severity, message: &str, attributes: Vec<KeyValue>) {
         let mut record = self.logger.create_log_record();
 
-        record.set_timestamp(SystemTime::now());
-        record.set_observed_timestamp(SystemTime::now());
+        let now = SystemTime::now();
+        record.set_timestamp(now);
+        record.set_observed_timestamp(now);
         record.set_severity_number(severity);
         record.set_body(AnyValue::from(message.to_string()));
 
         for kv in attributes {
-            record.add_attribute(kv.key.clone(), kv.value.to_string());
+            record.add_attribute(kv.key, any_value(kv.value));
         }
 
         self.logger.emit(record);
@@ -145,5 +146,17 @@ impl OtelLogger {
     /// ```
     pub fn fatal(&self, message: &str, attributes: Vec<KeyValue>) {
         self.log(Severity::Fatal, message, attributes);
+    }
+}
+
+/// An attribute value as a log attribute, keeping its type: an integer stays
+/// an integer in Loki, rather than becoming its string.
+fn any_value(value: Value) -> AnyValue {
+    match value {
+        Value::Bool(b) => AnyValue::Boolean(b),
+        Value::I64(i) => AnyValue::Int(i),
+        Value::F64(f) => AnyValue::Double(f),
+        Value::String(s) => AnyValue::String(s),
+        other => AnyValue::String(other.to_string().into()),
     }
 }

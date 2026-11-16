@@ -1,14 +1,16 @@
 #!/usr/bin/env python3
 """Load-tests every SDK the same way and writes docs/BENCHMARKS.md.
 
-Each SDK writes N log records, N spans and N counter increments over OTLP/gRPC
-to one counting collector (telemetry-go's `telemetry-loadgen -serve`), so the
-table compares what each SDK *delivered*, not only how fast it returned.
+Each SDK writes N log records, N spans and N counter increments over OTLP
+(gRPC; HTTP for C++) to one counting collector (telemetry-go's
+`telemetry-loadgen -serve`), so the table compares what each SDK *delivered*,
+not only how fast it returned. Beside every SDK, the same load goes through the
+upstream OpenTelemetry SDK for that language alone, for comparison.
 
     just bench                                # 1,000,000 per signal, all SDKs
     just bench 100000 --langs go,rust
 
-Needs go, cargo and uv on PATH. Standard library only.
+Needs go, cargo, uv and bazel (C++) on PATH. Standard library only.
 """
 
 import argparse
@@ -25,7 +27,9 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
 OTLP = "127.0.0.1:43170"  # away from 4317, so a running local stack is untouched
+OTLP_HTTP = "127.0.0.1:43180"  # the same collector over OTLP/HTTP, for the C++ SDKs
 COUNTS = "127.0.0.1:43200"
+OFFICIAL = "official OpenTelemetry SDK alone (default batch processor)"
 
 
 def sh(cmd, cwd, **kw):
@@ -35,10 +39,14 @@ def sh(cmd, cwd, **kw):
 def build(langs, scratch):
     loadgen = scratch / "telemetry-loadgen"
     sh(["go", "build", "-o", str(loadgen), "./cmd/telemetry-loadgen"], ROOT / "telemetry-go")
+    sh(["go", "build", "-o", str(scratch / "otel-baseline-go"), "./cmd/otel-baseline"], ROOT / "telemetry-go")
     if "rust" in langs:
-        sh(["cargo", "build", "--release", "-q", "-p", "telemetry-examples", "--bin", "loadgen"], ROOT / "telemetry-rs")
+        sh(["cargo", "build", "--release", "-q", "-p", "telemetry-examples", "--bin", "loadgen",
+            "--bin", "otel_baseline"], ROOT / "telemetry-rs")
     if "python" in langs:
         sh(["uv", "sync", "-q"], ROOT / "telemetry-py")
+    if "cpp" in langs:
+        sh(["bazel", "build", "-c", "opt", "//examples:loadgen", "//examples:otel_baseline"], ROOT / "telemetry-cpp")
     return loadgen
 
 
@@ -96,12 +104,30 @@ def variants(langs, loadgen, workers):
             ("Python", "default (drop when full)", "Python drop", cmd, {}),
             ("Python", "Lossless", "Python lossless", cmd, {"LOADGEN_LOSSLESS": "1"}),
         ]
+    if "cpp" in langs:
+        cpp = ROOT / "telemetry-cpp" / "bazel-bin" / "examples"
+        out.append(("C++", "default (drop when full)", "C++ drop",
+                    lambda sig, n: [str(cpp / "loadgen"), sig, str(n), OTLP_HTTP], {}))
+
+    # The same load through each language's upstream OpenTelemetry SDK alone.
+    scratch = loadgen.parent
+    official = {
+        "go": ("Go", lambda sig, n: [str(scratch / "otel-baseline-go"), "-signal", sig, "-n", str(n), "-endpoint", OTLP]),
+        "rust": ("Rust", lambda sig, n: [str(ROOT / "telemetry-rs" / "target" / "release" / "otel_baseline"), sig, str(n), OTLP]),
+        "python": ("Python", lambda sig, n: ["uv", "run", "-q", "--project", str(ROOT / "telemetry-py"), "python",
+                                             str(ROOT / "telemetry-py" / "examples" / "otel_baseline.py"), sig, str(n), OTLP]),
+        "cpp": ("C++", lambda sig, n: [str(ROOT / "telemetry-cpp" / "bazel-bin" / "examples" / "otel_baseline"),
+                                       sig, str(n), OTLP_HTTP]),
+    }
+    for key, (lang, cmd) in official.items():
+        if key in langs:
+            out.append((lang, OFFICIAL, f"{lang} OTel SDK", cmd, {}))
     return out
 
 
 def run_one(cmd, timeout, extra_env=None):
     env = dict(os.environ, OTEL_EXPORTER_OTLP_ENABLED="true", RUST_LOG="off", **(extra_env or {}))
-    p = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL, text=True, timeout=timeout, env=env)
+    p = subprocess.run(cmd, check=False, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL, text=True, timeout=timeout, env=env)
     for line in reversed(p.stdout.splitlines()):
         if line.startswith("{") and '"lang"' in line:
             return json.loads(line)
@@ -166,7 +192,7 @@ DATA = ROOT / "docs" / "benchmarks.json"
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--n", type=int, default=1_000_000)
-    ap.add_argument("--langs", default="go,rust,python")
+    ap.add_argument("--langs", default="go,rust,python,cpp")
     ap.add_argument("--signals", default="logs,spans,metrics")
     ap.add_argument("--timeout", type=int, default=1800, help="seconds per run")
     ap.add_argument("--out", default=str(ROOT / "docs" / "BENCHMARKS.md"))
@@ -186,7 +212,7 @@ def main():
     scratch = Path(os.environ.get("TMPDIR", "/tmp")) / "telemetry-bench"
     scratch.mkdir(exist_ok=True)
     loadgen = build(langs, scratch)
-    collector = subprocess.Popen([str(loadgen), "-serve", OTLP, "-counts", COUNTS],
+    collector = subprocess.Popen([str(loadgen), "-serve", OTLP, "-counts", COUNTS, "-http", OTLP_HTTP],
                                  stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
     results = []
     try:
@@ -234,7 +260,7 @@ def main():
     print(f"wrote {args.out} and {data_path}", file=sys.stderr)
 
 
-# ── the page ─────────────────────────────────────────────────────────────
+# The page
 
 
 def ok(rows):
@@ -264,6 +290,7 @@ def charts(data):
     out = []
     by = lambda sig: [r for r in rows if r["signal"] == sig]
 
+    out += from_official(data)
     out += ["## At a glance", ""]
 
     # Delivery and throughput, per signal.
@@ -349,6 +376,89 @@ def charts(data):
         out += ["### Go: cost of one call", ""]
         out += xychart("Go SDK nanoseconds per call", [m[0].removeprefix("Benchmark") for m in micro],
                        [float(m[1]) for m in micro], "ns / op")
+    return out
+
+
+def from_official(data):
+    """The starting point: what each upstream OpenTelemetry SDK delivers alone, then each step
+    this SDK takes from there."""
+    n = data["n"]
+    rows = ok(data["results"])
+    official = [r for r in rows if r["mode"] == OFFICIAL and r["signal"] in ("logs", "spans")]
+    if not official:
+        return []
+    out = ["## Starting point: the official SDKs", "",
+           "Each language's upstream OpenTelemetry SDK alone, with its default batch processor and",
+           "OTLP exporter, given the same burst. The calls return fast, and most of the records never",
+           "arrive: the batch processor's 2048-slot queue fills and drops the rest without a word.", ""]
+    for sig in ("logs", "spans"):
+        rs = [r for r in official if r["signal"] == sig]
+        if rs:
+            out += xychart(f"Official SDKs: {sig} delivered of {n:,} (%)", [r["lang"] for r in rs],
+                           [100 * r["delivered"] / n for r in rs], "% delivered")
+
+    steps = [("Go OTel SDK", "Official Go SDK alone"),
+             ("Go drop", "This SDK, default: drops counted and reported"),
+             ("Go lossless", "Lossless: the writer waits for room"),
+             (next((r["label"] for r in rows if r["label"].startswith("Go lossless x")), ""),
+              "Lossless, one goroutine per CPU, batch 8192"),
+             ("Go 4 exporters", "Lossless, plus 4 exporters in parallel")]
+    go = {(r["label"], r["signal"]): r for r in rows if r["lang"] == "Go"}
+    steps = [(label, what) for label, what in steps if (label, "logs") in go and (label, "spans") in go]
+    if len(steps) > 1:
+        out += ["### Step by step, in Go", "",
+                "Each step changes one thing, starting from the official SDK. The last row delivers every",
+                "record at the official SDK's speed for logs and twice it for spans. The official run uses",
+                "one thread, so read this as what each SDK can be made to deliver, not a like-for-like race.", "",
+                "| Step | Logs delivered | Logs / s | Spans delivered | Spans / s |",
+                "| ---- | -------------: | -------: | --------------: | --------: |"]
+        for label, what in steps:
+            lg, sp = go[(label, "logs")], go[(label, "spans")]
+            out.append(f"| {what} | {lg['delivered']:,} | {n / lg['emit_s']:,.0f} | "
+                       f"{sp['delivered']:,} | {n / sp['emit_s']:,.0f} |")
+        out += [""]
+        for sig in ("logs", "spans"):
+            out += xychart(f"Go {sig}: delivered (%) at each step", [str(i) for i in range(1, len(steps) + 1)],
+                           [100 * go[(label, sig)]["delivered"] / n for label, _ in steps], "% delivered")
+            out += xychart(f"Go {sig}: written per second at each step", [str(i) for i in range(1, len(steps) + 1)],
+                           [n / go[(label, sig)]["emit_s"] / 1e3 for label, _ in steps], "thousand / s", kind="line")
+    out += versus_official(data)
+    return out
+
+
+def versus_official(data):
+    """Each SDK against its language's upstream OpenTelemetry SDK alone."""
+    n = data["n"]
+    rows = ok(data["results"])
+    official = {(r["lang"], r["signal"]): r for r in rows if r["mode"] == OFFICIAL}
+    if not official:
+        return []
+    out = ["### Every language against its official SDK", "",
+           "This SDK's default and lossless modes beside the official SDK, one thread each. Above 1",
+           "means faster per call than the official SDK; the official SDK's speed is bought with the",
+           "records it drops.", ""]
+    table = ["| Language | Signal | Official: delivered | Official: rate | This SDK, drop: delivered | rate | Lossless: delivered | rate |",
+             "| -------- | ------ | ------------------: | -------------: | ------------------------: | ---: | ------------------: | ---: |"]
+    for sig in ("logs", "spans", "metrics"):
+        labels, ratios = [], []
+        for lang in ("Go", "Rust", "Python", "C++"):
+            off = official.get((lang, sig))
+            if not off:
+                continue
+            mine = [r for r in rows if r["lang"] == lang and r["signal"] == sig and r["mode"] != OFFICIAL]
+            drop = next((r for r in mine if "drop" in r["label"]), None)
+            lossless = next((r for r in mine if "lossless" in r["label"].lower() and "x" not in r["label"]
+                             and "exporters" not in r["label"]), None)
+            fmt = lambda r: (f"{r['delivered']:,}", f"{n / r['emit_s']:,.0f}/s") if r else ("—", "—")
+            table.append(f"| {lang} | {sig} | {fmt(off)[0]} | {fmt(off)[1]} | {fmt(drop)[0]} | {fmt(drop)[1]} | "
+                         f"{fmt(lossless)[0]} | {fmt(lossless)[1]} |")
+            if drop:
+                labels.append(lang)
+                ratios.append(off["emit_s"] / drop["emit_s"])
+        if labels:
+            out += xychart(f"{sig.capitalize()}: calls per second vs the official SDK (x)", labels, ratios,
+                           "x official")
+    out += table + [""]
     return out
 
 

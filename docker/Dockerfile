@@ -7,7 +7,7 @@ ARG ALERTMANAGER_VERSION=v0.31.1
 ARG ENVOY_VERSION=v1.37-latest
 ARG PYROSCOPE_VERSION=2.4.3
 
-# ── pull binaries from official images ───────────────────────────────
+# Pull binaries from official images
 FROM otel/opentelemetry-collector-contrib:${OTELCOL_VERSION} AS otelcol
 FROM grafana/loki:${LOKI_VERSION} AS loki
 FROM grafana/tempo:${TEMPO_VERSION} AS tempo
@@ -18,7 +18,7 @@ FROM prom/pushgateway:latest AS pushgateway
 FROM envoyproxy/envoy:${ENVOY_VERSION} AS envoy
 FROM grafana/pyroscope:${PYROSCOPE_VERSION} AS pyroscope
 
-# ── build stage: collect everything ──────────────────────────────────
+# Build stage: collect everything
 FROM alpine:3.21 AS builder
 
 RUN apk add --no-cache supervisor curl bash ca-certificates fontconfig
@@ -39,7 +39,7 @@ RUN chmod +x /opt/grafana/run.sh && \
   mkdir -p /data/loki /data/tempo /data/prometheus /data/pyroscope \
   /data/grafana /data/alertmanager /tmp/loki /tmp/tempo
 
-# ── final runtime image ───────────────────────────────────────────────
+# Final runtime image
 # Use glibc runtime so Envoy starts reliably on arm64/amd64.
 FROM debian:bookworm-slim
 

@@ -244,7 +244,8 @@ impl Telemetry {
             service_opts.environment.to_string(),
             logger.mcap_writer_arc(),
             logger.otel_logger_arc(),
-        );
+        )
+        .with_console(telemetry_opts.logging.console);
         logging::init(global_logger);
 
         let tracing_tracer = telemetry
@@ -467,6 +468,7 @@ pub struct TelemetryBuilder {
     tracing_enabled: bool,
     profiling_address: Option<String>,
     log_level: Option<options::LogLevel>,
+    console: Option<bool>,
     service_from_code: bool,
 }
 
@@ -501,6 +503,7 @@ impl TelemetryBuilder {
             tracing_enabled: false,
             profiling_address: None,
             log_level: None,
+            console: None,
             service_from_code: true,
         }
     }
@@ -540,6 +543,7 @@ impl TelemetryBuilder {
             tracing_enabled: false,
             profiling_address: None,
             log_level: None,
+            console: None,
             service_from_code: false,
         }
     }
@@ -691,6 +695,15 @@ impl TelemetryBuilder {
         self
     }
 
+    /// Prints each log line to stdout, or not; on by default. Off, records
+    /// still go to OTLP and MCAP: for services whose logs are read in Loki
+    /// rather than a terminal, where printing every line costs more than
+    /// exporting it.
+    pub fn with_console(mut self, console: bool) -> Self {
+        self.console = Some(console);
+        self
+    }
+
     /// Enables distributed tracing.
     pub fn with_tracing(mut self) -> Self {
         self.tracing_enabled = true;
@@ -818,6 +831,10 @@ impl TelemetryBuilder {
 
         if let Some(secure) = self.otlp_secure {
             telemetry_opts.telemetry.otlp.secure = secure;
+        }
+
+        if let Some(console) = self.console {
+            telemetry_opts.logging.console = console;
         }
 
         // Apply code-level log level (only if config didn't already set a per-module override)

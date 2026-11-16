@@ -44,6 +44,10 @@ func (c *counters) stats() SignalStats {
 // for: theirs drop silently once their queue is full (at log verbosity no
 // default logger prints), which is what made a burst of a million spans lose
 // 97% of them with no sign of it.
+//
+// Writers append to the batch being filled under a mutex, and the exporter
+// goroutine is woken once per full batch, not once per record: handing each
+// record over a channel spent a third of the CPU waking goroutines.
 type batcher[T any] struct {
 	name   string // "spans", "log records": for messages
 	cfg    options.Batch
@@ -51,150 +55,158 @@ type batcher[T any] struct {
 	report *reporter
 	count  *counters
 
-	queue    chan T
-	jobs     chan job[T] // collector -> exporter; one batch may wait while another exports
+	mu      sync.Mutex
+	room    sync.Cond // broadcast when records leave the queue; lossless writers wait on it
+	waiting int       // writers waiting on room
+	batch   []T       // being filled
+	ready   [][]T     // full batches, oldest first, waiting for the exporter
+	free    [][]T     // exported batches, emptied, for reuse
+	queued  int       // records in batch and ready
+	stopped bool
+
+	wake     chan struct{} // a batch is ready; buffered, so a writer never blocks on it
 	flushReq chan chan struct{}
-	done     chan struct{} // closed by shutdown
-	exited   chan struct{} // closed when the exporter has sent everything and returned
-	stopped  atomic.Bool
+	done     chan struct{}   // closed by shutdown
+	exited   chan struct{}   // closed when the exporter has sent everything and returned
 	stopCtx  context.Context // bounds the final drain; set before done closes
 
-	warnedDropped int64 // collector-owned: drops already warned about
-}
-
-// job is one batch for the exporter goroutine, or, with ack set, a marker
-// it closes once every batch before it has been exported.
-type job[T any] struct {
-	ctx   context.Context
-	batch []T
-	ack   chan struct{}
+	warnedDropped int64 // exporter-owned: drops already warned about
 }
 
 func newBatcher[T any](name string, cfg options.Batch, export func(context.Context, []T) error, r *reporter, c *counters) *batcher[T] {
 	b := &batcher[T]{
 		name: name, cfg: cfg, export: export, report: r, count: c,
-		queue:    make(chan T, cfg.QueueSize),
-		jobs:     make(chan job[T], 1),
+		batch:    make([]T, 0, cfg.BatchSize),
+		wake:     make(chan struct{}, 1),
 		flushReq: make(chan chan struct{}),
 		done:     make(chan struct{}),
 		exited:   make(chan struct{}),
 		stopCtx:  context.Background(),
 	}
-	go b.collect()
-	go b.exportLoop()
+	b.room.L = &b.mu
+	go b.run()
 	return b
 }
 
-// enqueue hands one record to the worker: waiting for room when lossless
-// (until ctx ends or the batcher shuts down), dropping it otherwise.
+// enqueue adds one record to the batch being filled: waiting for room when
+// lossless (until ctx ends or the batcher shuts down), dropping it otherwise.
 func (b *batcher[T]) enqueue(ctx context.Context, item T) {
 	b.count.emitted.Add(1)
-	if b.stopped.Load() {
+	b.mu.Lock()
+	for b.queued >= b.cfg.QueueSize && b.cfg.Lossless && !b.stopped && ctx.Err() == nil {
+		b.waitForRoom(ctx)
+	}
+	if b.stopped || b.queued >= b.cfg.QueueSize {
+		b.mu.Unlock()
 		b.count.dropped.Add(1)
 		return
 	}
-	select {
-	case b.queue <- item:
+	b.batch = append(b.batch, item)
+	b.queued++
+	if len(b.batch) >= b.cfg.BatchSize {
+		b.cut()
+	}
+	b.mu.Unlock()
+}
+
+// waitForRoom waits, with mu held, until a batch is exported, the batcher
+// stops or ctx ends.
+func (b *batcher[T]) waitForRoom(ctx context.Context) {
+	b.waiting++
+	if ctx.Done() != nil {
+		stop := context.AfterFunc(ctx, func() {
+			b.mu.Lock()
+			b.room.Broadcast()
+			b.mu.Unlock()
+		})
+		b.room.Wait()
+		stop()
+	} else {
+		b.room.Wait()
+	}
+	b.waiting--
+}
+
+// cut moves the batch being filled, if any, to ready and wakes the exporter.
+// mu must be held.
+func (b *batcher[T]) cut() {
+	if len(b.batch) == 0 {
 		return
+	}
+	b.ready = append(b.ready, b.batch)
+	if n := len(b.free); n > 0 {
+		b.batch = b.free[n-1]
+		b.free = b.free[:n-1]
+	} else {
+		b.batch = make([]T, 0, b.cfg.BatchSize)
+	}
+	select {
+	case b.wake <- struct{}{}:
 	default:
-	}
-	if !b.cfg.Lossless {
-		b.count.dropped.Add(1)
-		return
-	}
-	select {
-	case b.queue <- item:
-	case <-ctx.Done():
-		b.count.dropped.Add(1)
-	case <-b.done:
-		b.count.dropped.Add(1)
 	}
 }
 
-// collect fills batches from the queue and hands each full one to the
-// exporter goroutine, so the queue keeps draining while a batch exports —
-// producers waiting on a full queue (Lossless) are let in steadily rather
-// than all at once after each export.
-func (b *batcher[T]) collect() {
-	defer close(b.jobs)
+// run exports ready batches as they come, a partly filled one every
+// Interval, and everything on flush and shutdown.
+func (b *batcher[T]) run() {
+	defer close(b.exited)
 	tick := time.NewTicker(b.cfg.Interval)
 	defer tick.Stop()
 	ctx := context.Background()
-	batch := make([]T, 0, b.cfg.BatchSize)
 	for {
 		select {
-		case item := <-b.queue:
-			batch = b.fill(append(batch, item))
-			if len(batch) >= b.cfg.BatchSize {
-				batch = b.send(ctx, batch)
-			}
+		case <-b.wake:
+			b.exportReady(ctx, false)
 		case <-tick.C:
-			batch = b.send(ctx, batch)
+			b.exportReady(ctx, true)
 			b.warnDrops()
 		case ack := <-b.flushReq:
-			batch = b.drain(ctx, batch)
-			b.jobs <- job[T]{ack: ack}
+			b.exportReady(ctx, true)
+			close(ack)
 		case <-b.done:
-			b.drain(b.stopCtx, batch)
+			b.exportReady(b.stopCtx, true)
 			b.warnDrops()
 			return
 		}
 	}
 }
 
-// fill takes what is already queued, without waiting, until batch is full.
-func (b *batcher[T]) fill(batch []T) []T {
-	for len(batch) < b.cfg.BatchSize {
-		select {
-		case item := <-b.queue:
-			batch = append(batch, item)
-		default:
-			return batch
+// exportReady exports ready batches, oldest first, until none is left;
+// with partial set, the one being filled goes too.
+func (b *batcher[T]) exportReady(ctx context.Context, partial bool) {
+	b.mu.Lock()
+	if partial {
+		b.cut()
+	}
+	for len(b.ready) > 0 {
+		batch := b.ready[0]
+		b.ready[0] = nil
+		b.ready = b.ready[1:]
+		b.mu.Unlock()
+
+		b.exportOne(ctx, batch)
+
+		b.mu.Lock()
+		b.queued -= len(batch)
+		clear(batch) // drop references to what was exported
+		b.free = append(b.free, batch[:0])
+		if b.waiting > 0 {
+			b.room.Broadcast()
 		}
 	}
-	return batch
+	b.mu.Unlock()
 }
 
-// drain sends batch and everything queued behind it.
-func (b *batcher[T]) drain(ctx context.Context, batch []T) []T {
-	for {
-		batch = b.fill(batch)
-		if len(batch) < b.cfg.BatchSize {
-			return b.send(ctx, batch)
-		}
-		batch = b.send(ctx, batch)
-	}
-}
-
-// send hands batch to the exporter goroutine and returns an empty one to
-// fill next; the exporter goroutine owns batch from here on.
-func (b *batcher[T]) send(ctx context.Context, batch []T) []T {
-	if len(batch) == 0 {
-		return batch
-	}
-	b.jobs <- job[T]{ctx: ctx, batch: batch}
-	return make([]T, 0, b.cfg.BatchSize)
-}
-
-// exportLoop exports batches one at a time, in order: an OpenTelemetry
-// exporter's Export must not be called concurrently.
-func (b *batcher[T]) exportLoop() {
-	defer close(b.exited)
-	for j := range b.jobs {
-		if j.ack != nil {
-			close(j.ack)
-			continue
-		}
-		ctx, cancel := context.WithTimeout(j.ctx, b.cfg.Timeout)
-		err := b.export(ctx, j.batch)
-		cancel()
-		n := int64(len(j.batch))
-		if err != nil {
-			b.count.failed.Add(n)
-			b.report.Handle(fmt.Errorf("exporting %d %s: %w", n, b.name, err))
-		} else {
-			b.count.exported.Add(n)
-		}
+func (b *batcher[T]) exportOne(ctx context.Context, batch []T) {
+	ctx, cancel := context.WithTimeout(ctx, b.cfg.Timeout)
+	err := b.export(ctx, batch)
+	cancel()
+	n := int64(len(batch))
+	if err != nil {
+		b.count.failed.Add(n)
+		b.report.Handle(fmt.Errorf("exporting %d %s: %w", n, b.name, err))
+	} else {
+		b.count.exported.Add(n)
 	}
 }
 
@@ -230,10 +242,15 @@ func (b *batcher[T]) flush(ctx context.Context) error {
 
 // shutdown exports what is queued, within ctx, and stops the worker.
 func (b *batcher[T]) shutdown(ctx context.Context) error {
-	if b.stopped.Swap(true) {
+	b.mu.Lock()
+	if b.stopped {
+		b.mu.Unlock()
 		return nil
 	}
+	b.stopped = true
 	b.stopCtx = ctx
+	b.room.Broadcast() // lossless writers waiting for room drop instead
+	b.mu.Unlock()
 	close(b.done)
 	select {
 	case <-b.exited:

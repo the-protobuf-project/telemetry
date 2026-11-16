@@ -25,8 +25,8 @@ From `telemetry-rs/`:
 ```bash
 cargo run -p telemetry-examples --bin logging
 cargo run -p telemetry-examples --bin logging_mcap
-cargo run -p telemetry-examples --bin metrics    # OTLP metrics → :6009
-cargo run -p telemetry-examples --bin tracing   # OTLP traces → :6009
+cargo run -p telemetry-examples --bin metrics    # OTLP metrics to :6009
+cargo run -p telemetry-examples --bin tracing   # OTLP traces to :6009
 cargo run -p telemetry-examples --bin module_levels
 ```
 
@@ -34,4 +34,4 @@ cargo run -p telemetry-examples --bin module_levels
 
 - **`telemetry_local_otel!()`** — builder preset for `localhost:6009`
 - **`TelemetryBuilder::with_local_otel_collector()`** — same
-- **`Telemetry` `Drop`** — calls `close()` → flush + OTLP shutdown (safe to ignore explicit `close()`)
+- **`Telemetry` `Drop`** — calls `close()`, which flushes and shuts down OTLP (safe to ignore explicit `close()`)

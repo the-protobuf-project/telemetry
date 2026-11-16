@@ -20,7 +20,7 @@ use std::sync::Arc;
 
 use super::accounting::{
     AccountedLogProcessor, AccountedSpanProcessor, Counters, CountingLogExporter,
-    CountingSpanExporter,
+    CountingSpanExporter, Shards,
 };
 use tonic::metadata::{MetadataKey, MetadataMap, MetadataValue};
 
@@ -80,45 +80,9 @@ impl TelemetryProvider {
         let spans = Arc::new(Counters::default());
 
         let logger_provider = if logging_enabled {
-            let exporter = if telemetry_opts.otlp.use_http {
-                // Use HTTP protocol
-                let mut headers = HashMap::new();
-                if let Some(ref token) = telemetry_opts.otlp.auth_token {
-                    headers.insert("Authorization".to_string(), format!("Bearer {}", token));
-                }
-                for (key, value) in &telemetry_opts.otlp.headers {
-                    headers.insert(key.clone(), value.clone());
-                }
-
-                LogExporter::builder()
-                    .with_http()
-                    .with_endpoint(format!("{}/v1/logs", telemetry_opts.otlp.endpoint_url()))
-                    .with_headers(headers)
-                    .build()?
-            } else {
-                // Use gRPC protocol
-                let mut metadata = MetadataMap::new();
-                if let Some(ref token) = telemetry_opts.otlp.auth_token {
-                    metadata.insert(
-                        "authorization",
-                        format!("Bearer {}", token).parse().unwrap(),
-                    );
-                }
-                for (key, value) in &telemetry_opts.otlp.headers {
-                    if let (Ok(k), Ok(v)) = (
-                        key.parse::<MetadataKey<_>>(),
-                        value.parse::<MetadataValue<_>>(),
-                    ) {
-                        metadata.insert(k, v);
-                    }
-                }
-
-                LogExporter::builder()
-                    .with_tonic()
-                    .with_endpoint(telemetry_opts.otlp.endpoint_url())
-                    .with_metadata(metadata)
-                    .build()?
-            };
+            let exporters = (0..telemetry_opts.export.exporters.max(1))
+                .map(|_| log_exporter(telemetry_opts))
+                .collect::<Result<Vec<_>>>()?;
 
             // Build resource attributes including custom service labels
             let mut attrs = vec![
@@ -137,24 +101,32 @@ impl TelemetryProvider {
                 .with_attributes(attrs)
                 .build();
 
-            let config = opentelemetry_sdk::logs::BatchConfigBuilder::default()
-                .with_max_queue_size(telemetry_opts.export.queue_size)
-                .with_max_export_batch_size(
-                    telemetry_opts
-                        .export
-                        .batch_size
-                        .min(telemetry_opts.export.queue_size),
-                )
-                .build();
-            let batch = opentelemetry_sdk::logs::BatchLogProcessor::builder(
-                CountingLogExporter::new(exporter, Arc::clone(&logs)),
-            )
-            .with_batch_config(config)
-            .build();
+            let config = || {
+                opentelemetry_sdk::logs::BatchConfigBuilder::default()
+                    .with_max_queue_size(telemetry_opts.export.queue_size)
+                    .with_max_export_batch_size(
+                        telemetry_opts
+                            .export
+                            .batch_size
+                            .min(telemetry_opts.export.queue_size),
+                    )
+                    .build()
+            };
+            let shards = exporters
+                .into_iter()
+                .map(|exporter| {
+                    opentelemetry_sdk::logs::BatchLogProcessor::builder(CountingLogExporter::new(
+                        exporter,
+                        Arc::clone(&logs),
+                    ))
+                    .with_batch_config(config())
+                    .build()
+                })
+                .collect();
             Some(
                 SdkLoggerProvider::builder()
                     .with_log_processor(AccountedLogProcessor::new(
-                        batch,
+                        Shards::new(shards),
                         Arc::clone(&logs),
                         &telemetry_opts.export,
                     ))
@@ -240,43 +212,9 @@ impl TelemetryProvider {
         };
 
         let tracer_provider = if tracing_enabled {
-            let exporter = if telemetry_opts.otlp.use_http {
-                let mut headers = HashMap::new();
-                if let Some(ref token) = telemetry_opts.otlp.auth_token {
-                    headers.insert("Authorization".to_string(), format!("Bearer {}", token));
-                }
-                for (key, value) in &telemetry_opts.otlp.headers {
-                    headers.insert(key.clone(), value.clone());
-                }
-
-                opentelemetry_otlp::SpanExporter::builder()
-                    .with_http()
-                    .with_endpoint(format!("{}/v1/traces", telemetry_opts.otlp.endpoint_url()))
-                    .with_headers(headers)
-                    .build()?
-            } else {
-                let mut metadata = MetadataMap::new();
-                if let Some(ref token) = telemetry_opts.otlp.auth_token {
-                    metadata.insert(
-                        "authorization",
-                        format!("Bearer {}", token).parse().unwrap(),
-                    );
-                }
-                for (key, value) in &telemetry_opts.otlp.headers {
-                    if let (Ok(k), Ok(v)) = (
-                        key.parse::<MetadataKey<_>>(),
-                        value.parse::<MetadataValue<_>>(),
-                    ) {
-                        metadata.insert(k, v);
-                    }
-                }
-
-                opentelemetry_otlp::SpanExporter::builder()
-                    .with_tonic()
-                    .with_endpoint(telemetry_opts.otlp.endpoint_url())
-                    .with_metadata(metadata)
-                    .build()?
-            };
+            let exporters = (0..telemetry_opts.export.exporters.max(1))
+                .map(|_| span_exporter(telemetry_opts))
+                .collect::<Result<Vec<_>>>()?;
 
             // Build resource attributes including custom service labels
             let mut attrs = vec![
@@ -295,23 +233,30 @@ impl TelemetryProvider {
                 .with_attributes(attrs)
                 .build();
 
-            let config = opentelemetry_sdk::trace::BatchConfigBuilder::default()
-                .with_max_queue_size(telemetry_opts.export.queue_size)
-                .with_max_export_batch_size(
-                    telemetry_opts
-                        .export
-                        .batch_size
-                        .min(telemetry_opts.export.queue_size),
-                )
-                .build();
-            let batch = opentelemetry_sdk::trace::BatchSpanProcessor::builder(
-                CountingSpanExporter::new(exporter, Arc::clone(&spans)),
-            )
-            .with_batch_config(config)
-            .build();
+            let config = || {
+                opentelemetry_sdk::trace::BatchConfigBuilder::default()
+                    .with_max_queue_size(telemetry_opts.export.queue_size)
+                    .with_max_export_batch_size(
+                        telemetry_opts
+                            .export
+                            .batch_size
+                            .min(telemetry_opts.export.queue_size),
+                    )
+                    .build()
+            };
+            let shards = exporters
+                .into_iter()
+                .map(|exporter| {
+                    opentelemetry_sdk::trace::BatchSpanProcessor::builder(
+                        CountingSpanExporter::new(exporter, Arc::clone(&spans)),
+                    )
+                    .with_batch_config(config())
+                    .build()
+                })
+                .collect();
             let provider = SdkTracerProvider::builder()
                 .with_span_processor(AccountedSpanProcessor::new(
-                    batch,
+                    Shards::new(shards),
                     Arc::clone(&spans),
                     &telemetry_opts.export,
                 ))
@@ -417,4 +362,70 @@ impl TelemetryProvider {
             Err(anyhow!(errors.join("; ")))
         }
     }
+}
+
+/// The OTLP headers for an HTTP exporter: the bearer token and any extras.
+fn http_headers(opts: &OpenTelemetryOptions) -> HashMap<String, String> {
+    let mut headers = HashMap::new();
+    if let Some(ref token) = opts.otlp.auth_token {
+        headers.insert("Authorization".to_string(), format!("Bearer {}", token));
+    }
+    for (key, value) in &opts.otlp.headers {
+        headers.insert(key.clone(), value.clone());
+    }
+    headers
+}
+
+/// The gRPC metadata for a tonic exporter: the bearer token and any extras.
+fn grpc_metadata(opts: &OpenTelemetryOptions) -> MetadataMap {
+    let mut metadata = MetadataMap::new();
+    if let Some(ref token) = opts.otlp.auth_token {
+        metadata.insert(
+            "authorization",
+            format!("Bearer {}", token).parse().unwrap(),
+        );
+    }
+    for (key, value) in &opts.otlp.headers {
+        if let (Ok(k), Ok(v)) = (
+            key.parse::<MetadataKey<_>>(),
+            value.parse::<MetadataValue<_>>(),
+        ) {
+            metadata.insert(k, v);
+        }
+    }
+    metadata
+}
+
+/// One OTLP log exporter, over HTTP or gRPC as configured.
+fn log_exporter(opts: &OpenTelemetryOptions) -> Result<LogExporter> {
+    Ok(if opts.otlp.use_http {
+        LogExporter::builder()
+            .with_http()
+            .with_endpoint(format!("{}/v1/logs", opts.otlp.endpoint_url()))
+            .with_headers(http_headers(opts))
+            .build()?
+    } else {
+        LogExporter::builder()
+            .with_tonic()
+            .with_endpoint(opts.otlp.endpoint_url())
+            .with_metadata(grpc_metadata(opts))
+            .build()?
+    })
+}
+
+/// One OTLP span exporter, over HTTP or gRPC as configured.
+fn span_exporter(opts: &OpenTelemetryOptions) -> Result<opentelemetry_otlp::SpanExporter> {
+    Ok(if opts.otlp.use_http {
+        opentelemetry_otlp::SpanExporter::builder()
+            .with_http()
+            .with_endpoint(format!("{}/v1/traces", opts.otlp.endpoint_url()))
+            .with_headers(http_headers(opts))
+            .build()?
+    } else {
+        opentelemetry_otlp::SpanExporter::builder()
+            .with_tonic()
+            .with_endpoint(opts.otlp.endpoint_url())
+            .with_metadata(grpc_metadata(opts))
+            .build()?
+    })
 }

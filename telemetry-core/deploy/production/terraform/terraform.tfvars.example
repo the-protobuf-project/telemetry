@@ -4,12 +4,12 @@
 # Copy this file to terraform.tfvars and fill in your values
 # DO NOT commit terraform.tfvars to version control!
 
-# ----- Required -----
+# Required
 
 # Your SSH public key (get with: cat ~/.ssh/id_ed25519.pub)
 ssh_public_key_content = "ssh-ed25519 AAAA... your-email@example.com"
 
-# ----- Optional (defaults shown) -----
+# Optional (defaults shown)
 
 # AWS Region
 # aws_region = "us-east-1"
@@ -30,7 +30,7 @@ ssh_public_key_content = "ssh-ed25519 AAAA... your-email@example.com"
 # Grafana admin password
 # grafana_password = "changeme"
 
-# ----- AWS Certificate Manager (Optional) -----
+# AWS Certificate Manager (Optional)
 # Set route53_zone_id to enable automatic ACM certificate generation
 # and DNS record creation. Leave empty to use Let's Encrypt manually.
 

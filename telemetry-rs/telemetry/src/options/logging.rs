@@ -183,7 +183,7 @@ impl Default for LogOptions {
 }
 
 /// Logging options container.
-#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct LoggingOptions {
     /// Log options.
     #[serde(default)]
@@ -194,4 +194,19 @@ pub struct LoggingOptions {
     /// Per-module log level overrides keyed by service name.
     #[serde(default)]
     pub modules: HashMap<String, ModuleOptions>,
+    /// Print each log line to stdout (on by default). Off, records still go
+    /// to OTLP and MCAP.
+    #[serde(default = "default_true")]
+    pub console: bool,
+}
+
+impl Default for LoggingOptions {
+    fn default() -> Self {
+        Self {
+            log: LogOptions::default(),
+            level: LogLevel::default(),
+            modules: HashMap::new(),
+            console: true,
+        }
+    }
 }

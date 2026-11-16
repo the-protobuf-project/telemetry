@@ -148,11 +148,11 @@ cd examples/profiling
 go run main.go
 ```
 
-View results:
+View results in Grafana: open **Explore** and pick the datasource.
 
-- Logs: Grafana → Explore → Loki
-- Traces: Grafana → Explore → Tempo
-- Profiles: Grafana → Explore → Pyroscope
+- Logs: **Loki**
+- Traces: **Tempo**
+- Profiles: **Pyroscope**
 
 ## Project Structure
 

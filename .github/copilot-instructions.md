@@ -18,7 +18,7 @@ MCAP recording for offline analysis.
 ### 2. Core Components Architecture
 
 ```text
-telemetry.New() → Telemetry struct with:
+telemetry.New() returns a Telemetry struct with:
 ├── Logger (*logging.Logger)           # Structured logging with trace correlation
 ├── Metrics (*metrics.Metrics)         # OTel metrics
 ├── Tracing (*tracing.Tracing)         # Distributed tracing spans
@@ -144,7 +144,7 @@ Default endpoints:
 
 ## Common Gotchas
 
-1. **Shutdown Order**: Always stop Profiler → MCAP → Telemetry to ensure data flush
+1. **Shutdown Order**: Stop the profiler first, then MCAP, then Telemetry, so all data is flushed
 2. **MCAP Path**: Must specify absolute path in `FoxgloveOptions.McapPath`
 3. **Attribute Extraction**: Struct tags only work with supported field types
 4. **Context Propagation**: Pass context through telemetry calls for trace correlation

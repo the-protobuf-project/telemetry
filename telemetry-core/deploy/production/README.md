@@ -184,10 +184,10 @@ OTEL_DOMAIN=otel.yourdomain.com
 
 Create A records pointing to your server IP:
 
-```text
-telemetry.yourdomain.com -> <YOUR_IP>
-otel.yourdomain.com      -> <YOUR_IP>
-```
+| Name | Type | Value |
+| ---- | ---- | ----- |
+| `telemetry.yourdomain.com` | A | `<YOUR_IP>` |
+| `otel.yourdomain.com` | A | `<YOUR_IP>` |
 
 ## Sending Telemetry
 

@@ -10,8 +10,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 
 - C++: opentelemetry-cpp 1.30.0 (was 1.29.0), whose metrics headers build
-  with GCC 15; 1.29.0 misses `<cstdint>`. The 1.3.3 C++ release failed on it
-  and was not published (Go, Python, Rust and the image were).
+  with GCC 15; 1.29.0 misses `<cstdint>`. The 1.3.3 release failed on it and
+  stopped before the GitHub release; only its Go tag and image went out.
 
 ## [1.3.3] - 2026-11-16
 

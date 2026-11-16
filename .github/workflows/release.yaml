@@ -228,6 +228,10 @@ jobs:
 
       - name: Build and push multi-arch image
         uses: docker/build-push-action@v6
+        env:
+          # release_ruleset downloads every artifact in the run, and this
+          # build record artifact fails to download there.
+          DOCKER_BUILD_RECORD_UPLOAD: false
         with:
           context: ./docker
           file: ./docker/Dockerfile

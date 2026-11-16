@@ -49,27 +49,27 @@ func (l *Logger) Fatal(ctx context.Context, msg string, attrs ...attribute.KeyVa
 }
 
 // Infof logs an informational message with formatting
-func (l *Logger) Infof(ctx context.Context, format string, args ...interface{}) {
+func (l *Logger) Infof(ctx context.Context, format string, args ...any) {
 	l.Info(ctx, fmt.Sprintf(format, args...))
 }
 
 // Debugf logs a debug message with formatting
-func (l *Logger) Debugf(ctx context.Context, format string, args ...interface{}) {
+func (l *Logger) Debugf(ctx context.Context, format string, args ...any) {
 	l.Debug(ctx, fmt.Sprintf(format, args...))
 }
 
 // Warnf logs a warning message with formatting
-func (l *Logger) Warnf(ctx context.Context, format string, args ...interface{}) {
+func (l *Logger) Warnf(ctx context.Context, format string, args ...any) {
 	l.Warn(ctx, fmt.Sprintf(format, args...))
 }
 
 // Errorf logs an error message with formatting
-func (l *Logger) Errorf(ctx context.Context, format string, args ...interface{}) {
+func (l *Logger) Errorf(ctx context.Context, format string, args ...any) {
 	l.Error(ctx, fmt.Sprintf(format, args...))
 }
 
 // Fatalf logs a fatal message with formatting
-func (l *Logger) Fatalf(ctx context.Context, format string, args ...interface{}) {
+func (l *Logger) Fatalf(ctx context.Context, format string, args ...any) {
 	l.Fatal(ctx, fmt.Sprintf(format, args...))
 }
 
@@ -98,7 +98,7 @@ func (l *Logger) WithAttrs(attrs ...attribute.KeyValue) *Logger {
 // These methods use context.Background() internally
 
 // InfoMsg logs an informational message without requiring context
-func (l *Logger) InfoMsg(msg string, data ...interface{}) {
+func (l *Logger) InfoMsg(msg string, data ...any) {
 	ctx := context.Background()
 	if len(data) > 0 {
 		l.Info(ctx, msg, convertToKeyValues(data)...)
@@ -108,7 +108,7 @@ func (l *Logger) InfoMsg(msg string, data ...interface{}) {
 }
 
 // DebugMsg logs a debug message without requiring context
-func (l *Logger) DebugMsg(msg string, data ...interface{}) {
+func (l *Logger) DebugMsg(msg string, data ...any) {
 	ctx := context.Background()
 	if len(data) > 0 {
 		l.Debug(ctx, msg, convertToKeyValues(data)...)
@@ -118,7 +118,7 @@ func (l *Logger) DebugMsg(msg string, data ...interface{}) {
 }
 
 // WarnMsg logs a warning message without requiring context
-func (l *Logger) WarnMsg(msg string, data ...interface{}) {
+func (l *Logger) WarnMsg(msg string, data ...any) {
 	ctx := context.Background()
 	if len(data) > 0 {
 		l.Warn(ctx, msg, convertToKeyValues(data)...)
@@ -128,7 +128,7 @@ func (l *Logger) WarnMsg(msg string, data ...interface{}) {
 }
 
 // ErrorMsg logs an error message without requiring context and returns an error
-func (l *Logger) ErrorMsg(msg string, data ...interface{}) error {
+func (l *Logger) ErrorMsg(msg string, data ...any) error {
 	ctx := context.Background()
 	if len(data) > 0 {
 		l.Error(ctx, msg, convertToKeyValues(data)...)
@@ -139,7 +139,7 @@ func (l *Logger) ErrorMsg(msg string, data ...interface{}) error {
 }
 
 // FatalMsg logs a fatal message without requiring context
-func (l *Logger) FatalMsg(msg string, data ...interface{}) {
+func (l *Logger) FatalMsg(msg string, data ...any) {
 	ctx := context.Background()
 	if len(data) > 0 {
 		l.Fatal(ctx, msg, convertToKeyValues(data)...)
@@ -149,13 +149,13 @@ func (l *Logger) FatalMsg(msg string, data ...interface{}) {
 }
 
 // Printf logs a message using a format string
-func (l *Logger) Printf(format string, args ...interface{}) {
+func (l *Logger) Printf(format string, args ...any) {
 	l.Infof(context.Background(), format, args...)
 }
 
 // convertToKeyValues converts variadic interface{} data to attribute.KeyValue attributes
 // This is a helper function to bridge the gap between logging.Logger and telemetry.Logger
-func convertToKeyValues(data []interface{}) []attribute.KeyValue {
+func convertToKeyValues(data []any) []attribute.KeyValue {
 	if len(data) == 0 {
 		return nil
 	}

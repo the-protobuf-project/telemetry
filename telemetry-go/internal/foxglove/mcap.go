@@ -90,7 +90,7 @@ func NewUnifiedMcapWriter(serviceOpts options.ServiceOptions, foxgloveOpts optio
 
 // registerBuiltInSchemas registers the built-in schemas (foxglove.Log and mahcanirobotics.metric)
 func (u *UnifiedMcapWriter) registerBuiltInSchemas() error {
-	for _, schemaName := range []string{"foxglove.Log", "mahcanirobotics.metric"} {
+	for _, schemaName := range []string{"foxglove.Log", "mahcanirobotics.metric", "the-protobuf-project.trace"} {
 		if err := u.RegisterSchema(schemaName); err != nil {
 			return err
 		}
@@ -144,6 +144,12 @@ func (u *UnifiedMcapWriter) CreateLogChannel(topic string, metadata map[string]s
 // CreateMetricChannel creates a channel for a specific metric using the mahcanirobotics.metric schema
 func (u *UnifiedMcapWriter) CreateMetricChannel(topic string, metadata map[string]string) (uint16, error) {
 	return u.CreateChannel(topic, "mahcanirobotics.metric", metadata)
+}
+
+// CreateTraceChannel creates a channel for ended spans using the
+// the-protobuf-project.trace schema
+func (u *UnifiedMcapWriter) CreateTraceChannel(topic string, metadata map[string]string) (uint16, error) {
+	return u.CreateChannel(topic, "the-protobuf-project.trace", metadata)
 }
 
 // CreateChannel creates a channel with a specific schema

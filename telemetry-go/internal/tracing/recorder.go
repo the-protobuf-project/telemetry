@@ -45,7 +45,7 @@ type RecordedSpan struct {
 	Failed       bool   // status set to error
 	OK           bool   // status set to ok
 	Status       string // the status description
-	Attributes   map[string]interface{}
+	Attributes   map[string]any
 	Events       []string
 	Links        []string // the span ids linked to
 }
@@ -65,7 +65,7 @@ func (r *SpanRecorder) Spans() []RecordedSpan {
 			Failed:     s.Status.Code == codes.Error,
 			OK:         s.Status.Code == codes.Ok,
 			Status:     s.Status.Description,
-			Attributes: make(map[string]interface{}, len(s.Attributes)),
+			Attributes: make(map[string]any, len(s.Attributes)),
 		}
 		if s.Parent.IsValid() {
 			rs.ParentSpanID = s.Parent.SpanID().String()

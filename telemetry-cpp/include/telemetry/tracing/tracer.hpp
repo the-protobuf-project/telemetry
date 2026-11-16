@@ -38,6 +38,26 @@ inline const char* span_status_to_string(SpanStatus status) {
     }
 }
 
+/// What side of an interaction a span records, as OpenTelemetry defines it.
+enum class SpanKind {
+    Internal,
+    Server,
+    Client,
+    Producer,
+    Consumer
+};
+
+/// A caller's trace context, read from W3C headers by Tracer::extract: the
+/// span a request or message came from, in whatever language it was written.
+struct RemoteContext {
+    std::string trace_id;  ///< 32 lowercase hex digits; empty when the headers carried none
+    std::string span_id;   ///< 16 lowercase hex digits: the caller's span, parent of the next
+    bool sampled = true;
+    std::map<std::string, std::string> baggage;  ///< W3C baggage the caller sent
+
+    bool valid() const { return trace_id.size() == 32 && span_id.size() == 16; }
+};
+
 struct SpanEvent {
     std::string name;
     uint64_t timestamp_ns;
@@ -71,9 +91,18 @@ public:
     const std::string& name() const { return name_; }
     const std::string& trace_id() const { return trace_id_; }
     const std::string& span_id() const { return span_id_; }
+    /// The parent span's id: a local span's, or a remote caller's; empty for a root.
+    const std::string& parent_span_id() const { return parent_span_id_; }
+    /// W3C baggage this span carries on to the services it calls.
+    const std::map<std::string, std::string>& baggage() const { return baggage_; }
     bool is_ended() const { return ended_; }
 
 private:
+    friend class Tracer;
+    struct OtelState;  // the OpenTelemetry span this one exports through, when OTLP is on
+
+    void record_attribute(const std::string& key, const std::string& value);
+
     std::string name_;
     std::string trace_id_;
     std::string span_id_;
@@ -84,9 +113,11 @@ private:
     std::string status_description_;
     std::map<std::string, std::string> attributes_;
     std::vector<SpanEvent> events_;
+    std::map<std::string, std::string> baggage_;
     bool ended_ = false;
 
     std::shared_ptr<mcap::McapWriter> mcap_writer_;
+    std::shared_ptr<OtelState> otel_;
 };
 
 class Tracer {
@@ -113,12 +144,29 @@ public:
     Tracer& operator=(Tracer&&) noexcept;
 
     Span start_span(const std::string& name);
-    Span start_span(const std::string& name, const Span& parent);
+    Span start_span(const std::string& name, SpanKind kind);
+    Span start_span(const std::string& name, const Span& parent, SpanKind kind = SpanKind::Internal);
+    /// Starts a span continuing a remote caller's trace (see extract); an
+    /// invalid context starts a new trace.
+    Span start_span(const std::string& name, const RemoteContext& parent, SpanKind kind = SpanKind::Server);
+
+    /// Writes span's trace context into headers — W3C traceparent and, when
+    /// the span carries any, baggage — for the service a request or message
+    /// goes to, in any language, to continue the trace.
+    void inject(const Span& span, std::map<std::string, std::string>& headers) const;
+
+    /// Reads the trace context a caller sent in headers (header names in any
+    /// case). Without a valid traceparent the result is not valid(), and a
+    /// span started under it begins a new trace.
+    RemoteContext extract(const std::map<std::string, std::string>& headers) const;
 
     bool is_enabled() const { return enabled_; }
     const std::string& service_name() const { return service_name_; }
 
 private:
+    Span make_span(const std::string& name, const std::string& trace_id,
+                   const std::string& parent_span_id, bool remote_parent, bool sampled,
+                   const std::map<std::string, std::string>& baggage, SpanKind kind);
     std::string generate_trace_id();
     std::string generate_span_id();
 

@@ -1,3 +1,25 @@
+# OpenTelemetry Collector for the single-image stack, sized for sustained
+# high volume (see docker/README.md, "Sizing for 1M records/s").
+#
+# Every knob that decides throughput reads an environment variable with a
+# default, so a deployment tunes it with `docker run -e ...` instead of
+# editing this file:
+#
+#   OTELCOL_BATCH_SIZE         records per batch sent to a backend   (8192)
+#   OTELCOL_BATCH_MAX_SIZE     hard cap on one batch                 (16384)
+#   OTELCOL_BATCH_TIMEOUT      longest a record waits for a batch    (200ms)
+#   OTELCOL_EXPORT_CONSUMERS   concurrent requests per backend       (16)
+#   OTELCOL_EXPORT_QUEUE       batches buffered per backend          (2000)
+#   OTELCOL_MEMORY_LIMIT_MIB   memory_limiter: refuse above this     (80% of the collector's share)
+#   OTELCOL_MEMORY_SPIKE_MIB   memory_limiter: headroom for a spike  (20% of the share)
+#
+# The share itself (OTELCOL_MEMORY_MIB, OTELCOL_CPUS) is worked out from the
+# container's limits by entrypoint.sh.
+#
+# When a backend cannot keep up, the exporter queue fills, then the
+# memory_limiter refuses new data with a retryable error: SDKs back off and
+# retry rather than the collector being OOM-killed and losing everything.
+
 receivers:
   otlp:
     protocols:
@@ -7,14 +29,26 @@ receivers:
         # 16k points with their status flags is tens of MiB, and gRPC's
         # default 4 MiB rejects it whole, silently on the sender's side.
         max_recv_msg_size_mib: 64
+        max_concurrent_streams: 1024
+        read_buffer_size: 524288
+        write_buffer_size: 524288
       http:
         endpoint: 0.0.0.0:4318
         max_request_body_size: 67108864
 
 processors:
+  # First in every pipeline: measure before anything else allocates.
+  memory_limiter:
+    check_interval: 500ms
+    limit_mib: ${env:OTELCOL_MEMORY_LIMIT_MIB:-1600}
+    spike_limit_mib: ${env:OTELCOL_MEMORY_SPIKE_MIB:-400}
+
+  # Large batches: at 1M records/s, 512-record batches meant ~2,000 requests
+  # a second to each backend; 8192 makes it ~120.
   batch:
-    timeout: 1s
-    send_batch_size: 512
+    send_batch_size: ${env:OTELCOL_BATCH_SIZE:-8192}
+    send_batch_max_size: ${env:OTELCOL_BATCH_MAX_SIZE:-16384}
+    timeout: ${env:OTELCOL_BATCH_TIMEOUT:-200ms}
 
 connectors:
   spanmetrics:
@@ -33,21 +67,58 @@ connectors:
 exporters:
   otlphttp/loki:
     endpoint: "http://localhost:3101/otlp"
+    compression: zstd
+    sending_queue:
+      enabled: true
+      num_consumers: ${env:OTELCOL_EXPORT_CONSUMERS:-16}
+      queue_size: ${env:OTELCOL_EXPORT_QUEUE:-2000}
+    retry_on_failure:
+      enabled: true
+      initial_interval: 200ms
+      max_interval: 5s
+      max_elapsed_time: 120s
   otlp/tempo:
     endpoint: localhost:3200
+    compression: zstd
     tls:
       insecure: true
+    sending_queue:
+      enabled: true
+      num_consumers: ${env:OTELCOL_EXPORT_CONSUMERS:-16}
+      queue_size: ${env:OTELCOL_EXPORT_QUEUE:-2000}
+    retry_on_failure:
+      enabled: true
+      initial_interval: 200ms
+      max_interval: 5s
+      max_elapsed_time: 120s
   prometheusremotewrite:
     endpoint: http://localhost:9090/api/v1/write
     tls:
       insecure: true
+    remote_write_queue:
+      enabled: true
+      num_consumers: ${env:OTELCOL_EXPORT_CONSUMERS:-16}
+      queue_size: 100000
   debug:
-    verbosity: detailed
+    verbosity: basic
 
 extensions:
-  health_check: null
+  health_check:
+    endpoint: 0.0.0.0:13133
 
 service:
+  # The collector's own metrics (accepted/refused/dropped per signal, queue
+  # size) on :8888, scraped by Prometheus — the first place to look when a
+  # load test falls short (see docker/README.md, "Finding the bottleneck").
+  telemetry:
+    metrics:
+      level: detailed
+      readers:
+        - pull:
+            exporter:
+              prometheus:
+                host: 0.0.0.0
+                port: 8888
   extensions:
     - health_check
   pipelines:
@@ -55,6 +126,7 @@ service:
       receivers:
         - otlp
       processors:
+        - memory_limiter
         - batch
       exporters:
         - otlphttp/loki
@@ -63,6 +135,7 @@ service:
         - otlp
         - spanmetrics
       processors:
+        - memory_limiter
         - batch
       exporters:
         - prometheusremotewrite
@@ -70,6 +143,7 @@ service:
       receivers:
         - otlp
       processors:
+        - memory_limiter
         - batch
       exporters:
         - otlp/tempo

@@ -76,7 +76,7 @@ func main() {
 	// Example 1: Traditional logging (without attributes)
 	// ========================================
 	p.Logger.Info("Traditional logging - map")
-	p.Logger.Info("User joined room", map[string]interface{}{
+	p.Logger.Info("User joined room", map[string]any{
 		"user_id":  "user-alice",
 		"room_id":  "room-ai-chat",
 		"language": "en",

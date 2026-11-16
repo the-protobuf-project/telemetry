@@ -29,3 +29,12 @@ cc_binary(
     srcs = ["tracing.cpp"],
     deps = ["//src:telemetry"],
 )
+
+cc_binary(
+    name = "crosslang",
+    srcs = ["crosslang.cpp"],
+    deps = [
+        "//src:telemetry",
+        "@nlohmann_json//:json",
+    ],
+)

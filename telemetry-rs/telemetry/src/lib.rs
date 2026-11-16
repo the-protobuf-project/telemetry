@@ -34,6 +34,7 @@ pub mod foxglove;
 pub mod logging;
 pub mod metrics;
 pub mod options;
+pub mod profiling;
 pub mod telemetry;
 pub mod tracing;
 pub mod traits;
@@ -64,6 +65,7 @@ pub struct Telemetry {
     pub metrics: Metrics,
     mcap_writer: Option<Arc<Mutex<foxglove::UnifiedMcapWriter>>>,
     telemetry: Option<telemetry::TelemetryProvider>,
+    profiler: Option<profiling::Profiler>,
     closed: bool,
 }
 
@@ -204,6 +206,11 @@ impl Telemetry {
             .map(|writer| logging::LogMcapWriter::new(&service_opts, Arc::clone(writer)))
             .transpose()?;
 
+        // Read and write W3C trace context and baggage, as every Telemetry SDK
+        // does, so a trace started by a Go, Python or C++ service continues
+        // here, and one started here continues in them.
+        tracing::install_propagator();
+
         let telemetry = Some(telemetry::TelemetryProvider::new(
             &service_opts,
             &telemetry_opts.telemetry,
@@ -247,12 +254,15 @@ impl Telemetry {
             telemetry.as_ref().and_then(|t| t.meter_provider()),
         )?;
 
+        let profiler = profiling::Profiler::start(&service_opts, &telemetry_opts.profiling)?;
+
         Ok(Self {
             logger,
             tracing: tracing_instance,
             metrics,
             mcap_writer,
             telemetry,
+            profiler,
             closed: false,
         })
     }
@@ -317,6 +327,10 @@ impl Telemetry {
             return Ok(());
         }
         self.closed = true;
+        // Profiles first: the agent's last push is part of what close flushes.
+        if let Some(mut profiler) = self.profiler.take() {
+            profiler.stop();
+        }
 
         let mut errors = Vec::new();
 
@@ -757,6 +771,12 @@ impl TelemetryBuilder {
         if let Some(path) = self.mcap_path {
             telemetry_opts.foxglove.enabled = true;
             telemetry_opts.foxglove.mcap_path = path;
+        }
+
+        // Profiling: with_profiling used to be stored and never read.
+        if let Some(address) = self.profiling_address {
+            telemetry_opts.profiling.enabled = true;
+            telemetry_opts.profiling.server_address = address;
         }
 
         Telemetry::init(service_opts, telemetry_opts)

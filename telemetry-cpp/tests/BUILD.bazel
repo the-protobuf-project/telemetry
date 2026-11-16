@@ -1,0 +1,10 @@
+load("@rules_cc//cc:defs.bzl", "cc_test")
+
+cc_test(
+    name = "tracing_test",
+    srcs = ["tracing_test.cpp"],
+    deps = [
+        "//src:telemetry",
+        "@catch2//:catch2_main",
+    ],
+)

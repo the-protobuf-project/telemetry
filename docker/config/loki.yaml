@@ -38,8 +38,29 @@ storage_config:
     active_index_directory: /data/loki/tsdb/index
     cache_location: /data/loki/tsdb/cache
 
+# Ingest limits, sized for ~1M log records/s (~200 MB/s) into one instance.
+# Loki's defaults (4 MB/s per tenant, 3 MB/s per stream) refuse 98% of that
+# with 429s, which the collector retries until its queue fills. A service's
+# records share a handful of streams (service_name + severity), so the
+# per-stream limit binds first. Override with -e LOKI_INGEST_MB=... etc.;
+# supervisord starts Loki with -config.expand-env=true.
 limits_config:
   allow_structured_metadata: true
+  ingestion_rate_mb: ${LOKI_INGEST_MB:-512}
+  ingestion_burst_size_mb: ${LOKI_INGEST_BURST_MB:-1024}
+  per_stream_rate_limit: ${LOKI_STREAM_RATE:-256MB}
+  per_stream_rate_limit_burst: ${LOKI_STREAM_BURST:-512MB}
+  max_global_streams_per_user: 100000
+  max_structured_metadata_entries_count: 256
+  max_line_size: 256KB
+  reject_old_samples: false
+
+ingester:
+  chunk_target_size: 1572864
+  chunk_idle_period: 1m
+  max_chunk_age: 5m
+  wal:
+    dir: /data/loki/wal
 
 analytics:
   reporting_enabled: false

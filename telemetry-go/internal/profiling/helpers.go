@@ -3,6 +3,7 @@ package profiling
 import (
 	"context"
 	"fmt"
+	"maps"
 	"time"
 )
 
@@ -83,9 +84,7 @@ func (p *Profiler) ProfileSection(ctx context.Context, section string, tags map[
 	// Merge section name with custom tags
 	allTags := make(map[string]string)
 	allTags["section"] = section
-	for k, v := range tags {
-		allTags[k] = v
-	}
+	maps.Copy(allTags, tags)
 
 	p.TagWrapper(ctx, allTags, fn)
 }

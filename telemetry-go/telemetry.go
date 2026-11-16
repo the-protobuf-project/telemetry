@@ -2,6 +2,10 @@ package telemetry
 
 import (
 	"context"
+	"errors"
+	"fmt"
+	"log/slog"
+	"maps"
 	"net"
 	"net/http"
 	"strings"
@@ -51,6 +55,24 @@ type RecordedSpan = tracing.RecordedSpan
 
 // NewSpanRecorder returns an empty SpanRecorder.
 var NewSpanRecorder = tracing.NewSpanRecorder
+
+// ExportOptions tunes the export queues: how many records wait, how many go
+// per request, and whether a full queue drops records or makes the program
+// wait. See [Builder.WithExport].
+type ExportOptions = options.ExportOptions
+
+// SignalStats counts what happened to one signal's records: emitted,
+// exported, dropped (queue full), failed (export error).
+type SignalStats = telemetry.SignalStats
+
+// Stats is what the export pipeline did with the program's log records and
+// spans; see [Telemetry.Stats]. Metrics are aggregated before export, so
+// they have nothing to drop.
+type Stats struct {
+	Logs, Spans  SignalStats
+	ExportErrors int64  // failed export requests, every signal
+	LastError    string // the latest of them
+}
 
 // LogLevel is a type alias for options.LogLevel so modules can use telemetry.Level1, etc.
 type LogLevel = options.LogLevel
@@ -104,7 +126,8 @@ type Builder struct {
 	serviceOpts   options.ServiceOptions
 	telemetryOpts options.TelemetryOptions
 	configPath    string
-	secureSet     bool // WithOTLPSecure decided TLS; autoConfigureOTLP leaves it
+	secureSet     bool         // WithOTLPSecure decided TLS; autoConfigureOTLP leaves it
+	logHandler    slog.Handler // WithLogHandler: where log records are printed
 	shutdown      time.Duration
 	err           error
 }
@@ -119,8 +142,12 @@ type Builder struct {
 //	    WithConfig("config.yaml").
 //	    Build()
 func New() *Builder {
-	// Auto-discover and load config on creation
-	telemetryOpts, serviceOpts, _ := options.LoadConfigWithDefaults("")
+	// Auto-discover and load config on creation. A config file that is
+	// found but cannot be read fails Build rather than being ignored.
+	telemetryOpts, serviceOpts, err := options.LoadConfigWithDefaults("")
+	if err != nil {
+		return &Builder{err: fmt.Errorf("telemetry: %w", err)}
+	}
 	return &Builder{
 		serviceOpts:   *serviceOpts,
 		telemetryOpts: *telemetryOpts,
@@ -283,6 +310,47 @@ func (b *Builder) WithShutdownTimeout(d time.Duration) *Builder {
 	return b
 }
 
+// WithExport tunes the OTLP export queues for logs and spans. A program that
+// writes faster than its collector accepts fills them; by default what does
+// not fit is dropped — counted in [Telemetry.Stats], warned about, and
+// reported by Close — so telemetry never slows the program. With
+// opts.Lossless the program waits for room instead, and nothing is lost.
+//
+//	telemetry.New().WithExport(telemetry.ExportOptions{Lossless: true, QueueSize: 65536})
+//
+// The same settings come from the config file ([telemetry.export]) or
+// TELEMETRY_TELEMETRY__EXPORT__LOSSLESS=true and friends.
+func (b *Builder) WithExport(opts ExportOptions) *Builder {
+	if b.err != nil {
+		return b
+	}
+	b.telemetryOpts.Telemetry.Export = opts
+	return b
+}
+
+// WithLogHandler prints log records with h instead of the default console
+// logger: a JSON handler for a log shipper, the program's own handler, or
+// slog.DiscardHandler for no console output at all. Records still go to
+// OpenTelemetry and MCAP as configured, and only those at or above the
+// service's log level reach h.
+//
+//	telemetry.New().WithLogHandler(slog.NewJSONHandler(os.Stdout, nil))
+func (b *Builder) WithLogHandler(h slog.Handler) *Builder {
+	if b.err != nil {
+		return b
+	}
+	b.logHandler = h
+	return b
+}
+
+// WithLogger prints log records with l's handler; see [Builder.WithLogHandler].
+func (b *Builder) WithLogger(l *slog.Logger) *Builder {
+	if b.err != nil || l == nil {
+		return b
+	}
+	return b.WithLogHandler(l.Handler())
+}
+
 // WithMCAP enables MCAP file logging at the specified path.
 func (b *Builder) WithMCAP(path string) *Builder {
 	if b.err != nil {
@@ -346,9 +414,7 @@ func (b *Builder) WithLabels(labels map[string]string) *Builder {
 	if b.serviceOpts.Labels == nil {
 		b.serviceOpts.Labels = make(map[string]string)
 	}
-	for k, v := range labels {
-		b.serviceOpts.Labels[k] = v
-	}
+	maps.Copy(b.serviceOpts.Labels, labels)
 	return b
 }
 
@@ -385,6 +451,8 @@ func (b *Builder) Build() (*Telemetry, error) {
 
 	b.telemetryOpts.Telemetry.OTLP = b.otlp()
 	applySDKDisabled(&b.telemetryOpts.Telemetry)
+	// Spans recorded to MCAP need real ids even when nothing exports them.
+	b.telemetryOpts.Telemetry.Tracing.Local = b.telemetryOpts.Foxglove.Enabled && b.telemetryOpts.Foxglove.McapPath != ""
 
 	ctx := context.Background()
 
@@ -408,11 +476,12 @@ func (b *Builder) Build() (*Telemetry, error) {
 		shutdownTimeout: b.shutdown,
 		telemetry:       tel,
 		unifiedMcap:     unifiedMcap,
-		Logger:          logging.NewLogger(b.serviceOpts, b.telemetryOpts.Logging, unifiedMcap, tel.GetLogger()),
+		Logger:          logging.NewLogger(b.serviceOpts, b.telemetryOpts.Logging, unifiedMcap, tel.GetLogger(), b.logHandler),
 		Metrics:         metrics.NewMetrics(b.serviceOpts, unifiedMcap, tel.GetMetrics()),
 		Tracing:         tracing.NewTracing(b.serviceOpts, b.telemetryOpts.Tracing, unifiedMcap, tel.GetTracer()),
 		Profiler:        profiling.NewProfiler(b.serviceOpts, b.telemetryOpts.Profiling, unifiedMcap),
 	}
+	tel.SetReportOutput(p.Logger.Console())
 
 	return p, nil
 }
@@ -529,11 +598,12 @@ func NewLegacy(ctx context.Context, serviceOpts options.ServiceOptions, opts opt
 		ctx:         ctx,
 		telemetry:   tel,
 		unifiedMcap: unifiedMcap,
-		Logger:      logging.NewLogger(serviceOpts, opts.Logging, unifiedMcap, tel.GetLogger()),
+		Logger:      logging.NewLogger(serviceOpts, opts.Logging, unifiedMcap, tel.GetLogger(), nil),
 		Metrics:     metrics.NewMetrics(serviceOpts, unifiedMcap, tel.GetMetrics()),
 		Tracing:     tracing.NewTracing(serviceOpts, opts.Tracing, unifiedMcap, tel.GetTracer()),
 		Profiler:    profiling.NewProfiler(serviceOpts, opts.Profiling, unifiedMcap),
 	}
+	tel.SetReportOutput(p.Logger.Console())
 
 	return p, nil
 }
@@ -542,13 +612,16 @@ func NewLegacy(ctx context.Context, serviceOpts options.ServiceOptions, opts opt
 // exporters hold. It takes at most the shutdown timeout
 // ([DefaultShutdownTimeout] unless WithShutdownTimeout says otherwise), so a
 // collector that is not listening cannot hold up the process's exit.
+//
+// Close returns an error when any log record or span was dropped or failed
+// to export during the program's run, saying how many and why.
 func (p *Telemetry) Close() error {
 	// Stop profiler first to flush remaining data
 	if p.Profiler != nil {
 		if err := p.Profiler.Stop(); err != nil {
 			// Log error but continue with shutdown
 			if p.Logger != nil {
-				p.Logger.Warn("Failed to stop profiler", map[string]interface{}{"error": err.Error()})
+				p.Logger.Warn("Failed to stop profiler", map[string]any{"error": err.Error()})
 			}
 		}
 	}
@@ -584,9 +657,61 @@ func (p *Telemetry) Close() error {
 		}
 		ctx, cancel := context.WithTimeout(context.WithoutCancel(ctx), timeout)
 		defer cancel()
-		return p.telemetry.Shutdown(ctx)
+		err := p.telemetry.Shutdown(ctx)
+		return errors.Join(err, p.Stats().lossError())
 	}
 	return nil
+}
+
+// Stats says what the export pipeline did with the log records and spans the
+// program emitted. Read it after Close for the final count; before, records
+// still queued show as Pending.
+func (p *Telemetry) Stats() Stats {
+	if p == nil || p.telemetry == nil {
+		return Stats{}
+	}
+	logs, spans, errs, last := p.telemetry.Stats()
+	return Stats{Logs: logs, Spans: spans, ExportErrors: errs, LastError: last}
+}
+
+// lossError describes the records that never reached the collector, or is nil.
+func (s Stats) lossError() error {
+	var parts []string
+	for _, sig := range []struct {
+		name string
+		s    SignalStats
+	}{{"log records", s.Logs}, {"spans", s.Spans}} {
+		if sig.s.Dropped > 0 {
+			parts = append(parts, fmt.Sprintf("%d of %d %s dropped (export queue full)", sig.s.Dropped, sig.s.Emitted, sig.name))
+		}
+		if sig.s.Failed > 0 {
+			parts = append(parts, fmt.Sprintf("%d of %d %s failed to export", sig.s.Failed, sig.s.Emitted, sig.name))
+		}
+	}
+	if len(parts) == 0 {
+		return nil
+	}
+	err := "telemetry: " + strings.Join(parts, "; ")
+	if s.Logs.Dropped+s.Spans.Dropped > 0 {
+		err += "; use WithExport(ExportOptions{Lossless: true}) or a larger QueueSize to keep them"
+	}
+	if s.LastError != "" {
+		err += "; last export error: " + s.LastError
+	}
+	return errors.New(err)
+}
+
+// Slog returns a *slog.Logger that writes through this instance: the
+// console (or the WithLogHandler handler), OpenTelemetry and MCAP. Records
+// logged with a context carrying a span are correlated with its trace:
+//
+//	log := t.Slog()
+//	log.InfoContext(ctx, "order placed", "order_id", id)
+func (p *Telemetry) Slog() *slog.Logger {
+	if p == nil || p.Logger == nil {
+		return slog.New(slog.DiscardHandler)
+	}
+	return p.Logger.Slog()
 }
 
 // MetricsHandler serves every metric the pipeline records in the Prometheus

@@ -5,6 +5,7 @@ ARG PROMETHEUS_VERSION=v3.10.0
 ARG GRAFANA_VERSION=12.4.1
 ARG ALERTMANAGER_VERSION=v0.31.1
 ARG ENVOY_VERSION=v1.37-latest
+ARG PYROSCOPE_VERSION=2.4.3
 
 # ── pull binaries from official images ───────────────────────────────
 FROM otel/opentelemetry-collector-contrib:${OTELCOL_VERSION} AS otelcol
@@ -15,6 +16,7 @@ FROM grafana/grafana:${GRAFANA_VERSION} AS grafana
 FROM prom/alertmanager:${ALERTMANAGER_VERSION} AS alertmanager
 FROM prom/pushgateway:latest AS pushgateway
 FROM envoyproxy/envoy:${ENVOY_VERSION} AS envoy
+FROM grafana/pyroscope:${PYROSCOPE_VERSION} AS pyroscope
 
 # ── build stage: collect everything ──────────────────────────────────
 FROM alpine:3.21 AS builder
@@ -31,9 +33,10 @@ COPY --from=grafana /run.sh /opt/grafana/run.sh
 COPY --from=alertmanager /bin/alertmanager /usr/local/bin/alertmanager
 COPY --from=pushgateway /bin/pushgateway /usr/local/bin/pushgateway
 COPY --from=envoy /usr/local/bin/envoy /usr/local/bin/envoy
+COPY --from=pyroscope /usr/bin/pyroscope /usr/local/bin/pyroscope
 
 RUN chmod +x /opt/grafana/run.sh && \
-  mkdir -p /data/loki /data/tempo /data/prometheus \
+  mkdir -p /data/loki /data/tempo /data/prometheus /data/pyroscope \
   /data/grafana /data/alertmanager /tmp/loki /tmp/tempo
 
 # ── final runtime image ───────────────────────────────────────────────
@@ -44,7 +47,7 @@ FROM debian:bookworm-slim
 # package to inherit repo visibility and show source/README).
 LABEL org.opencontainers.image.source="https://github.com/the-protobuf-project/telemetry" \
   org.opencontainers.image.title="telemetry-stack" \
-  org.opencontainers.image.description="Grafana, Prometheus, Pushgateway, Tempo, Loki, Alertmanager, OTel Collector and Envoy in a single image, fronted by one ingress port (6009)." \
+  org.opencontainers.image.description="Grafana, Prometheus, Pushgateway, Tempo, Loki, Pyroscope, Alertmanager, OTel Collector and Envoy in a single image, fronted by one ingress port (6009)." \
   org.opencontainers.image.licenses="Apache-2.0"
 
 RUN apt-get update && \
@@ -66,6 +69,7 @@ COPY --from=builder /usr/local/bin/promtool /usr/local/bin/promtool
 COPY --from=builder /usr/local/bin/alertmanager /usr/local/bin/alertmanager
 COPY --from=builder /usr/local/bin/pushgateway /usr/local/bin/pushgateway
 COPY --from=builder /usr/local/bin/envoy /usr/local/bin/envoy
+COPY --from=builder /usr/local/bin/pyroscope /usr/local/bin/pyroscope
 COPY --from=builder /opt/grafana /opt/grafana
 
 # data dirs

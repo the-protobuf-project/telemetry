@@ -3,6 +3,7 @@ package metrics
 import (
 	"encoding/json"
 	"fmt"
+	"maps"
 	"strings"
 	"sync"
 	"time"
@@ -106,9 +107,7 @@ func (m *MetricMcapWriter) getOrCreateChannel(metricName string) (uint16, error)
 
 	// Create channel metadata
 	channelMetadata := make(map[string]string)
-	for k, v := range m.metadata {
-		channelMetadata[k] = v
-	}
+	maps.Copy(channelMetadata, m.metadata)
 	channelMetadata["metric_name"] = metricName
 
 	// Create channel in unified writer

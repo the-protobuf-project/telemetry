@@ -10,6 +10,7 @@ type OpenTelemetryOptions struct {
 	Metrics MetricsTelemetryOptions `json:"metrics"` // Metrics telemetry options
 	Tracing TracingTelemetryOptions `json:"tracing"` // Tracing telemetry options
 	OTLP    OTLPOptions             `json:"otlp"`    // OTLP exporter options
+	Export  ExportOptions           `json:"export"`  // export queues: size, batching, drop or block when full
 }
 
 // LoggingTelemetryOptions defines the configuration for OpenTelemetry logging
@@ -34,6 +35,9 @@ type TracingTelemetryOptions struct {
 	// Exporter, when set, also receives every span, synchronously: the
 	// SpanRecorder a test reads. Not configuration, so never read from a file.
 	Exporter sdktrace.SpanExporter `json:"-"`
+	// Local keeps a real tracer provider even with nothing exporting, so
+	// spans have ids — for MCAP recording. Set by Build when MCAP is on.
+	Local bool `json:"-"`
 }
 
 // OTLPOptions defines the settings for OTLP exporter

@@ -4,6 +4,8 @@ import (
 	"context"
 	"crypto/tls"
 	"fmt"
+	"log/slog"
+	"maps"
 	"net/http"
 	"strings"
 	"time"
@@ -23,7 +25,7 @@ import (
 	sdkmetric "go.opentelemetry.io/otel/sdk/metric"
 	"go.opentelemetry.io/otel/sdk/resource"
 	sdktrace "go.opentelemetry.io/otel/sdk/trace"
-	semconv "go.opentelemetry.io/otel/semconv/v1.26.0"
+	semconv "go.opentelemetry.io/otel/semconv/v1.43.0"
 	"google.golang.org/grpc/credentials"
 )
 
@@ -47,23 +49,30 @@ type Telemetry struct {
 	// promHandler serves the metrics to Prometheus; nil when that exporter is off.
 	promHandler http.Handler
 
+	// report says what telemetry could not do; logs and spans count what
+	// happened to every record.
+	report      *reporter
+	logs, spans counters
+
 	// Shutdown function
 	shutdownFuncs []func(context.Context) error
 }
-
-// noopErrorHandler silently discards OpenTelemetry internal errors
-// (e.g. exporter connection refused) to avoid polluting application output.
-type noopErrorHandler struct{}
-
-func (n noopErrorHandler) Handle(_ error) {}
 
 // New creates a new Telemetry instance with OpenTelemetry SDK configured
 // New creates a Telemetry instance from the provided service and OpenTelemetry options.
 // It initializes the enabled tracing, metrics, and logging components and returns an
 // error if resource creation or component initialization fails.
 func New(ctx context.Context, serviceOpts options.ServiceOptions, telemetryOpts options.OpenTelemetryOptions) (*Telemetry, error) {
-	// Suppress noisy OTel exporter errors (e.g. connection refused)
-	otel.SetErrorHandler(noopErrorHandler{})
+	t := &Telemetry{
+		serviceName:   serviceOpts.Name,
+		shutdownFuncs: make([]func(context.Context) error, 0),
+		report:        newReporter(),
+	}
+
+	// Export errors are reported, at a bounded rate (see reporter), rather
+	// than discarded: a collector that refuses or drops what it is sent is
+	// the first thing to know when telemetry goes missing.
+	otel.SetErrorHandler(t.report)
 
 	// Read and write W3C trace context and baggage on every instrumented
 	// boundary. OTel's default propagator is a no-op: without this, a server
@@ -74,11 +83,6 @@ func New(ctx context.Context, serviceOpts options.ServiceOptions, telemetryOpts 
 	otel.SetTextMapPropagator(propagation.NewCompositeTextMapPropagator(
 		propagation.TraceContext{}, propagation.Baggage{},
 	))
-
-	t := &Telemetry{
-		serviceName:   serviceOpts.Name,
-		shutdownFuncs: make([]func(context.Context) error, 0),
-	}
 
 	// Create resource with service information
 	res, err := t.createResource(serviceOpts)
@@ -151,9 +155,7 @@ func resolveOTLPConfig(otlp *options.OTLPOptions) (endpoint string, headers map[
 	headers = make(map[string]string)
 
 	// Copy existing headers
-	for k, v := range otlp.Headers {
-		headers[k] = v
-	}
+	maps.Copy(headers, otlp.Headers)
 
 	// Add auth token as Authorization header if provided
 	if otlp.AuthToken != "" {
@@ -193,46 +195,10 @@ func resolveOTLPConfig(otlp *options.OTLPOptions) (endpoint string, headers map[
 
 // initTracing initializes the OpenTelemetry tracing pipeline
 func (t *Telemetry) initTracing(ctx context.Context, opts options.OpenTelemetryOptions) error {
-	var exporter sdktrace.SpanExporter
-	var err error
-
-	if opts.OTLP.Enabled {
-		endpoint, headers, secure := resolveOTLPConfig(&opts.OTLP)
-		if opts.OTLP.UseHTTP {
-			// Use HTTP exporter
-			httpOpts := []otlptracehttp.Option{
-				otlptracehttp.WithEndpoint(endpoint),
-			}
-			if !secure {
-				httpOpts = append(httpOpts, otlptracehttp.WithInsecure())
-			}
-			if len(headers) > 0 {
-				httpOpts = append(httpOpts, otlptracehttp.WithHeaders(headers))
-			}
-			exporter, err = otlptracehttp.New(ctx, httpOpts...)
-		} else {
-			// Use gRPC exporter
-			grpcOpts := []otlptracegrpc.Option{
-				otlptracegrpc.WithEndpoint(endpoint),
-			}
-			if secure {
-				grpcOpts = append(grpcOpts, otlptracegrpc.WithTLSCredentials(credentials.NewTLS(&tls.Config{})))
-			} else {
-				grpcOpts = append(grpcOpts, otlptracegrpc.WithInsecure())
-			}
-			if len(headers) > 0 {
-				grpcOpts = append(grpcOpts, otlptracegrpc.WithHeaders(headers))
-			}
-			exporter, err = otlptracegrpc.New(ctx, grpcOpts...)
-		}
-	} else if opts.Tracing.Exporter == nil {
+	if !opts.OTLP.Enabled && opts.Tracing.Exporter == nil && !opts.Tracing.Local {
 		// No OTLP exporter - use no-op tracer to avoid nil panics
 		t.tracer = NewTracer(otel.GetTracerProvider().Tracer(t.serviceName))
 		return nil
-	}
-
-	if err != nil {
-		return fmt.Errorf("failed to create trace exporter: %w", err)
 	}
 
 	// Create tracer provider
@@ -240,8 +206,17 @@ func (t *Telemetry) initTracing(ctx context.Context, opts options.OpenTelemetryO
 		sdktrace.WithResource(t.resource),
 		sdktrace.WithSampler(sdktrace.AlwaysSample()),
 	}
-	if exporter != nil {
-		providerOpts = append(providerOpts, sdktrace.WithBatcher(exporter))
+	if opts.OTLP.Enabled {
+		cfg := opts.Export.Resolve(options.SpanEnvPrefix, 5*time.Second)
+		shards := make([]*spanProcessor, cfg.Exporters)
+		for i := range shards {
+			exporter, err := newOTLPSpanExporter(ctx, &opts.OTLP)
+			if err != nil {
+				return fmt.Errorf("failed to create trace exporter: %w", err)
+			}
+			shards[i] = newSpanProcessor(exporter, cfg, t.report, &t.spans)
+		}
+		providerOpts = append(providerOpts, sdktrace.WithSpanProcessor(shardSpans(shards)))
 	}
 	if opts.Tracing.Exporter != nil {
 		providerOpts = append(providerOpts, sdktrace.WithSyncer(opts.Tracing.Exporter))
@@ -258,6 +233,36 @@ func (t *Telemetry) initTracing(ctx context.Context, opts options.OpenTelemetryO
 	t.tracer = NewTracer(t.tracerProvider.Tracer(t.serviceName))
 
 	return nil
+}
+
+// newOTLPSpanExporter is the OTLP span exporter otlp describes, over HTTP or
+// gRPC.
+func newOTLPSpanExporter(ctx context.Context, otlp *options.OTLPOptions) (sdktrace.SpanExporter, error) {
+	endpoint, headers, secure := resolveOTLPConfig(otlp)
+	if otlp.UseHTTP {
+		httpOpts := []otlptracehttp.Option{
+			otlptracehttp.WithEndpoint(endpoint),
+		}
+		if !secure {
+			httpOpts = append(httpOpts, otlptracehttp.WithInsecure())
+		}
+		if len(headers) > 0 {
+			httpOpts = append(httpOpts, otlptracehttp.WithHeaders(headers))
+		}
+		return otlptracehttp.New(ctx, httpOpts...)
+	}
+	grpcOpts := []otlptracegrpc.Option{
+		otlptracegrpc.WithEndpoint(endpoint),
+	}
+	if secure {
+		grpcOpts = append(grpcOpts, otlptracegrpc.WithTLSCredentials(credentials.NewTLS(&tls.Config{})))
+	} else {
+		grpcOpts = append(grpcOpts, otlptracegrpc.WithInsecure())
+	}
+	if len(headers) > 0 {
+		grpcOpts = append(grpcOpts, otlptracegrpc.WithHeaders(headers))
+	}
+	return otlptracegrpc.New(ctx, grpcOpts...)
 }
 
 // initMetrics initializes the OpenTelemetry metrics pipeline: a periodic
@@ -343,40 +348,21 @@ func (t *Telemetry) initLogging(ctx context.Context, opts options.OpenTelemetryO
 	// Only add OTLP exporter if enabled (for Loki/remote logging)
 	// Console output is handled by the charmbracelet logger
 	if opts.OTLP.Enabled {
-		endpoint, headers, secure := resolveOTLPConfig(&opts.OTLP)
-		var otlpExporter sdklog.Exporter
-		var err error
-		if opts.OTLP.UseHTTP {
-			// Use HTTP exporter
-			httpOpts := []otlploghttp.Option{
-				otlploghttp.WithEndpoint(endpoint),
+		cfg := opts.Export.Resolve(options.LogEnvPrefix, time.Second)
+		shards := make([]*logProcessor, cfg.Exporters)
+		for i := range shards {
+			exporter, err := newOTLPLogExporter(ctx, &opts.OTLP)
+			if err != nil {
+				return fmt.Errorf("failed to create OTLP log exporter: %w", err)
 			}
-			if !secure {
-				httpOpts = append(httpOpts, otlploghttp.WithInsecure())
-			}
-			if len(headers) > 0 {
-				httpOpts = append(httpOpts, otlploghttp.WithHeaders(headers))
-			}
-			otlpExporter, err = otlploghttp.New(ctx, httpOpts...)
-		} else {
-			// Use gRPC exporter
-			grpcOpts := []otlploggrpc.Option{
-				otlploggrpc.WithEndpoint(endpoint),
-			}
-			if secure {
-				grpcOpts = append(grpcOpts, otlploggrpc.WithTLSCredentials(credentials.NewTLS(&tls.Config{})))
-			} else {
-				grpcOpts = append(grpcOpts, otlploggrpc.WithInsecure())
-			}
-			if len(headers) > 0 {
-				grpcOpts = append(grpcOpts, otlploggrpc.WithHeaders(headers))
-			}
-			otlpExporter, err = otlploggrpc.New(ctx, grpcOpts...)
+			shards[i] = newLogProcessor(exporter, cfg, t.report, &t.logs)
 		}
-		if err != nil {
-			return fmt.Errorf("failed to create OTLP log exporter: %w", err)
-		}
-		processors = append(processors, sdklog.NewBatchProcessor(otlpExporter))
+		processors = append(processors, shardLogs(shards))
+	}
+	if len(processors) == 0 {
+		// Nothing exports log records: leave the logger nil so the program
+		// does not build records no one reads.
+		return nil
 	}
 
 	// Create logger provider with all processors
@@ -400,7 +386,48 @@ func (t *Telemetry) initLogging(ctx context.Context, opts options.OpenTelemetryO
 	return nil
 }
 
-// GetLogger returns the underlying OpenTelemetry logger
+// Stats counts what happened to the log records and spans sent for export.
+func (t *Telemetry) Stats() (logs, spans SignalStats, errors int64, lastError string) {
+	errors, lastError = t.report.Errors()
+	return t.logs.stats(), t.spans.stats(), errors, lastError
+}
+
+// SetReportOutput sends the reports of failed exports and dropped records
+// to h, the program's console log.
+func (t *Telemetry) SetReportOutput(h slog.Handler) { t.report.SetOutput(h) }
+
+// newOTLPLogExporter is the OTLP log exporter otlp describes, over HTTP or
+// gRPC.
+func newOTLPLogExporter(ctx context.Context, otlp *options.OTLPOptions) (sdklog.Exporter, error) {
+	endpoint, headers, secure := resolveOTLPConfig(otlp)
+	if otlp.UseHTTP {
+		httpOpts := []otlploghttp.Option{
+			otlploghttp.WithEndpoint(endpoint),
+		}
+		if !secure {
+			httpOpts = append(httpOpts, otlploghttp.WithInsecure())
+		}
+		if len(headers) > 0 {
+			httpOpts = append(httpOpts, otlploghttp.WithHeaders(headers))
+		}
+		return otlploghttp.New(ctx, httpOpts...)
+	}
+	grpcOpts := []otlploggrpc.Option{
+		otlploggrpc.WithEndpoint(endpoint),
+	}
+	if secure {
+		grpcOpts = append(grpcOpts, otlploggrpc.WithTLSCredentials(credentials.NewTLS(&tls.Config{})))
+	} else {
+		grpcOpts = append(grpcOpts, otlploggrpc.WithInsecure())
+	}
+	if len(headers) > 0 {
+		grpcOpts = append(grpcOpts, otlploggrpc.WithHeaders(headers))
+	}
+	return otlploggrpc.New(ctx, grpcOpts...)
+}
+
+// GetLogger returns the underlying OpenTelemetry logger, or nil when no log
+// record is exported anywhere.
 func (t *Telemetry) GetLogger() log.Logger {
 	if t.loggerProvider != nil {
 		return t.loggerProvider.Logger(t.serviceName)

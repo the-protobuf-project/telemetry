@@ -2,10 +2,12 @@ package tracing
 
 import (
 	"context"
+	"maps"
 	"time"
 
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/attribute"
+	"go.opentelemetry.io/otel/baggage"
 	"go.opentelemetry.io/otel/propagation"
 	"go.opentelemetry.io/otel/trace"
 )
@@ -60,7 +62,7 @@ func kindOf(k trace.SpanKind) SpanKind {
 type spanConfig struct {
 	kind  SpanKind
 	start time.Time
-	attrs map[string]interface{}
+	attrs map[string]any
 	links []context.Context
 }
 
@@ -78,14 +80,12 @@ func WithStartTime(t time.Time) SpanOption {
 }
 
 // WithSpanAttributes sets attributes the span starts with.
-func WithSpanAttributes(attrs map[string]interface{}) SpanOption {
+func WithSpanAttributes(attrs map[string]any) SpanOption {
 	return func(c *spanConfig) {
 		if c.attrs == nil {
-			c.attrs = make(map[string]interface{}, len(attrs))
+			c.attrs = make(map[string]any, len(attrs))
 		}
-		for k, v := range attrs {
-			c.attrs[k] = v
-		}
+		maps.Copy(c.attrs, attrs)
 	}
 }
 
@@ -117,9 +117,7 @@ func (t *Tracing) StartSpan(ctx context.Context, spanName string, opts ...SpanOp
 	for k, v := range cfg.attrs {
 		attributes = append(attributes, convertToAttribute(k, v))
 	}
-	for k, v := range t.labels {
-		attributes = append(attributes, attribute.String(k, v))
-	}
+	attributes = append(attributes, t.labels...)
 	if len(attributes) > 0 {
 		start = append(start, trace.WithAttributes(attributes...))
 	}
@@ -130,7 +128,35 @@ func (t *Tracing) StartSpan(ctx context.Context, spanName string, opts ...SpanOp
 	}
 
 	newCtx, span := t.tracer.Start(ctx, spanName, start...)
-	return newCtx, &Span{span: span}
+	return newCtx, t.recorded(ctx, span, spanName)
+}
+
+// SetBaggage returns ctx carrying key=value as W3C baggage: it travels with
+// the trace to every service downstream (Inject writes it, Extract reads it),
+// whatever language each is written in. Use it for request-scoped values
+// every hop needs — a tenant, a user, a request class — not for large data:
+// it rides on every outgoing request.
+func (t *Tracing) SetBaggage(ctx context.Context, key, value string) (context.Context, error) {
+	m, err := baggage.NewMember(key, value)
+	if err != nil {
+		return ctx, err
+	}
+	b, err := baggage.FromContext(ctx).SetMember(m)
+	if err != nil {
+		return ctx, err
+	}
+	return baggage.ContextWithBaggage(ctx, b), nil
+}
+
+// Baggage returns the W3C baggage ctx carries: set here with SetBaggage, or
+// sent by a caller and read by Extract.
+func (t *Tracing) Baggage(ctx context.Context) map[string]string {
+	members := baggage.FromContext(ctx).Members()
+	out := make(map[string]string, len(members))
+	for _, m := range members {
+		out[m.Key()] = m.Value()
+	}
+	return out
 }
 
 // Inject writes the trace context in ctx into headers, W3C traceparent and

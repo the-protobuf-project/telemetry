@@ -194,7 +194,7 @@ func runMaleniaConversationPipeline() {
 	ctx := context.Background()
 	err = processMaleniaConversation(ctx, k, conversationReq)
 	if err != nil {
-		_ = k.Logger.Error("Conversation failed", map[string]interface{}{"error": err.Error()})
+		_ = k.Logger.Error("Conversation failed", map[string]any{"error": err.Error()})
 	} else {
 		k.Logger.Info("✅ Conversation completed successfully!", nil)
 	}
@@ -605,7 +605,7 @@ func runMaleniaWithError() {
 	})
 
 	if err != nil {
-		_ = k.Logger.Error("❌ Conversation failed with error (automatically recorded in trace)", map[string]interface{}{"error": err.Error()})
+		_ = k.Logger.Error("❌ Conversation failed with error (automatically recorded in trace)", map[string]any{"error": err.Error()})
 	}
 
 	time.Sleep(2 * time.Second)

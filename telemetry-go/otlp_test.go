@@ -18,8 +18,8 @@ func TestWithOTLPSecure(t *testing.T) {
 		{"telemetry", 6009, nil, false},
 		{"otel.example.com", 443, nil, true},
 		{"otel.example.com", 4318, nil, true},
-		{"otel-collector", 4317, ptr(true), true},
-		{"otel.example.com", 443, ptr(false), false},
+		{"otel-collector", 4317, new(true), true},
+		{"otel.example.com", 443, new(false), false},
 	} {
 		b := New().WithOTLP(c.host, c.port)
 		if c.secure != nil {
@@ -31,4 +31,5 @@ func TestWithOTLPSecure(t *testing.T) {
 	}
 }
 
-func ptr[T any](v T) *T { return &v }
+//go:fix inline
+func ptr[T any](v T) *T { return new(v) }

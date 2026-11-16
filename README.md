@@ -27,9 +27,12 @@
 - [Configuration — `telemetry.toml`](#configuration--telemetrytoml)
 - [Environment variables](#environment-variables)
 - [Telemetry signals](#telemetry-signals)
+- [Tracing across languages](#tracing-across-languages)
+- [Writing at high volume](#writing-at-high-volume)
 - [Observability stack](#observability-stack)
 - [Repository layout](#repository-layout)
 - [Development](#development)
+- [Releases](#releases)
 - [Use cases](#use-cases)
 - [Contributing](#contributing)
 - [License](#license)
@@ -289,6 +292,133 @@ export TELEMETRY_LOGGING_MODULES_VISION_LEVEL=3
 | Profiling   | Continuous CPU/memory profiling delivered to Pyroscope. |
 | MCAP        | Unified recording of signals to an MCAP file for Foxglove Studio. |
 
+## Tracing across languages
+
+A trace crosses a service boundary in three headers defined by the
+[W3C Trace Context](https://www.w3.org/TR/trace-context/) and
+[Baggage](https://www.w3.org/TR/baggage/) standards:
+
+```text
+traceparent: 00-4bf92f3577b34da6a3ce929d0e0e4736-00f067aa0ba902b7-01
+             │  └── trace id (shared by every span) └── parent span id └ sampled
+tracestate:  vendor-specific data, passed through untouched
+baggage:     key=value pairs that travel with the request (tenant=acme)
+```
+
+Every Telemetry SDK installs this propagator when it is built. The **caller
+injects** its span's context into the outgoing request's headers; the
+**callee extracts** it and starts its span under it. Both spans then share
+one trace id, and Tempo shows the request as one trace across both services,
+whatever language each is written in.
+
+Say service A (`orders`, Go) calls service B (`inventory`, Rust) over HTTP:
+
+```go
+// Service A — Go: start a client span and put its context on the request.
+ctx, span := tel.Tracing.StartSpan(ctx, "inventory.reserve",
+    telemetry.WithSpanKind(telemetry.SpanKindClient))
+defer span.End()
+
+headers := map[string]string{}
+tel.Tracing.Inject(ctx, headers) // writes traceparent (+ tracestate, baggage)
+
+req, _ := http.NewRequestWithContext(ctx, "POST", inventoryURL, body)
+for k, v := range headers {
+    req.Header.Set(k, v)
+}
+```
+
+```rust
+// Service B — Rust: continue the caller's trace from the request headers.
+use telemetry::tracing::SpanKind;
+
+let headers: HashMap<String, String> = request_headers_lowercased(&req);
+let tracing = telemetry.tracing.as_ref().unwrap();
+
+let parent = tracing.extract(&headers); // the Go span, as a remote parent
+let mut span = tracing.start_span_with("inventory.reserve", SpanKind::Server, Some(&parent));
+span.set_attribute("order.id", order_id);
+
+// Calling a third service? Hand the trace on the same way.
+let mut out = HashMap::new();
+tracing.inject(&span, &mut out);
+```
+
+The reverse direction is the same calls on the other side:
+`tracing.inject` in Rust and `tel.Tracing.Extract(ctx, headers)` followed by
+`StartSpan(ctx, ..., WithSpanKind(SpanKindServer))` in Go. Over gRPC the
+headers are the request metadata; over a message broker they are the message
+headers (`SpanKindProducer` / `SpanKindConsumer`).
+
+Things that break the chain:
+
+- **The callee does not extract.** It starts a new trace, and Tempo shows two
+  unrelated traces. Always start the server span from the extracted context.
+- **Header names change case.** HTTP header names are case-insensitive, and
+  the propagator expects lowercase `traceparent`. Lowercase keys when copying
+  headers into a map.
+- **A proxy strips unknown headers.** Allow `traceparent`, `tracestate` and
+  `baggage` through gateways and load balancers.
+
+Try it locally. A Go service starts a trace, and a Rust service continues it:
+
+```bash
+bench/crosslang-demo.sh
+# go   (orders-go)    trace 7cd054b6…  span a8fb30b7…
+# rust (inventory-rs) trace 7cd054b6…  parent a8fb30b7…
+# OK: one trace across Go and Rust
+```
+
+CI runs the same check on every change, so a regression in either SDK's
+propagation fails the build. With the stack running
+(`telemetry-core`, `docker compose up -d`), set
+`TELEMETRY_DEMO_OTLP=localhost:4317` to see the single trace in Grafana Tempo.
+
+## Writing at high volume
+
+Logs and spans are exported asynchronously: each call puts the record in a
+bounded queue, and a background exporter sends it to the collector in
+batches. When a program writes faster than the collector accepts, the queue
+fills, and something has to give. The Go SDK lets you choose what:
+
+```go
+tel, err := telemetry.New().
+    WithService("ingest", "1.0.0").
+    WithExport(telemetry.ExportOptions{
+        Lossless:  true,  // wait for room instead of dropping (default: drop)
+        QueueSize: 65536, // records waiting per signal (default 2048)
+        BatchSize: 8192,  // records per export request (default 512)
+    }).
+    Build()
+```
+
+Either way nothing is lost silently. Every drop is counted, warned about while
+it happens, and returned by `Close`:
+
+```text
+telemetry: 935442 of 1000000 log records dropped (export queue full);
+use WithExport(ExportOptions{Lossless: true}) or a larger QueueSize to keep them
+```
+
+`tel.Stats()` gives the counts at any time (emitted, exported, dropped,
+failed per signal). The same settings come from `[telemetry.export]` in
+`telemetry.toml`, `TELEMETRY_TELEMETRY__EXPORT__LOSSLESS=true`, or the
+standard `OTEL_BSP_*` / `OTEL_BLRP_*` variables.
+
+To find where time goes when a run falls short, `telemetry-loadgen` writes a
+million records through the SDK and profiles the run:
+
+```bash
+cd telemetry-go
+go run ./cmd/telemetry-loadgen -n 1000000 -lossless \
+    -cpuprofile cpu.out -memprofile mem.out -mutexprofile mutex.out -trace trace.out
+go tool pprof -http=: cpu.out
+```
+
+It reports emitted vs. delivered per signal, against an in-process collector
+or a real one (`-endpoint host:4317`). Results for every SDK are in
+[BENCHMARKS.md](BENCHMARKS.md).
+
 ## Observability stack
 
 Telemetry ships a complete, pre-configured stack in
@@ -345,6 +475,31 @@ cd telemetry-cpp && bazel build //...
 Continuous integration builds and tests all four SDKs and validates the
 observability stack. See [`.github/workflows`](.github/workflows) for the CI and
 release pipelines.
+
+## Releases
+
+One tag releases every SDK at one version:
+
+```bash
+git tag v1.3.0
+git push origin v1.3.0
+```
+
+| SDK    | Published as | Install |
+| ------ | ------------ | ------- |
+| Go     | tag `telemetry-go/v1.3.0`, pushed by the workflow | `go get github.com/the-protobuf-project/telemetry/telemetry-go@v1.3.0` |
+| Rust   | crates.io | `cargo add telemetry@1.3.0` |
+| Python | PyPI | `pip install telemetry-py==1.3.0` |
+| C++    | GitHub release asset | `telemetry-cpp-1.3.0.tar.gz` |
+
+The Go module lives in a subdirectory, so Go resolves its versions from tags
+prefixed with that directory (`telemetry-go/v1.3.0`), not from the repository's
+`v1.3.0`. The release workflow creates that tag on the same commit and asks
+the Go proxy for it, so `go get` and pkg.go.dev see the release at once.
+The workflow stamps the version into `Cargo.toml`, `pyproject.toml` and the C++
+build files from the tag ([`bench/set-version.sh`](bench/set-version.sh)),
+so the manifests cannot disagree with the release. Publishing to crates.io and
+PyPI needs the `CARGO_REGISTRY_TOKEN` and `PYPI_API_TOKEN` repository secrets.
 
 ## Use cases
 

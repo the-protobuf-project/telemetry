@@ -3,8 +3,10 @@ package metrics
 import (
 	"context"
 	"fmt"
+	"os"
 	"reflect"
 	"strings"
+	"sync"
 
 	"github.com/the-protobuf-project/telemetry/telemetry-go/internal/foxglove"
 	"github.com/the-protobuf-project/telemetry/telemetry-go/internal/telemetry"
@@ -24,35 +26,47 @@ type Metrics struct {
 	otelMetrics *telemetry.Metrics
 	mcapWriter  *MetricMcapWriter
 	ctx         context.Context
-	registered  map[string]bool   // Track registered metrics
-	serviceName string            // Service name prefix for metrics
-	labels      map[string]string // Service labels to add as metric attributes
+	serviceName string                   // Service name prefix for metrics
+	labels      metric.MeasurementOption // Service labels, as one attribute set built once
+	plans       sync.Map                 // reflect.Type -> []fieldMetric
+	instruments sync.Map                 // kind + ":" + name -> instrument
 }
 
 // NewMetrics creates a Metrics instance configured with the service options and OpenTelemetry metrics.
 // When a unified MCAP writer is provided, it also configures MCAP metric output when initialization succeeds.
 func NewMetrics(serviceOpts options.ServiceOptions, unifiedWriter *foxglove.UnifiedMcapWriter, otelMetrics *telemetry.Metrics) *Metrics {
+	labels := make([]attribute.KeyValue, 0, len(serviceOpts.Labels))
+	for k, v := range serviceOpts.Labels {
+		labels = append(labels, attribute.String(k, v))
+	}
 	m := &Metrics{
 		otelMetrics: otelMetrics,
 		ctx:         context.Background(),
-		registered:  make(map[string]bool),
 		serviceName: serviceOpts.Name,
-		labels:      serviceOpts.Labels,
+		labels:      metric.WithAttributeSet(attribute.NewSet(labels...)),
 	}
 
 	// Initialize MCAP writer if unified writer is provided
 	if unifiedWriter != nil {
 		writer, err := NewMetricMcapWriter(serviceOpts, unifiedWriter)
 		if err != nil {
-			// Log error but continue - metrics will still work via OTEL
-			// The error will be visible in the logs
-			fmt.Printf("Warning: Failed to initialize MCAP metrics writer: %v\n", err)
+			// Metrics still work via OTel without the MCAP side-channel.
+			fmt.Fprintf(os.Stderr, "Warning: Failed to initialize MCAP metrics writer: %v\n", err)
 		} else {
 			m.mcapWriter = writer
 		}
 	}
 
 	return m
+}
+
+// fieldMetric is one tagged field of a struct type: where it is and what it
+// records, worked out once per type rather than on every Record.
+type fieldMetric struct {
+	index []int  // reflect.Value.FieldByIndex path, through nested structs
+	ptrs  []bool // whether each step but the last goes through a pointer
+	kind  string // counter, histogram or gauge
+	name  string // full metric name, service-prefixed
 }
 
 // Record records a metric value from a struct with tags
@@ -74,174 +88,182 @@ func (m *Metrics) Record(v any, attrs ...metric.AddOption) error {
 		return fmt.Errorf("Record requires a struct, got %T", v)
 	}
 
-	return m.extractAndRecordMetrics(rv, attrs...)
+	plan, err := m.plan(rv.Type())
+	if err != nil {
+		return err
+	}
+	opts := m.measurementOptions(attrs)
+	for _, f := range plan {
+		fv, ok := fieldAt(rv, f)
+		if !ok {
+			continue
+		}
+		val, err := toFloat(f.kind, fv)
+		if err != nil {
+			return err
+		}
+		if err := m.record(f.kind, f.name, val, opts); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
-// extractAndRecordMetrics extracts metrics from struct tags and records them
-func (m *Metrics) extractAndRecordMetrics(rv reflect.Value, attrs ...metric.AddOption) error {
-	rt := rv.Type()
+// measurementOptions is the caller's options plus the service labels, as
+// options every instrument accepts. An option that only applies to adding
+// (not recording) is kept for counters alone.
+func (m *Metrics) measurementOptions(attrs []metric.AddOption) []metric.AddOption {
+	return append(append(make([]metric.AddOption, 0, len(attrs)+1), attrs...), m.labels)
+}
 
-	for i := 0; i < rv.NumField(); i++ {
-		field := rt.Field(i)
-		fieldValue := rv.Field(i)
+func (m *Metrics) plan(t reflect.Type) ([]fieldMetric, error) {
+	if p, ok := m.plans.Load(t); ok {
+		return p.([]fieldMetric), nil
+	}
+	var plan []fieldMetric
+	if err := m.collect(t, nil, nil, &plan); err != nil {
+		return nil, err
+	}
+	m.plans.Store(t, plan)
+	return plan, nil
+}
 
+// collect walks t's fields, and those of nested structs, for metric tags.
+func (m *Metrics) collect(t reflect.Type, index []int, ptrs []bool, plan *[]fieldMetric) error {
+	for i := range t.NumField() {
+		field := t.Field(i)
 		if !field.IsExported() {
 			continue
 		}
-
-		// Check if field has telemetry tag for metric
-		tag := field.Tag.Get("telemetry")
-		if tag != "" {
-			// Parse tag format: "metric:type:name" or "metric:counter:requests attribute:session.id"
-			// Split by space and extract only items with "metric:" prefix
-			// Other prefixes (e.g., "attribute:", "trace:") are ignored by this function
-			for _, tagPart := range strings.Fields(tag) {
-				if metricDef, found := strings.CutPrefix(tagPart, "metric:"); found {
-					// Parse metric definition: "type:name"
-					parts := strings.Split(metricDef, ":")
-					if len(parts) >= 2 {
-						metricType := parts[0]
-						metricName := parts[1]
-
-						// Prefix metric name with service name
-						if m.serviceName != "" {
-							metricName = m.serviceName + "." + metricName
-						}
-						// Add service labels as attributes
-
-						allAttrs := make([]metric.AddOption, 0, len(attrs)+1)
-
-						allAttrs = append(allAttrs, attrs...)
-
-						// Convert labels to metric attributes
-						labelAttrs := make([]attribute.KeyValue, 0, len(m.labels))
-
-						for key, value := range m.labels {
-							labelAttrs = append(labelAttrs, attribute.String(key, value))
-						}
-
-						if len(labelAttrs) > 0 {
-							allAttrs = append(allAttrs, metric.WithAttributeSet(attribute.NewSet(labelAttrs...)))
-						}
-
-						// Record metric based on type
-						if err := m.recordMetric(metricType, metricName, fieldValue, allAttrs...); err != nil {
-							return err
-						}
-					}
-				}
+		idx := append(append([]int(nil), index...), i)
+		for part := range strings.FieldsSeq(field.Tag.Get("telemetry")) {
+			def, ok := strings.CutPrefix(part, "metric:")
+			if !ok {
+				continue
 			}
+			kind, name, ok := strings.Cut(def, ":")
+			if !ok {
+				continue
+			}
+			if name, _, _ = strings.Cut(name, ":"); name == "" {
+				continue
+			}
+			switch kind {
+			case "counter", "histogram", "gauge":
+			default:
+				return fmt.Errorf("unknown metric type: %s", kind)
+			}
+			if m.serviceName != "" {
+				name = m.serviceName + "." + name
+			}
+			*plan = append(*plan, fieldMetric{index: idx, ptrs: append([]bool(nil), ptrs...), kind: kind, name: name})
 		}
-
-		// Recursively process nested structs
-		if fieldValue.Kind() == reflect.Struct {
-			if err := m.extractAndRecordMetrics(fieldValue, attrs...); err != nil {
+		switch ft := field.Type; {
+		case ft.Kind() == reflect.Struct:
+			if err := m.collect(ft, idx, append(ptrs, false), plan); err != nil {
 				return err
 			}
-		} else if fieldValue.Kind() == reflect.Pointer && !fieldValue.IsNil() && fieldValue.Elem().Kind() == reflect.Struct {
-			if err := m.extractAndRecordMetrics(fieldValue.Elem(), attrs...); err != nil {
+		case ft.Kind() == reflect.Pointer && ft.Elem().Kind() == reflect.Struct:
+			if err := m.collect(ft.Elem(), idx, append(ptrs, true), plan); err != nil {
 				return err
 			}
 		}
 	}
-
 	return nil
 }
 
-// recordMetric records a single metric value
-func (m *Metrics) recordMetric(metricType, name string, value reflect.Value, attrs ...metric.AddOption) error {
-	switch metricType {
+// fieldAt follows f's path through rv; false when a pointer on it is nil.
+func fieldAt(rv reflect.Value, f fieldMetric) (reflect.Value, bool) {
+	for i, idx := range f.index {
+		rv = rv.Field(idx)
+		if i < len(f.ptrs) && f.ptrs[i] {
+			if rv.IsNil() {
+				return reflect.Value{}, false
+			}
+			rv = rv.Elem()
+		}
+	}
+	return rv, true
+}
+
+func toFloat(kind string, v reflect.Value) (float64, error) {
+	switch v.Kind() {
+	case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64:
+		return float64(v.Int()), nil
+	case reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64:
+		return float64(v.Uint()), nil
+	case reflect.Float32, reflect.Float64:
+		return v.Float(), nil
+	default:
+		return 0, fmt.Errorf("%s requires numeric value, got %v", kind, v.Kind())
+	}
+}
+
+// record records one value through the instrument kind names, creating the
+// instrument the first time it is used.
+func (m *Metrics) record(kind, name string, val float64, opts []metric.AddOption) error {
+	inst, err := m.instrument(kind, name)
+	if err != nil {
+		return err
+	}
+	switch i := inst.(type) {
+	case metric.Float64Counter:
+		i.Add(m.ctx, val, opts...)
+		if m.mcapWriter != nil {
+			return m.mcapWriter.WriteCounter(name, val)
+		}
+	case metric.Float64Histogram:
+		i.Record(m.ctx, val, recordOptions(opts)...)
+		if m.mcapWriter != nil {
+			return m.mcapWriter.WriteHistogram(name, val)
+		}
+	case metric.Float64Gauge:
+		i.Record(m.ctx, val, recordOptions(opts)...)
+		if m.mcapWriter != nil {
+			return m.mcapWriter.WriteGauge(name, val)
+		}
+	}
+	return nil
+}
+
+// recordOptions keeps the options that also apply to recording: attributes
+// given with metric.WithAttributes or WithAttributeSet, and the labels.
+func recordOptions(opts []metric.AddOption) []metric.RecordOption {
+	out := make([]metric.RecordOption, 0, len(opts))
+	for _, o := range opts {
+		if r, ok := o.(metric.RecordOption); ok {
+			out = append(out, r)
+		}
+	}
+	return out
+}
+
+func (m *Metrics) instrument(kind, name string) (any, error) {
+	key := kind + ":" + name
+	if inst, ok := m.instruments.Load(key); ok {
+		return inst, nil
+	}
+	var (
+		inst any
+		err  error
+	)
+	switch kind {
 	case "counter":
-		return m.recordCounter(name, value, attrs...)
+		inst, err = m.otelMetrics.FloatCounter(name)
 	case "histogram":
-		return m.recordHistogram(name, value, attrs...)
+		inst, err = m.otelMetrics.FloatHistogram(name)
 	case "gauge":
-		return m.recordGauge(name, value, attrs...)
+		// A synchronous gauge: the value recorded is the value reported. (An
+		// UpDownCounter here summed every value recorded into the next.)
+		inst, err = m.otelMetrics.Meter().Float64Gauge(name)
 	default:
-		return fmt.Errorf("unknown metric type: %s", metricType)
+		return nil, fmt.Errorf("unknown metric type: %s", kind)
 	}
-}
-
-// recordCounter records a counter metric
-func (m *Metrics) recordCounter(name string, value reflect.Value, attrs ...metric.AddOption) error {
-	var val float64
-	switch value.Kind() {
-	case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64:
-		val = float64(value.Int())
-	case reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64:
-		val = float64(value.Uint())
-	case reflect.Float32, reflect.Float64:
-		val = value.Float()
-	default:
-		return fmt.Errorf("counter requires numeric value, got %v", value.Kind())
-	}
-
-	counter, err := m.otelMetrics.FloatCounter(name)
 	if err != nil {
-		return err
+		return nil, err
 	}
-	counter.Add(m.ctx, val, attrs...)
-
-	// Write to MCAP
-	if m.mcapWriter != nil {
-		return m.mcapWriter.WriteCounter(name, val)
-	}
-	return nil
-}
-
-// recordHistogram records a histogram metric
-func (m *Metrics) recordHistogram(name string, value reflect.Value, attrs ...metric.AddOption) error {
-	var val float64
-	switch value.Kind() {
-	case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64:
-		val = float64(value.Int())
-	case reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64:
-		val = float64(value.Uint())
-	case reflect.Float32, reflect.Float64:
-		val = value.Float()
-	default:
-		return fmt.Errorf("histogram requires numeric value, got %v", value.Kind())
-	}
-
-	hist, err := m.otelMetrics.FloatHistogram(name)
-	if err != nil {
-		return err
-	}
-	hist.Record(m.ctx, val)
-
-	// Write to MCAP
-	if m.mcapWriter != nil {
-		return m.mcapWriter.WriteHistogram(name, val)
-	}
-	return nil
-}
-
-// recordGauge records a gauge metric (using UpDownCounter for simplicity)
-func (m *Metrics) recordGauge(name string, value reflect.Value, attrs ...metric.AddOption) error {
-	var val float64
-	switch value.Kind() {
-	case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64:
-		val = float64(value.Int())
-	case reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64:
-		val = float64(value.Uint())
-	case reflect.Float32, reflect.Float64:
-		val = value.Float()
-	default:
-		return fmt.Errorf("gauge requires numeric value, got %v", value.Kind())
-	}
-
-	// Use UpDownCounter as a gauge (can go up and down)
-	gauge, err := m.otelMetrics.FloatUpDownCounter(name)
-	if err != nil {
-		return err
-	}
-	gauge.Add(m.ctx, val, attrs...)
-
-	// Write to MCAP
-	if m.mcapWriter != nil {
-		return m.mcapWriter.WriteGauge(name, val)
-	}
-	return nil
+	actual, _ := m.instruments.LoadOrStore(key, inst)
+	return actual, nil
 }
 
 // WriteMcap writes a raw metric value to this instance's MCAP writer (a

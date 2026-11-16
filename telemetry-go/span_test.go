@@ -3,6 +3,7 @@ package telemetry_test
 import (
 	"context"
 	"errors"
+	"runtime"
 	"testing"
 	"time"
 
@@ -32,7 +33,7 @@ func TestATraceCrossesHeadersIntoAChildSpan(t *testing.T) {
 
 	ctx, send := tel.Tracing.StartSpan(context.Background(), "streams.send",
 		telemetry.WithSpanKind(telemetry.SpanKindProducer),
-		telemetry.WithSpanAttributes(map[string]interface{}{"messaging.destination.name": "order.placed", "size": 12}))
+		telemetry.WithSpanAttributes(map[string]any{"messaging.destination.name": "order.placed", "size": 12}))
 	headers := map[string]string{}
 	tel.Tracing.Inject(ctx, headers)
 	send.SetOK()
@@ -122,4 +123,10 @@ func TestWithTracingOffStartSpanLeavesTheCallersSpanAlone(t *testing.T) {
 	if n := len(rec.Spans()); n != 1 {
 		t.Errorf("spans %d", n)
 	}
+}
+
+// runtimeFrame is the file and line of pc.
+func runtimeFrame(pc uintptr) (string, int) {
+	f, _ := runtime.CallersFrames([]uintptr{pc}).Next()
+	return f.File, f.Line
 }

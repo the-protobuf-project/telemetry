@@ -6,7 +6,8 @@ import (
 	"github.com/the-protobuf-project/protokit/schema"
 )
 
-func boolPtr(b bool) *bool { return &b }
+//go:fix inline
+func boolPtr(b bool) *bool { return new(b) }
 
 func TestInferLabel(t *testing.T) {
 	tests := []struct {
@@ -29,17 +30,17 @@ func TestInferLabel(t *testing.T) {
 		{"string resource_reference stays out", nil, schema.TypeString, true, false, false},
 
 		// Explicit override wins outright, both directions.
-		{"override true on bool: in, no warn", boolPtr(true), schema.TypeBool, false, true, false},
-		{"override true on enum: in, no warn", boolPtr(true), schema.TypeEnum, false, true, false},
-		{"override true on string: in, warn", boolPtr(true), schema.TypeString, false, true, true},
-		{"override true on numeric: in, warn", boolPtr(true), schema.TypeInt64, false, true, true},
-		{"override true on bytes: in, warn", boolPtr(true), schema.TypeBytes, false, true, true},
-		{"override true on message: in, warn", boolPtr(true), schema.TypeJSON, false, true, true},
-		{"override true on bool resource_reference: in, warn", boolPtr(true), schema.TypeBool, true, true, true},
-		{"override true on enum resource_reference: in, warn", boolPtr(true), schema.TypeEnum, true, true, true},
-		{"override false on bool: out", boolPtr(false), schema.TypeBool, false, false, false},
-		{"override false on enum: out", boolPtr(false), schema.TypeEnum, false, false, false},
-		{"override false on string: out", boolPtr(false), schema.TypeString, false, false, false},
+		{"override true on bool: in, no warn", new(true), schema.TypeBool, false, true, false},
+		{"override true on enum: in, no warn", new(true), schema.TypeEnum, false, true, false},
+		{"override true on string: in, warn", new(true), schema.TypeString, false, true, true},
+		{"override true on numeric: in, warn", new(true), schema.TypeInt64, false, true, true},
+		{"override true on bytes: in, warn", new(true), schema.TypeBytes, false, true, true},
+		{"override true on message: in, warn", new(true), schema.TypeJSON, false, true, true},
+		{"override true on bool resource_reference: in, warn", new(true), schema.TypeBool, true, true, true},
+		{"override true on enum resource_reference: in, warn", new(true), schema.TypeEnum, true, true, true},
+		{"override false on bool: out", new(false), schema.TypeBool, false, false, false},
+		{"override false on enum: out", new(false), schema.TypeEnum, false, false, false},
+		{"override false on string: out", new(false), schema.TypeString, false, false, false},
 	}
 
 	for _, tt := range tests {

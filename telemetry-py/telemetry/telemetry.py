@@ -20,6 +20,45 @@ from .options import (
 )
 
 
+def start_profiling(service_opts: ServiceOptions, opts) -> bool:
+    """Start the Pyroscope agent when profiling is enabled; True if started.
+
+    Tags match the Go and Rust SDKs (service, version, environment) so one
+    Grafana query covers every language.
+    """
+    if not opts.enabled:
+        return False
+    try:
+        import pyroscope
+    except ImportError as e:
+        raise RuntimeError(
+            "profiling is enabled but pyroscope-io is not installed: "
+            "pip install 'telemetry-py[profiling]'"
+        ) from e
+    environment = getattr(service_opts.environment, "value", service_opts.environment)
+    pyroscope.configure(
+        application_name=f"{service_opts.name}.{environment}",
+        server_address=opts.server_address,
+        basic_auth_username=opts.basic_auth_user,
+        basic_auth_password=opts.basic_auth_password,
+        tenant_id=opts.tenant_id,
+        tags={
+            "service": service_opts.name,
+            "version": service_opts.version,
+            "environment": str(environment),
+            **opts.tags,
+        },
+    )
+    return True
+
+
+def stop_profiling() -> None:
+    """Flush the last profile and stop the Pyroscope agent."""
+    import pyroscope
+
+    pyroscope.shutdown()
+
+
 class TelemetryBuilder:
     """Builder for creating Telemetry instances with fluent API.
 
@@ -127,6 +166,16 @@ class TelemetryBuilder:
         self._mcap_path = path
         return self
 
+    def with_profiling(
+        self, server_address: str = "http://localhost:4040"
+    ) -> "TelemetryBuilder":
+        """Push continuous CPU profiles to Pyroscope at server_address.
+
+        Needs the ``profiling`` extra: ``pip install telemetry-py[profiling]``.
+        """
+        self._profiling_address = server_address
+        return self
+
     def with_log_level(self, level: LogLevel) -> "TelemetryBuilder":
         """
         Set the log level for the telemetry service.
@@ -206,6 +255,10 @@ class TelemetryBuilder:
             telemetry_opts.foxglove.enabled = True
             telemetry_opts.foxglove.mcap_path = self._mcap_path
 
+        if getattr(self, "_profiling_address", None):
+            telemetry_opts.profiling.enabled = True
+            telemetry_opts.profiling.server_address = self._profiling_address
+
         return Telemetry(service_opts, telemetry_opts)
 
 
@@ -271,6 +324,9 @@ class Telemetry:
             mcap_writer=self.mcap_writer,
         )
 
+        # Continuous profiling (Pyroscope), when enabled
+        self._profiling = start_profiling(service_opts, telemetry_opts.profiling)
+
         # Initialize tracing
         self.tracing = TelemetryTracing(
             service_opts=service_opts,
@@ -307,6 +363,9 @@ class Telemetry:
     def close(self):
         """Close all Telemetry components and flush pending data"""
         # Close components in order
+        if self._profiling:
+            stop_profiling()
+            self._profiling = False
         self.tracing.close()
         self.metrics.close()
         self.logger.close()

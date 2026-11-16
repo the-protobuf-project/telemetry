@@ -3,9 +3,26 @@
 //! This module provides integration with OpenTelemetry for distributed tracing,
 //! supporting both tokio-rs/tracing instrumentation and manual span management.
 
+use std::borrow::Cow;
+use std::collections::HashMap;
+
 use anyhow::Result;
-use opentelemetry::KeyValue;
-use opentelemetry::trace::Status;
+use opentelemetry::propagation::TextMapCompositePropagator;
+use opentelemetry::baggage::BaggageExt;
+use opentelemetry::trace::{Span as _, SpanKind, Status, TraceContextExt, Tracer as _};
+use opentelemetry::{Context, ContextGuard, KeyValue};
+use opentelemetry_sdk::propagation::{BaggagePropagator, TraceContextPropagator};
+
+/// Installs the W3C TraceContext and Baggage propagator globally, the same
+/// one telemetry-go installs, so `traceparent`, `tracestate` and `baggage`
+/// headers carry a trace across services whatever language each is written
+/// in. Telemetry's builder calls it; it is safe to call more than once.
+pub fn install_propagator() {
+    opentelemetry::global::set_text_map_propagator(TextMapCompositePropagator::new(vec![
+        Box::new(TraceContextPropagator::new()),
+        Box::new(BaggagePropagator::new()),
+    ]));
+}
 
 /// Configures global `tracing` instrumentation with OpenTelemetry and console output.
 ///
@@ -136,6 +153,74 @@ impl TelemetryTracing {
         Span::new(self.tracer.as_ref(), name)
     }
 
+    /// Starts a span of `kind` as a child of `parent`: a context from
+    /// [`TelemetryTracing::extract`] continues a remote caller's trace, one
+    /// from [`Span::context`] nests under a local span, and `None` starts a
+    /// new trace.
+    ///
+    /// ```no_run
+    /// # use std::collections::HashMap;
+    /// # use telemetry::tracing::{TelemetryTracing, SpanKind};
+    /// # let tracing = TelemetryTracing::new(None);
+    /// # let headers: HashMap<String, String> = HashMap::new();
+    /// // Server side of a request from a Go service.
+    /// let parent = tracing.extract(&headers);
+    /// let span = tracing.start_span_with("orders.handle", SpanKind::Server, Some(&parent));
+    /// span.end();
+    /// ```
+    pub fn start_span_with(
+        &self,
+        name: impl Into<Cow<'static, str>>,
+        kind: SpanKind,
+        parent: Option<&Context>,
+    ) -> Span {
+        let parent = parent.cloned().unwrap_or_default();
+        let span = self
+            .tracer
+            .as_ref()
+            .map(|t| t.span_builder(name).with_kind(kind).start_with_context(t, &parent));
+        Span { span, parent }
+    }
+
+    /// Returns `cx` with `key=value` added to its W3C baggage: it travels with
+    /// the trace to every service downstream (inject writes it, extract reads
+    /// it), in any language. Start spans under the returned context.
+    pub fn set_baggage(&self, cx: &Context, key: impl Into<String>, value: impl Into<String>) -> Context {
+        // with_baggage replaces the whole set: carry the existing entries over.
+        let key = key.into();
+        let mut entries: Vec<KeyValue> = cx
+            .baggage()
+            .iter()
+            .filter(|(k, _)| k.as_str() != key)
+            .map(|(k, (v, _))| KeyValue::new(k.clone(), v.clone()))
+            .collect();
+        entries.push(KeyValue::new(key, value.into()));
+        cx.with_baggage(entries)
+    }
+
+    /// The W3C baggage `cx` carries.
+    pub fn baggage(&self, cx: &Context) -> HashMap<String, String> {
+        cx.baggage().iter().map(|(k, (v, _))| (k.to_string(), v.to_string())).collect()
+    }
+
+    /// Reads the trace context a caller sent in `headers` (`traceparent`,
+    /// `tracestate`, `baggage`). Without them it is an empty context, and a
+    /// span started under it begins a new trace.
+    pub fn extract(&self, headers: &HashMap<String, String>) -> Context {
+        opentelemetry::global::get_text_map_propagator(|p| p.extract(headers))
+    }
+
+    /// Writes `span`'s trace context into `headers`, for the service the
+    /// request or message goes to — in any language — to continue the trace.
+    /// Writes nothing when tracing is off.
+    pub fn inject(&self, span: &Span, headers: &mut HashMap<String, String>) {
+        if span.span.is_none() {
+            return;
+        }
+        let cx = span.context();
+        opentelemetry::global::get_text_map_propagator(|p| p.inject_context(&cx, headers));
+    }
+
     /// Checks if tracing is enabled.
     pub fn is_enabled(&self) -> bool {
         self.tracer.is_some()
@@ -147,6 +232,8 @@ impl TelemetryTracing {
 /// Represents a unit of work in distributed tracing.
 pub struct Span {
     span: Option<opentelemetry_sdk::trace::Span>,
+    // The context the span started under: its baggage goes on with the trace.
+    parent: Context,
 }
 
 impl Span {
@@ -155,12 +242,44 @@ impl Span {
         tracer: Option<&opentelemetry_sdk::trace::Tracer>,
         name: &'static str,
     ) -> Self {
-        let span = tracer.map(|t| {
-            use opentelemetry::trace::Tracer;
-            t.start(name)
-        });
+        let span = tracer.map(|t| t.start(name));
 
-        Self { span }
+        Self { span, parent: Context::new() }
+    }
+
+    /// A context carrying this span, to start child spans under it or to
+    /// inject into outgoing headers.
+    pub fn context(&self) -> Context {
+        match &self.span {
+            Some(span) => self.parent.with_remote_span_context(span.span_context().clone()),
+            None => self.parent.clone(),
+        }
+    }
+
+    /// Makes this span current until the guard is dropped. Log records emitted
+    /// meanwhile (`logger::info!` and friends) carry its trace and span id, so
+    /// a trace in Tempo finds the logs every service wrote under it —
+    /// distributed logging.
+    ///
+    /// ```no_run
+    /// # use telemetry::tracing::{TelemetryTracing, SpanKind};
+    /// # let tracing = TelemetryTracing::new(None);
+    /// let span = tracing.start_span_with("reserve", SpanKind::Server, None);
+    /// let _current = span.attach();
+    /// telemetry::logger::info!("reserved"); // correlated with the span
+    /// ```
+    pub fn attach(&self) -> ContextGuard {
+        self.context().attach()
+    }
+
+    /// The span's trace id as 32 hex digits, or `None` when tracing is off.
+    pub fn trace_id(&self) -> Option<String> {
+        self.span.as_ref().map(|s| s.span_context().trace_id().to_string())
+    }
+
+    /// The span's id as 16 hex digits, or `None` when tracing is off.
+    pub fn span_id(&self) -> Option<String> {
+        self.span.as_ref().map(|s| s.span_context().span_id().to_string())
     }
 
     /// Sets an attribute on the span.
@@ -171,7 +290,6 @@ impl Span {
     /// * `value` - Attribute value
     pub fn set_attribute(&mut self, key: &str, value: impl Into<opentelemetry::Value>) {
         if let Some(ref mut span) = self.span {
-            use opentelemetry::trace::Span;
             span.set_attribute(KeyValue::new(key.to_string(), value.into()));
         }
     }
@@ -183,7 +301,6 @@ impl Span {
     /// * `name` - Event name
     pub fn add_event(&mut self, name: &str) {
         if let Some(ref mut span) = self.span {
-            use opentelemetry::trace::Span;
             span.add_event(name.to_string(), vec![]);
         }
     }
@@ -195,7 +312,6 @@ impl Span {
     /// * `error` - Error to record
     pub fn record_error(&mut self, error: &dyn std::error::Error) {
         if let Some(ref mut span) = self.span {
-            use opentelemetry::trace::Span;
             span.record_error(error);
             span.set_status(Status::error(error.to_string()));
         }
@@ -204,7 +320,6 @@ impl Span {
     /// Ends the span with success status.
     pub fn end(mut self) {
         if let Some(mut span) = self.span.take() {
-            use opentelemetry::trace::Span;
             span.set_status(Status::Ok);
             span.end();
         }
@@ -214,8 +329,92 @@ impl Span {
 impl Drop for Span {
     fn drop(&mut self) {
         if let Some(mut span) = self.span.take() {
-            use opentelemetry::trace::Span;
             span.end();
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use opentelemetry_sdk::trace::SdkTracerProvider;
+    use opentelemetry::trace::TracerProvider as _;
+
+    fn tracing() -> TelemetryTracing {
+        install_propagator();
+        let provider = SdkTracerProvider::builder().build();
+        TelemetryTracing::new(Some(provider.tracer("test")))
+    }
+
+    // The header a telemetry-go service sends (W3C spec example ids).
+    const TRACEPARENT: &str = "00-4bf92f3577b34da6a3ce929d0e0e4736-00f067aa0ba902b7-01";
+
+    #[test]
+    fn a_span_under_extracted_headers_continues_the_callers_trace() {
+        let t = tracing();
+        let headers = HashMap::from([("traceparent".to_string(), TRACEPARENT.to_string())]);
+        let parent = t.extract(&headers);
+        let span = t.start_span_with("handle", SpanKind::Server, Some(&parent));
+        assert_eq!(span.trace_id().as_deref(), Some("4bf92f3577b34da6a3ce929d0e0e4736"));
+        assert_ne!(span.span_id().as_deref(), Some("00f067aa0ba902b7"));
+
+        let mut out = HashMap::new();
+        t.inject(&span, &mut out);
+        let sent = out.get("traceparent").expect("traceparent injected");
+        assert!(sent.starts_with("00-4bf92f3577b34da6a3ce929d0e0e4736-"), "{sent}");
+        assert!(sent.ends_with("-01"), "{sent}");
+        assert!(sent.contains(span.span_id().unwrap().as_str()), "the downstream parent is this span: {sent}");
+    }
+
+    #[test]
+    fn without_headers_a_new_trace_starts() {
+        let t = tracing();
+        let span = t.start_span_with("root", SpanKind::Internal, Some(&t.extract(&HashMap::new())));
+        assert_ne!(span.trace_id().as_deref(), Some("4bf92f3577b34da6a3ce929d0e0e4736"));
+        let child = t.start_span_with("child", SpanKind::Client, Some(&span.context()));
+        assert_eq!(child.trace_id(), span.trace_id());
+    }
+
+    #[test]
+    fn baggage_from_the_caller_goes_on_downstream() {
+        let t = tracing();
+        let headers = HashMap::from([
+            ("traceparent".to_string(), TRACEPARENT.to_string()),
+            ("baggage".to_string(), "tenant=acme".to_string()),
+        ]);
+        let parent = t.extract(&headers);
+        assert_eq!(t.baggage(&parent).get("tenant").map(String::as_str), Some("acme"));
+        let parent = t.set_baggage(&parent, "region", "eu");
+        let span = t.start_span_with("handle", SpanKind::Server, Some(&parent));
+        let mut out = HashMap::new();
+        t.inject(&span, &mut out);
+        let sent = out.get("baggage").expect("baggage injected");
+        assert!(sent.contains("tenant=acme") && sent.contains("region=eu"), "{sent}");
+    }
+
+    #[test]
+    fn an_attached_span_is_current_for_the_logs_written_under_it() {
+        let t = tracing();
+        let span = t.start_span_with("work", SpanKind::Internal, None);
+        {
+            let _current = span.attach();
+            let cx = Context::current();
+            assert_eq!(
+                Some(cx.span().span_context().trace_id().to_string()),
+                span.trace_id(),
+                "the log SDK reads the trace id from the current context"
+            );
+        }
+        assert!(!Context::current().span().span_context().is_valid());
+    }
+
+    #[test]
+    fn disabled_tracing_injects_nothing() {
+        let t = TelemetryTracing::new(None);
+        let span = t.start_span_with("x", SpanKind::Client, None);
+        let mut out = HashMap::new();
+        t.inject(&span, &mut out);
+        assert!(out.is_empty());
+        assert_eq!(span.trace_id(), None);
     }
 }

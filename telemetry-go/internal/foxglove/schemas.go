@@ -9,9 +9,10 @@ type SchemaRegistry struct {
 func NewSchemaRegistry() *SchemaRegistry {
 	return &SchemaRegistry{
 		schemas: map[string]string{
-			"foxglove.Log":           foxgloveLogSchema,
-			"mahcanirobotics.metric": shokkiMetricSchema,
-			"foxglove.Plot":          foxglovePlotSchema,
+			"foxglove.Log":               foxgloveLogSchema,
+			"mahcanirobotics.metric":     shokkiMetricSchema,
+			"foxglove.Plot":              foxglovePlotSchema,
+			"the-protobuf-project.trace": traceSchema,
 		},
 	}
 }
@@ -112,4 +113,23 @@ const foxglovePlotSchema = `{
     "y": {"type": "number", "description": "Y-axis value"}
   },
   "required": ["timestamp", "x", "y"]
+}`
+
+// traceSchema describes one ended span (internal/tracing.SpanData), the same
+// shape telemetry-py and telemetry-rs record, so Foxglove shows spans from
+// every SDK alike.
+const traceSchema = `{
+  "title": "the-protobuf-project.trace",
+  "type": "object",
+  "properties": {
+    "timestamp": {"type": "string", "format": "date-time"},
+    "span_name": {"type": "string"},
+    "trace_id": {"type": "string"},
+    "span_id": {"type": "string"},
+    "parent_id": {"type": "string"},
+    "attributes": {"type": "object"},
+    "status": {"type": "string"},
+    "duration_ns": {"type": "integer"},
+    "service_name": {"type": "string"}
+  }
 }`

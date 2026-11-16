@@ -3,6 +3,7 @@ package profiling
 import (
 	"context"
 	"fmt"
+	"maps"
 	"runtime"
 
 	"github.com/grafana/pyroscope-go"
@@ -44,9 +45,7 @@ func NewProfiler(serviceOpts options.ServiceOptions, opts options.ProfilingOptio
 	}
 
 	// Add custom tags if provided
-	for k, v := range opts.Tags {
-		tags[k] = v
-	}
+	maps.Copy(tags, opts.Tags)
 
 	// Configure Pyroscope
 	config := pyroscope.Config{

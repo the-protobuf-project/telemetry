@@ -18,10 +18,90 @@ concurrency:
   group: release-${{ github.ref }}
   cancel-in-progress: false
 
+# One tag releases every SDK at one version:
+#
+#   git tag v1.3.0 && git push origin v1.3.0
+#
+#   Go      telemetry-go/v1.3.0 is tagged and pushed, which is what makes
+#           `go get github.com/the-protobuf-project/telemetry/telemetry-go@v1.3.0`
+#           resolve (a module in a subdirectory is versioned by tags prefixed
+#           with its directory; a bare v1.3.0 tag versions nothing Go can see)
+#   Rust    crates published to crates.io at 1.3.0 (with CARGO_REGISTRY_TOKEN)
+#   Python  telemetry-py 1.3.0 published to PyPI (with PYPI_API_TOKEN)
+#   C++     headers + static library attached to the GitHub release
+#
+# Versions are stamped from the tag (bench/set-version.sh), so the manifests
+# can never disagree with the release.
 jobs:
+  version:
+    name: Resolve version
+    runs-on: blacksmith-4vcpu-ubuntu-2404
+    outputs:
+      tag: ${{ steps.v.outputs.tag }}
+      version: ${{ steps.v.outputs.version }}
+    steps:
+      - id: v
+        run: |
+          tag="${{ github.event.inputs.tag || github.ref_name }}"
+          version="${tag#v}"
+          if [[ ! "$version" =~ ^[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.-]+)?$ ]]; then
+            echo "::error::release tag must look like v1.2.3 or v1.2.3-rc.1, got '$tag'"
+            exit 1
+          fi
+          echo "tag=$tag" >> "$GITHUB_OUTPUT"
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+
+  release-go:
+    name: Tag Go module
+    runs-on: blacksmith-4vcpu-ubuntu-2404
+    needs: version
+    permissions:
+      contents: write
+    env:
+      GO_TAG: telemetry-go/v${{ needs.version.outputs.version }}
+      GO_MODULE: github.com/${{ github.repository }}/telemetry-go
+    steps:
+      - name: Check out code
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+          ref: ${{ needs.version.outputs.tag }}
+
+      - name: Set up Go
+        uses: actions/setup-go@v6
+        with:
+          go-version-file: telemetry-go/go.mod
+
+      - name: Test before tagging
+        working-directory: telemetry-go
+        run: go test -race ./...
+
+      - name: Tag telemetry-go/vX.Y.Z on the released commit
+        run: |
+          if git rev-parse -q --verify "refs/tags/$GO_TAG" >/dev/null; then
+            echo "$GO_TAG already exists"
+          else
+            git config user.name "github-actions[bot]"
+            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+            git tag -a "$GO_TAG" -m "telemetry-go ${{ needs.version.outputs.version }}" HEAD
+            git push origin "$GO_TAG"
+          fi
+
+      - name: Publish to the Go module proxy
+        # The proxy fetches a version the first time it is asked for it;
+        # asking now makes it (and pkg.go.dev) list the release immediately.
+        run: |
+          for i in 1 2 3 4 5; do
+            GOPROXY=https://proxy.golang.org GOFLAGS=-mod=mod \
+              go list -m "$GO_MODULE@v${{ needs.version.outputs.version }}" && exit 0
+            sleep 15
+          done
+          echo "::warning::proxy.golang.org has not picked up $GO_TAG yet; it will on first use"
+
   build-python:
     name: Build Python distribution
     runs-on: blacksmith-4vcpu-ubuntu-2404
+    needs: version
     env:
       PYPI_API_TOKEN: ${{ secrets.PYPI_API_TOKEN }}
     steps:
@@ -32,6 +112,9 @@ jobs:
         uses: actions/setup-python@v6
         with:
           python-version: '3.12'
+
+      - name: Stamp the release version
+        run: bench/set-version.sh "${{ needs.version.outputs.version }}"
 
       - name: Build sdist and wheel
         working-directory: ./telemetry-py
@@ -56,9 +139,13 @@ jobs:
   build-cpp:
     name: Build C++ artifact
     runs-on: blacksmith-4vcpu-ubuntu-2404
+    needs: version
     steps:
       - name: Check out code
         uses: actions/checkout@v6
+
+      - name: Stamp the release version
+        run: bench/set-version.sh "${{ needs.version.outputs.version }}"
 
       - name: Set up Bazel
         uses: bazel-contrib/setup-bazel@0.15.0
@@ -77,29 +164,33 @@ jobs:
           mkdir -p dist/telemetry-cpp
           cp -r include dist/telemetry-cpp/
           cp bazel-bin/src/libtelemetry.a dist/telemetry-cpp/
-          tar -czf dist/telemetry-cpp.tar.gz -C dist telemetry-cpp
+          tar -czf "dist/telemetry-cpp-${{ needs.version.outputs.version }}.tar.gz" -C dist telemetry-cpp
 
       - name: Upload C++ artifact
         uses: actions/upload-artifact@v4
         with:
           name: cpp-dist
-          path: telemetry-cpp/dist/telemetry-cpp.tar.gz
+          path: telemetry-cpp/dist/telemetry-cpp-*.tar.gz
 
   package-rust:
     name: Package Rust crate
     runs-on: blacksmith-4vcpu-ubuntu-2404
+    needs: version
     env:
       CARGO_REGISTRY_TOKEN: ${{ secrets.CARGO_REGISTRY_TOKEN }}
     steps:
       - name: Check out code
         uses: actions/checkout@v6
 
+      - name: Stamp the release version
+        run: bench/set-version.sh "${{ needs.version.outputs.version }}"
+
       - name: Set up Rust
         uses: dtolnay/rust-toolchain@stable
 
       - name: Verify crates package cleanly
         working-directory: ./telemetry-rs
-        run: cargo package -p telemetry-derive -p telemetry --no-verify
+        run: cargo package -p telemetry-derive -p telemetry --no-verify --allow-dirty
 
       - name: Upload crate artifacts
         uses: actions/upload-artifact@v4
@@ -112,9 +203,10 @@ jobs:
       - name: Publish to crates.io
         if: ${{ startsWith(github.ref, 'refs/tags/') && env.CARGO_REGISTRY_TOKEN != '' }}
         working-directory: ./telemetry-rs
+        # --allow-dirty: the only change is the version stamped above.
         run: |
-          cargo publish -p telemetry-derive
-          cargo publish -p telemetry
+          cargo publish -p telemetry-derive --allow-dirty
+          cargo publish -p telemetry --allow-dirty
 
   build-docker:
     name: Build & push observability image (GHCR)
@@ -166,7 +258,7 @@ jobs:
   release:
     name: Create GitHub Release
     runs-on: blacksmith-4vcpu-ubuntu-2404
-    needs: [build-python, build-cpp, package-rust]
+    needs: [version, release-go, build-python, build-cpp, package-rust]
     steps:
       - name: Download all artifacts
         uses: actions/download-artifact@v4
@@ -178,6 +270,15 @@ jobs:
         with:
           tag_name: ${{ github.event.inputs.tag || github.ref_name }}
           generate_release_notes: true
+          body: |
+            ## Install ${{ needs.version.outputs.version }}
+
+            | Language | |
+            | -------- | - |
+            | Go       | `go get github.com/${{ github.repository }}/telemetry-go@v${{ needs.version.outputs.version }}` |
+            | Rust     | `cargo add telemetry@${{ needs.version.outputs.version }}` |
+            | Python   | `pip install telemetry-py==${{ needs.version.outputs.version }}` |
+            | C++      | `telemetry-cpp-${{ needs.version.outputs.version }}.tar.gz` below |
           files: |
             artifacts/python-dist/*
             artifacts/cpp-dist/*

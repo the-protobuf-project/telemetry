@@ -20,11 +20,13 @@ Typical usage example:
 from collections.abc import Callable
 from typing import Any
 
-from opentelemetry import trace
+from opentelemetry import baggage, propagate, trace
+from opentelemetry.context import Context, attach
 from opentelemetry.exporter.otlp.proto.grpc.trace_exporter import OTLPSpanExporter
 from opentelemetry.sdk.resources import Resource
 from opentelemetry.sdk.trace import TracerProvider
 from opentelemetry.sdk.trace.export import BatchSpanProcessor
+from opentelemetry.trace import SpanKind
 
 from ...options import OTLPOptions, ServiceOptions, TracingOptions
 from ..foxglove import UnifiedMcapWriter
@@ -107,6 +109,7 @@ class TelemetryTracing:
 
         provider.add_span_processor(BatchSpanProcessor(exporter))
         trace.set_tracer_provider(provider)
+        self._provider = provider
 
         self.tracer = trace.get_tracer(service_opts.name)
 
@@ -135,7 +138,11 @@ class TelemetryTracing:
         return create_trace_decorator(self, name, attributes)
 
     def start_span(
-        self, name: str, attributes: dict[str, Any] | None = None
+        self,
+        name: str,
+        attributes: dict[str, Any] | None = None,
+        parent: Context | None = None,
+        kind: SpanKind = SpanKind.INTERNAL,
     ) -> SpanContext:
         """Manually start a span using a context manager.
 
@@ -155,7 +162,44 @@ class TelemetryTracing:
                 span.add_event("checkpoint")
                 span.set_attribute("result", "success")
         """
-        return SpanContext(self, name, attributes)
+        return SpanContext(self, name, attributes, parent=parent, kind=kind)
+
+    def inject(self, headers: dict[str, str] | None = None) -> dict[str, str]:
+        """Write the current trace context into headers for the next service.
+
+        Adds W3C ``traceparent``, ``tracestate`` and ``baggage`` — the same
+        headers the Go, Rust and C++ SDKs read — so the service the request
+        or message goes to continues this trace, in any language.
+
+        Example:
+            with telemetry.tracing.start_span("checkout", kind=SpanKind.CLIENT):
+                requests.post(url, headers=telemetry.tracing.inject())
+        """
+        headers = {} if headers is None else headers
+        propagate.inject(headers)
+        return headers
+
+    def extract(self, headers: dict[str, str]) -> Context:
+        """Read the trace context a caller sent, to start spans under it.
+
+        Example:
+            parent = telemetry.tracing.extract(dict(request.headers))
+            with telemetry.tracing.start_span("handle", parent=parent, kind=SpanKind.SERVER):
+                ...
+        """
+        return propagate.extract({k.lower(): v for k, v in headers.items()})
+
+    def set_baggage(self, key: str, value: str) -> object:
+        """Attach key=value as W3C baggage to the current context.
+
+        It travels with the trace to every service downstream. Returns a
+        token for ``opentelemetry.context.detach`` to undo it.
+        """
+        return attach(baggage.set_baggage(key, value))
+
+    def get_baggage(self, parent: Context | None = None) -> dict[str, str]:
+        """The W3C baggage in the current context, or in ``parent``."""
+        return {k: str(v) for k, v in baggage.get_all(parent).items()}
 
     def get_current_trace_id(self) -> str | None:
         """Get the current trace ID from context.
@@ -176,9 +220,12 @@ class TelemetryTracing:
         return span_id if span_id else None
 
     def close(self):
-        """Close the tracing system.
+        """Export the spans still queued.
 
-        Performs cleanup operations. Currently a no-op as OpenTelemetry
-        handles cleanup automatically.
+        Flushes the tracer provider this instance created, so spans ended
+        before close() reach the collector even if the program keeps running;
+        the OpenTelemetry SDK shuts the provider down at interpreter exit.
         """
-        pass
+        provider = getattr(self, "_provider", None)
+        if provider is not None:
+            provider.force_flush()

@@ -1,16 +1,31 @@
-# Pyroscope configuration for local development
+# Pyroscope in the single-image stack: continuous profiles from the SDKs'
+# Pyroscope clients, reachable through Envoy on :6009 at /ingest (push) and
+# /pyroscope/ (UI and query API), and in Grafana as the Pyroscope datasource.
 target: all
 
-# Server configuration
+# The ingester-based (v1) storage: one self-contained instance with no
+# metastore. Pyroscope 2.x defaults to v1-v2-dual, whose metastore client
+# dials gRPC on 9095 — Tempo's port here — and never becomes ready. v1 also
+# needs -write-path=ingester, which has no YAML key; supervisord passes it.
+architecture_storage: v1
+
 server:
   http_listen_port: 4040
-  grpc_listen_port: 9095
+  # Tempo already listens on the default 9095.
+  grpc_listen_port: 9097
 
-# Use local filesystem for blocks storage
+memberlist:
+  # Loki and Tempo use 7946.
+  bind_port: 7947
+
 storage:
-  path: /var/lib/pyroscope
+  backend: filesystem
+  filesystem:
+    dir: /data/pyroscope/shared
 
-# Ingester configuration
+pyroscopedb:
+  data_path: /data/pyroscope/db
+
 ingester:
   lifecycler:
     ring:

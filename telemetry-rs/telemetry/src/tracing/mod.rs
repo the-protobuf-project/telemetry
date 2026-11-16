@@ -7,7 +7,9 @@
 pub mod tracing;
 
 pub use ::tracing as reexport;
-pub use tracing::{Span, TelemetryTracing, init_tokio_tracing};
+pub use opentelemetry::Context;
+pub use opentelemetry::trace::SpanKind;
+pub use tracing::{Span, TelemetryTracing, init_tokio_tracing, install_propagator};
 
 /// Re-export Telemetry's instrument macro.
 ///

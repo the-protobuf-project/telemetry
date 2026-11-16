@@ -22,15 +22,15 @@ type LogMcapWriter struct {
 // https://github.com/foxglove/schemas/blob/main/schemas/jsonschema/Log.json
 // Extended with service_version and service_environment fields
 type FoxgloveLog struct {
-	Timestamp          FoxgloveTimestamp      `json:"timestamp"`
-	Level              int32                  `json:"level"`               // 0=UNKNOWN, 1=DEBUG, 2=INFO, 3=WARNING, 4=ERROR, 5=FATAL
-	Message            string                 `json:"message"`             // Log message
-	Name               string                 `json:"name"`                // Process or node name (service name with version and env)
-	File               string                 `json:"file"`                // Filename
-	Line               uint32                 `json:"line"`                // Line number
-	Data               map[string]interface{} `json:"data,omitempty"`      // Additional structured data
-	ServiceVersion     string                 `json:"service_version"`     // Service version (e.g., "1.0.0")
-	ServiceEnvironment string                 `json:"service_environment"` // Service environment (e.g., "development", "production")
+	Timestamp          FoxgloveTimestamp `json:"timestamp"`
+	Level              int32             `json:"level"`               // 0=UNKNOWN, 1=DEBUG, 2=INFO, 3=WARNING, 4=ERROR, 5=FATAL
+	Message            string            `json:"message"`             // Log message
+	Name               string            `json:"name"`                // Process or node name (service name with version and env)
+	File               string            `json:"file"`                // Filename
+	Line               uint32            `json:"line"`                // Line number
+	Data               map[string]any    `json:"data,omitempty"`      // Additional structured data
+	ServiceVersion     string            `json:"service_version"`     // Service version (e.g., "1.0.0")
+	ServiceEnvironment string            `json:"service_environment"` // Service environment (e.g., "development", "production")
 }
 
 // FoxgloveTimestamp represents a timestamp in Foxglove format
@@ -81,9 +81,12 @@ func NewLogMcapWriter(serviceOpts options.ServiceOptions, unifiedWriter *foxglov
 }
 
 // WriteLog writes a log message using the Foxglove Log schema
-func (l *LogMcapWriter) WriteLog(level, message, file string, line uint32, data map[string]interface{}) error {
-	now := time.Now()
+func (l *LogMcapWriter) WriteLog(level, message, file string, line uint32, data map[string]any) error {
+	return l.WriteLogAt(time.Now(), level, message, file, line, data)
+}
 
+// WriteLogAt writes a log message logged at now using the Foxglove Log schema.
+func (l *LogMcapWriter) WriteLogAt(now time.Time, level, message, file string, line uint32, data map[string]any) error {
 	// Convert string level to Foxglove level integer
 	levelInt := stringToFoxgloveLevel(level)
 

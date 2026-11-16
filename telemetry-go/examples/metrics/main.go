@@ -39,7 +39,7 @@ func main() {
 	p.Logger.Info("Metrics will be written to OTLP and MCAP")
 
 	// Simulate LLM processing with metrics (run for 2 minutes to generate rate data)
-	for i := 0; i < 120; i++ {
+	for i := range 120 {
 		// LLM request metrics
 		llmMetrics := LLMMetrics{
 			TokensProcessed: int64(rand.Intn(500) + 100),
@@ -55,12 +55,12 @@ func main() {
 				telemetry.StringAttribute("user_type", "premium"),
 			),
 		); err != nil {
-			if err := p.Logger.Error("Failed to record LLM metrics", map[string]interface{}{"error": err.Error()}); err != nil {
+			if err := p.Logger.Error("Failed to record LLM metrics", map[string]any{"error": err.Error()}); err != nil {
 				return
 			}
 		}
 
-		p.Logger.Info("LLM request processed", map[string]interface{}{
+		p.Logger.Info("LLM request processed", map[string]any{
 			"tokens":        llmMetrics.TokensProcessed,
 			"response_time": llmMetrics.ResponseTime,
 		})
@@ -79,12 +79,12 @@ func main() {
 					telemetry.StringAttribute("audio_format", "wav"),
 				),
 			); err != nil {
-				if err := p.Logger.Error("Failed to record transcription metrics", map[string]interface{}{"error": err.Error()}); err != nil {
+				if err := p.Logger.Error("Failed to record transcription metrics", map[string]any{"error": err.Error()}); err != nil {
 					return
 				}
 			}
 
-			p.Logger.Info("Audio transcribed", map[string]interface{}{
+			p.Logger.Info("Audio transcribed", map[string]any{
 				"duration":   transMetrics.AudioDuration,
 				"confidence": transMetrics.Confidence,
 			})

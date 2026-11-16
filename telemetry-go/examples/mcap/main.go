@@ -47,7 +47,7 @@ func main() {
 	languages := []string{"en", "es", "ja", "fr"}
 	messageTypes := []string{"text", "speech", "llm_response"}
 
-	for i := 0; i < 20; i++ {
+	for i := range 20 {
 		userIdx := i % len(users)
 
 		msg := ChatMessage{

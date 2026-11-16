@@ -1,6 +1,6 @@
 # OpenTelemetry Stack
 
-Single image running Grafana, Prometheus, Pushgateway, Tempo, Loki, Alertmanager, OTel Collector, and Envoy under supervisord.
+Single image running Grafana, Prometheus, Pushgateway, Tempo, Loki, Pyroscope, Alertmanager, OTel Collector, and Envoy under supervisord — every signal the SDKs send (traces, metrics, logs, baggage-carrying requests, profiles) has somewhere to land.
 
 ## Services
 
@@ -8,6 +8,7 @@ Single image running Grafana, Prometheus, Pushgateway, Tempo, Loki, Alertmanager
 | -------------- | ------------- | ------------------------------ |
 | Loki           | 3100/3101     | Log aggregation                |
 | Tempo          | 3200/3201     | Distributed tracing            |
+| Pyroscope      | 4040          | Continuous profiling           |
 | Prometheus     | 9090          | Metrics                        |
 | Pushgateway    | 9091          | Prometheus pushed metrics      |
 | Alertmanager   | 9093          | Alert routing                  |
@@ -75,6 +76,9 @@ At runtime, the stack uses:
 - Loki API: `http://<host>:6009/logs/...`
 - Prometheus: `http://<host>:6009/metrics/...`
 - Tempo HTTP API: `http://<host>:6009/traces/...`
+- Pyroscope: profiles pushed to `http://<host>:6009/ingest` (point the SDKs'
+  profiling server address at `http://<host>:6009`); UI and API at
+  `http://<host>:6009/pyroscope/`
 - Alertmanager UI/API: `http://<host>:6009/alertmanager/`
 - Pushgateway: `http://<host>:6009/pushgateway/...`
 - OTel Collector health: `http://<host>:6009/otelcol/`
@@ -103,6 +107,72 @@ Stack-specific health metrics include:
 - `thirdparty_opentelemetry_envoy_ready`
 
 Freshness-adjusted recording rules expose `_live` variants (for example `thirdparty_service_ready_live`) that turn to `0` when Pushgateway series are stale.
+
+## Sizing for 1M records/s
+
+The image ships tuned for high volume: large collector batches, exporter
+queues with retry, a `memory_limiter` that refuses data (retryably) before the
+collector can be OOM-killed, and Loki / Tempo ingest limits raised from their
+defaults (4 MB/s and 10,000 live traces), which refuse almost everything at
+this rate. `bench/stack_bench.py` reproduces the measurements below.
+
+### Measured: 8 CPUs, 6 GB, one container
+
+`docker run --cpus 8 --memory 6g`, Go SDK through Envoy (`:6009`) → collector
+→ backends, `ExportOptions{Lossless: true, Exporters: 4, BatchSize: 8192}`:
+
+| Signal | 1M records | Collector accepted / refused | Reached the backend | Peak memory | Verdict |
+| ------ | ---------- | ---------------------------- | ------------------- | ----------- | ------- |
+| Logs   | 834k/s from the SDK | 1,000,000 / 0 | 987,568 in Loki when counters settled, rest draining | 1.7 GB | **Holds 1M/s on 4–5 cores** |
+| Spans (1M *separate* traces) | 376k/s from the SDK | — | Tempo kept up, but held 3.3 GB and saturated the CPUs for minutes after; Prometheus and the collector's own metrics stopped answering | 4.2 GB | **Does not fit in one 8-core box** |
+| Metrics | 10.5M increments/s in-process | a few hundred points per export | all | — | **Trivial**: aggregated before export |
+
+What the numbers say:
+
+- **Logs at 1M/s fit in one container** with 8 cores and 6 GB. The collector
+  used about 1.5 GB and 2–3 cores; Loki the rest.
+- **Spans at 1M/s do not.** The binding cost is not the collector — it
+  accepted everything — but Tempo: every root span is a trace Tempo holds in
+  memory until it goes idle, and its metrics generator (span metrics, service
+  graphs and the `local-blocks` processor behind TraceQL metrics) works through
+  every one. A real workload is gentler (a trace is tens of spans, so 1M spans/s
+  is ~50k traces/s), but plan for Tempo as its own process.
+- **Metrics cost nothing at the backend** whatever the call rate: the SDK sums
+  increments and exports one point per series per interval.
+
+### Recommended allocation
+
+| Rate (per signal) | Shape | CPU | Memory | Settings |
+| ----------------- | ----- | --- | ------ | -------- |
+| up to ~100k/s | this image, one container | 4 | 4 GB | defaults |
+| logs 1M/s | this image | 8 | 6–8 GB | `-e OTELCOL_CPUS=3`; SDK `Exporters: 4`, `Lossless: true` |
+| spans 1M/s | collector + Loki here, **Tempo on its own** (or `tempo-distributed`) | 8 here + 8–16 for Tempo | 6 GB here + 16 GB Tempo | drop `local-blocks` from `metrics_generator_processors` if TraceQL metrics are not needed |
+| all signals 1M/s each | split per backend; scale the collector horizontally behind a load balancer (it is stateless) | 4 per collector replica (~500k records/s each) | 2 GB per replica | |
+
+The collector takes a fixed share of the container (entrypoint.sh): half its
+CPUs and a quarter of its memory by default, refusing data above 80% of that.
+Override with `OTELCOL_CPUS`, `OTELCOL_MEMORY_MIB` or `OTELCOL_MEMORY_SHARE_PCT`.
+Throughput knobs (`OTELCOL_BATCH_SIZE`, `OTELCOL_EXPORT_CONSUMERS`,
+`OTELCOL_EXPORT_QUEUE`), Loki's (`LOKI_INGEST_MB`, `LOKI_STREAM_RATE`) and
+Tempo's (`TEMPO_INGEST_BYTES`, `TEMPO_MAX_LIVE_TRACES`) are all environment
+variables; see the comments at the top of each file in `config/`.
+
+### Finding the bottleneck
+
+The collector reports what it accepted, refused and failed per signal on
+`:8888`, and Prometheus scrapes it (`job="otelcol"`):
+
+```promql
+sum(rate(otelcol_receiver_accepted_log_records_total[1m]))   # arriving
+sum(rate(otelcol_receiver_refused_log_records_total[1m]))    # memory_limiter pushing back
+sum(rate(otelcol_exporter_send_failed_log_records_total[1m])) # a backend rejecting
+max(otelcol_exporter_queue_size) / max(otelcol_exporter_queue_capacity)  # how close to full
+```
+
+Refused climbing means the collector needs memory or cores; send-failed
+climbing means the backend does (Loki 429s, Tempo `LIVE_TRACES_EXCEEDED`).
+On the SDK side, `Telemetry.Stats()` and the error `Close` returns say what
+never left the process.
 
 ## Data Volume
 

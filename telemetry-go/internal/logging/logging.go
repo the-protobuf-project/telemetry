@@ -2,249 +2,235 @@ package logging
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
+	"log/slog"
 	"os"
+	"runtime"
+	"time"
 
 	"github.com/charmbracelet/log"
 	"github.com/the-protobuf-project/telemetry/telemetry-go/internal/foxglove"
 	"github.com/the-protobuf-project/telemetry/telemetry-go/options"
 
-	"go.opentelemetry.io/otel/attribute"
 	otellog "go.opentelemetry.io/otel/log"
 )
 
+// LevelFatal is the level Fatal and Fatalf log at, above slog.LevelError.
+const LevelFatal = slog.Level(12)
+
 // Logger is the main logging client for the telemetry framework.
-// It wraps Charmbracelet's log.Logger and provides structured logging,
-// format-based logging, and hooks for MCAP/OTEL integration.
-// It also forwards logs to OpenTelemetry for OTLP/Loki integration
-// and optionally writes to MCAP files for Foxglove visualization.
+//
+// Every record goes through one slog.Handler that fans out to the console
+// (charmbracelet/log by default, or the program's own handler — see
+// Builder.WithLogHandler), to OpenTelemetry when log records are exported,
+// and to MCAP when recording. The level is checked once, before a record is
+// built, so a filtered-out Debug call costs next to nothing.
 type Logger struct {
-	loggerService      *log.Logger
-	otelLogger         *OtelLogger
-	mcapWriter         *LogMcapWriter
-	ctx                context.Context
-	serviceName        string
-	serviceVersion     string
-	serviceEnvironment string
+	handler slog.Handler
+	console slog.Handler
+	mcap    *LogMcapWriter
+	ctx     context.Context
+	skip    int // extra caller frames to skip (options.LogOptions.CallerOffset)
 }
 
-// NewLogger initializes a new structured logger instance based on
-// the provided service and logging options.
-// If otelLogger is provided, logs will be forwarded to OTLP/Loki.
-// If unifiedWriter is provided, logs will be written to MCAP files.
-func NewLogger(serviceOpts options.ServiceOptions, opts options.LoggingOptions, unifiedWriter *foxglove.UnifiedMcapWriter, otelLogger otellog.Logger) *Logger {
-	loggerService := log.NewWithOptions(os.Stderr, log.Options{
-		Prefix:          formatPrefix(serviceOpts),
-		Level:           resolveLogLevel(serviceOpts.Name, opts, serviceOpts.Environment),
-		ReportCaller:    true, // Always show file:line
-		ReportTimestamp: true, // Always show timestamp
-		TimeFormat:      resolveTimeFormat(opts),
-		CallerOffset:    resolveCallerOffset(opts),
-	})
-
-	logger := &Logger{
-		loggerService:      loggerService,
-		ctx:                context.Background(),
-		serviceName:        serviceOpts.Name,
-		serviceVersion:     serviceOpts.Version,
-		serviceEnvironment: string(serviceOpts.Environment),
+// NewLogger builds the logger for a service. console is where records are
+// printed; nil uses the default charmbracelet console on stderr. otelLogger,
+// when not nil, receives every record for OTLP export, and unifiedWriter,
+// when not nil, records them to MCAP.
+func NewLogger(serviceOpts options.ServiceOptions, opts options.LoggingOptions, unifiedWriter *foxglove.UnifiedMcapWriter, otelLogger otellog.Logger, console slog.Handler) *Logger {
+	level := slog.Level(resolveLogLevel(serviceOpts.Name, opts, serviceOpts.Environment))
+	if console == nil {
+		console = log.NewWithOptions(os.Stderr, log.Options{
+			Prefix:          formatPrefix(serviceOpts),
+			Level:           log.Level(level),
+			ReportCaller:    true, // Always show file:line
+			ReportTimestamp: true, // Always show timestamp
+			TimeFormat:      resolveTimeFormat(opts),
+		})
 	}
 
-	// If OTLP logger is provided, set it up for forwarding
+	sinks := []slog.Handler{console}
 	if otelLogger != nil {
-		logger.otelLogger = NewOtelLogger(otelLogger)
+		sinks = append(sinks, newOtelHandler(otelLogger))
 	}
-
-	// If unified MCAP writer is provided, create log channel
+	l := &Logger{
+		console: console,
+		ctx:     context.Background(),
+		skip:    max(resolveCallerOffset(opts)-3, 0),
+	}
 	if unifiedWriter != nil {
 		mcapWriter, err := NewLogMcapWriter(serviceOpts, unifiedWriter)
 		if err != nil {
-			loggerService.Errorf("Failed to initialize MCAP log writer: %v", err)
+			printTo(console, slog.LevelError, "Failed to initialize MCAP log writer", "error", err)
 		} else {
-			logger.mcapWriter = mcapWriter
-			loggerService.Infof("MCAP logging enabled, writing to: %s", unifiedWriter.GetFilePath())
+			l.mcap = mcapWriter
+			sinks = append(sinks, &mcapHandler{w: mcapWriter})
 		}
 	}
-
-	return logger
-}
-
-// WithContext returns a new Logger with the specified context for OTLP logging
-func (l *Logger) WithContext(ctx context.Context) *Logger {
-	return &Logger{
-		loggerService:      l.loggerService,
-		otelLogger:         l.otelLogger,
-		mcapWriter:         l.mcapWriter,
-		ctx:                ctx,
-		serviceName:        l.serviceName,
-		serviceVersion:     l.serviceVersion,
-		serviceEnvironment: l.serviceEnvironment,
+	l.handler = &levelHandler{level: level, next: slog.NewMultiHandler(sinks...)}
+	if l.mcap != nil {
+		printTo(console, slog.LevelInfo, "MCAP logging enabled", "path", unifiedWriter.GetFilePath())
 	}
+	return l
 }
 
-// Info logs an info-level message with optional structured data.
-func (l *Logger) Info(msg string, data ...any) {
-	l.log(log.InfoLevel, msg, data...)
+// Slog returns a *slog.Logger writing through this logger: to the console,
+// OpenTelemetry and MCAP alike. Records logged with a context carrying a span
+// (InfoContext and friends) are correlated with that trace.
+func (l *Logger) Slog() *slog.Logger { return slog.New(l.handler) }
+
+// Handler is the slog.Handler behind Slog, for composing with other handlers.
+func (l *Logger) Handler() slog.Handler { return l.handler }
+
+// Console is the handler records are printed with: the program's own (see
+// Builder.WithLogHandler) or the default console.
+func (l *Logger) Console() slog.Handler { return l.console }
+
+// WithContext returns a Logger whose records carry ctx, so they are
+// correlated with the span ctx holds.
+func (l *Logger) WithContext(ctx context.Context) *Logger {
+	c := *l
+	c.ctx = ctx
+	return &c
 }
+
+// Info logs an info-level message with optional structured data: a map
+// (each entry becomes an attribute), a struct (its `telemetry:"attribute:k"`
+// fields become attributes and the whole value a JSON "data" attribute),
+// slog.Attr values, or any other value (recorded as "data").
+func (l *Logger) Info(msg string, data ...any) { l.emit(l.ctx, slog.LevelInfo, msg, nil, data) }
 
 // Debug logs a debug-level message with optional structured data.
-func (l *Logger) Debug(msg string, data ...any) {
-	l.log(log.DebugLevel, msg, data...)
-}
+func (l *Logger) Debug(msg string, data ...any) { l.emit(l.ctx, slog.LevelDebug, msg, nil, data) }
 
 // Warn logs a warning-level message with optional structured data.
-func (l *Logger) Warn(msg string, data ...any) {
-	l.log(log.WarnLevel, msg, data...)
-}
+func (l *Logger) Warn(msg string, data ...any) { l.emit(l.ctx, slog.LevelWarn, msg, nil, data) }
 
-// Error logs an error-level message with optional structured data.
+// Error logs an error-level message with optional structured data, and
+// returns msg as an error.
 func (l *Logger) Error(msg string, data ...any) error {
-	l.log(log.ErrorLevel, msg, data...)
+	l.emit(l.ctx, slog.LevelError, msg, nil, data)
 	return fmt.Errorf("%s", msg)
 }
 
 // Fatal logs a fatal-level message with optional structured data and exits the program.
 func (l *Logger) Fatal(msg string, data ...any) {
-	l.log(log.FatalLevel, msg, data...)
+	l.emit(l.ctx, LevelFatal, msg, nil, data)
 	os.Exit(1)
 }
 
 // Infof logs an info-level message using a format string.
-func (l *Logger) Infof(format string, args ...any) {
-	l.loggerService.Infof(format, args...)
-	if l.otelLogger != nil {
-		l.otelLogger.WithContext(l.ctx).Infof(format, args...)
-	}
-}
+func (l *Logger) Infof(format string, args ...any) { l.emitf(slog.LevelInfo, format, args) }
 
 // Debugf logs a debug-level message using a format string.
-func (l *Logger) Debugf(format string, args ...any) {
-	l.loggerService.Debugf(format, args...)
-	if l.otelLogger != nil {
-		l.otelLogger.WithContext(l.ctx).Debugf(format, args...)
-	}
-}
+func (l *Logger) Debugf(format string, args ...any) { l.emitf(slog.LevelDebug, format, args) }
 
 // Warnf logs a warning-level message using a format string.
-func (l *Logger) Warnf(format string, args ...any) {
-	l.loggerService.Warnf(format, args...)
-	if l.otelLogger != nil {
-		l.otelLogger.WithContext(l.ctx).Warnf(format, args...)
-	}
-}
+func (l *Logger) Warnf(format string, args ...any) { l.emitf(slog.LevelWarn, format, args) }
 
-// Errorf logs an error-level message using a format string.
-func (l *Logger) Errorf(format string, args ...interface{}) error {
-	l.loggerService.Errorf(format, args...)
-	if l.otelLogger != nil {
-		l.otelLogger.WithContext(l.ctx).Errorf(format, args...)
-	}
+// Errorf logs an error-level message using a format string, and returns it
+// as an error.
+func (l *Logger) Errorf(format string, args ...any) error {
+	l.emitf(slog.LevelError, format, args)
 	return fmt.Errorf(format, args...)
 }
 
 // Fatalf logs a fatal-level message using a format string and exits the program.
 func (l *Logger) Fatalf(format string, args ...any) {
-	l.loggerService.Fatalf(format, args...)
-	if l.otelLogger != nil {
-		l.otelLogger.WithContext(l.ctx).Fatalf(format, args...)
-	}
+	l.emitf(LevelFatal, format, args)
 	os.Exit(1)
 }
 
-// log is the internal handler for all log levels, with optional structured data.
-func (l *Logger) log(level log.Level, msg string, data ...any) {
-	// Log to stdout via charmbracelet logger
-	if len(data) == 0 {
-		l.loggerService.Log(level, msg)
-	} else {
-		sub := l.loggerService.With("data", formattedData(data[0]))
-		sub.Log(level, msg)
-	}
-
-	// Forward to OTLP logger if available
-	if l.otelLogger != nil {
-		otelLogger := l.otelLogger.WithContext(l.ctx)
-
-		// Get caller information for file and line
-		file, line := getCallerInfo(3) // Skip 3 frames: getCallerInfo, log, and the calling function
-
-		// Build attributes with service metadata and caller info
-		attrs := []attribute.KeyValue{
-			attribute.String("service.name", l.serviceName),
-			attribute.String("service.version", l.serviceVersion),
-			attribute.String("service.environment", l.serviceEnvironment),
-			attribute.String("code.filepath", file),
-			attribute.Int("code.lineno", line),
-		}
-
-		// Convert user data to OTLP attributes if present
-		// Iterate through all data items
-		for _, d := range data {
-			attrs = append(attrs, dataToOtelAttributes(d)...)
-		}
-
-		// Build the log body: message first, then data as a JSON object on the same line.
-		// Format: "User joined room | {"user_id":"user-alice","room_id":"room-ai-chat"}"
-		// This keeps the message visible in the Grafana log list while showing structured data inline.
-		body := msg
-		if len(data) > 0 {
-			if b, err := json.Marshal(convertToMap(data[0])); err == nil {
-				body = fmt.Sprintf("%s | %s", msg, string(b))
-			} else {
-				body = fmt.Sprintf("%s | %v", msg, formattedData(data[0]))
-			}
-		}
-
-		// Map charmbracelet log levels to OTLP
-		switch level {
-		case log.DebugLevel:
-			otelLogger.Debug(body, attrs...)
-		case log.InfoLevel:
-			otelLogger.Info(body, attrs...)
-		case log.WarnLevel:
-			otelLogger.Warn(body, attrs...)
-		case log.ErrorLevel:
-			otelLogger.Error(body, attrs...)
-		case log.FatalLevel:
-			otelLogger.Fatal(body, attrs...)
-		default:
-			otelLogger.Info(body, attrs...)
-		}
-	}
-
-	// Write to MCAP file if available
-	if l.mcapWriter != nil && !l.mcapWriter.IsClosed() {
-		levelStr := level.String()
-
-		// Get caller information for file and line
-		file, line := getCallerInfo(3) // Skip 3 frames: getCallerInfo, log, and the calling function
-
-		// Convert structured data to map for MCAP
-		var dataMap map[string]interface{}
-		if len(data) > 0 {
-			dataMap = convertToMap(data[0])
-		}
-
-		// Write to MCAP with structured data in separate field
-		if err := l.mcapWriter.WriteLog(levelStr, msg, file, uint32(line), dataMap); err != nil {
-			l.loggerService.Warnf("Failed to write to MCAP: %v", err)
-		}
-	}
+// DebugContext logs at debug level with slog-style key-value args, correlated
+// with the span in ctx.
+func (l *Logger) DebugContext(ctx context.Context, msg string, args ...any) {
+	l.emit(ctx, slog.LevelDebug, msg, args, nil)
 }
 
-// Close closes the logger and any associated resources (e.g., MCAP writer)
-func (l *Logger) Close() error {
-	if l.mcapWriter != nil && !l.mcapWriter.IsClosed() {
-		if err := l.mcapWriter.Close(); err != nil {
-			return fmt.Errorf("failed to close MCAP writer: %w", err)
-		}
-		l.loggerService.Info("MCAP writer closed successfully")
-	}
-	return nil
+// InfoContext logs at info level with slog-style key-value args, correlated
+// with the span in ctx.
+func (l *Logger) InfoContext(ctx context.Context, msg string, args ...any) {
+	l.emit(ctx, slog.LevelInfo, msg, args, nil)
 }
+
+// WarnContext logs at warn level with slog-style key-value args, correlated
+// with the span in ctx.
+func (l *Logger) WarnContext(ctx context.Context, msg string, args ...any) {
+	l.emit(ctx, slog.LevelWarn, msg, args, nil)
+}
+
+// ErrorContext logs at error level with slog-style key-value args, correlated
+// with the span in ctx.
+func (l *Logger) ErrorContext(ctx context.Context, msg string, args ...any) {
+	l.emit(ctx, slog.LevelError, msg, args, nil)
+}
+
+// emit builds one record and hands it to the handler. Callers are the
+// exported methods only, so the caller's frame is a fixed distance away.
+// args are slog-style key-value pairs; data is the legacy structured data.
+func (l *Logger) emit(ctx context.Context, level slog.Level, msg string, args, data []any) {
+	if !l.handler.Enabled(ctx, level) {
+		return
+	}
+	var pcs [1]uintptr
+	runtime.Callers(3+l.skip, pcs[:]) // runtime.Callers, emit, the exported method
+	r := slog.NewRecord(time.Now(), level, msg, pcs[0])
+	if len(args) > 0 {
+		r.Add(args...)
+	}
+	for _, d := range data {
+		r.AddAttrs(dataAttrs(d)...)
+	}
+	_ = l.handler.Handle(ctx, r)
+}
+
+func (l *Logger) emitf(level slog.Level, format string, args []any) {
+	if !l.handler.Enabled(l.ctx, level) {
+		return
+	}
+	var pcs [1]uintptr
+	runtime.Callers(3+l.skip, pcs[:]) // runtime.Callers, emitf, the exported method
+	r := slog.NewRecord(time.Now(), level, fmt.Sprintf(format, args...), pcs[0])
+	_ = l.handler.Handle(l.ctx, r)
+}
+
+// Close is a no-op: the MCAP file is closed by Telemetry.Close.
+func (l *Logger) Close() error { return nil }
 
 // GetMcapWriter returns the MCAP writer if available (useful for custom logging)
-func (l *Logger) GetMcapWriter() *LogMcapWriter {
-	return l.mcapWriter
+func (l *Logger) GetMcapWriter() *LogMcapWriter { return l.mcap }
+
+// levelHandler drops records below level before any sink sees them.
+type levelHandler struct {
+	level slog.Level
+	next  slog.Handler
+}
+
+func (h *levelHandler) Enabled(ctx context.Context, level slog.Level) bool {
+	return level >= h.level && h.next.Enabled(ctx, level)
+}
+
+func (h *levelHandler) Handle(ctx context.Context, r slog.Record) error {
+	if r.Level < h.level {
+		return nil
+	}
+	return h.next.Handle(ctx, r)
+}
+
+func (h *levelHandler) WithAttrs(attrs []slog.Attr) slog.Handler {
+	return &levelHandler{level: h.level, next: h.next.WithAttrs(attrs)}
+}
+
+func (h *levelHandler) WithGroup(name string) slog.Handler {
+	return &levelHandler{level: h.level, next: h.next.WithGroup(name)}
+}
+
+// printTo logs one record straight to h, for the logger's own messages.
+func printTo(h slog.Handler, level slog.Level, msg string, args ...any) {
+	if !h.Enabled(context.Background(), level) {
+		return
+	}
+	r := slog.NewRecord(time.Now(), level, msg, 0)
+	r.Add(args...)
+	_ = h.Handle(context.Background(), r)
 }

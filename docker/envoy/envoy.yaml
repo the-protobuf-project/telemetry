@@ -42,6 +42,20 @@ static_resources:
                           route:
                             cluster: otelcol_http
                             timeout: 60s
+                        # Pyroscope profile push from the SDKs' Pyroscope
+                        # clients (server address http://host:6009)
+                        - match:
+                            prefix: "/ingest"
+                          route:
+                            cluster: pyroscope
+                            timeout: 60s
+                        # Pyroscope UI and query API
+                        - match:
+                            prefix: "/pyroscope/"
+                          route:
+                            cluster: pyroscope
+                            prefix_rewrite: "/"
+                            timeout: 60s
                         # Alertmanager UI/API mounted at /alertmanager/*
                         - match:
                             path: "/alertmanager"
@@ -142,6 +156,20 @@ static_resources:
                       "@type": type.googleapis.com/envoy.extensions.filters.http.router.v3.Router
 
   clusters:
+    - name: pyroscope
+      connect_timeout: 5s
+      type: STRICT_DNS
+      lb_policy: ROUND_ROBIN
+      load_assignment:
+        cluster_name: pyroscope
+        endpoints:
+          - lb_endpoints:
+              - endpoint:
+                  address:
+                    socket_address:
+                      address: 127.0.0.1
+                      port_value: 4040
+
     - name: loki
       connect_timeout: 5s
       type: STRICT_DNS

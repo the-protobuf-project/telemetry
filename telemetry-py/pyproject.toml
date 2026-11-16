@@ -18,6 +18,10 @@ dependencies = [
     "dynaconf>=3.3.5",
 ]
 
+[project.optional-dependencies]
+# Continuous profiling to Pyroscope (Telemetry.new().with_profiling(...)).
+profiling = ["pyroscope-io>=1.4.0"]
+
 [tool.hatch.build.targets.wheel]
 packages = ["telemetry"]
 

@@ -182,6 +182,30 @@ class FoxgloveOptions:
 
 
 @dataclass
+class ProfilingOptions:
+    """Continuous profiling to Pyroscope.
+
+    Needs the ``profiling`` extra (``pip install telemetry-py[profiling]``).
+
+    Attributes:
+        enabled: Push CPU profiles to Pyroscope.
+        server_address: Pyroscope URL; the single-image stack serves it on its
+            OTLP port too (``http://host:6009``).
+        basic_auth_user: Basic auth user (Grafana Cloud).
+        basic_auth_password: Basic auth password (Grafana Cloud).
+        tenant_id: Tenant for a multi-tenant Pyroscope.
+        tags: Extra tags on every profile.
+    """
+
+    enabled: bool = False
+    server_address: str = "http://localhost:4040"
+    basic_auth_user: str = ""
+    basic_auth_password: str = ""
+    tenant_id: str = ""
+    tags: dict[str, str] = field(default_factory=dict)
+
+
+@dataclass
 class OpenTelemetryOptions:
     """Unified telemetry configuration.
 
@@ -238,6 +262,7 @@ class TelemetryOptions:
 
     telemetry: OpenTelemetryOptions = field(default_factory=OpenTelemetryOptions)
     foxglove: FoxgloveOptions = field(default_factory=FoxgloveOptions)
+    profiling: ProfilingOptions = field(default_factory=ProfilingOptions)
     logging: LoggingOptions | None = None
     tracing: TracingOptions | None = None
 
@@ -354,9 +379,19 @@ def from_config(
         otlp=otlp_opts,
     )
 
+    profiling_opts = ProfilingOptions(
+        enabled=cfg.get("profiling.enabled", False),
+        server_address=cfg.get("profiling.server_address", "http://localhost:4040"),
+        basic_auth_user=cfg.get("profiling.basic_auth_user", ""),
+        basic_auth_password=cfg.get("profiling.basic_auth_password", ""),
+        tenant_id=cfg.get("profiling.tenant_id", ""),
+        tags=dict(cfg.get("profiling.tags", {}) or {}),
+    )
+
     telemetry_opts = TelemetryOptions(
         telemetry=telemetry_opts,
         foxglove=foxglove_opts,
+        profiling=profiling_opts,
     )
 
     return service_opts, telemetry_opts

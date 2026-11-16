@@ -96,7 +96,7 @@ func SDKDisabledByEnv() bool {
 // envListHas reports whether the comma-separated environment variable key
 // lists want, ignoring case and spaces.
 func envListHas(key, want string) bool {
-	for _, v := range strings.Split(os.Getenv(key), ",") {
+	for v := range strings.SplitSeq(os.Getenv(key), ",") {
 		if strings.EqualFold(strings.TrimSpace(v), want) {
 			return true
 		}

@@ -238,6 +238,39 @@ func handleRequest(ctx context.Context, p *telemetry.Telemetry) {
 }
 ```
 
+### Bring your own logger
+
+Every record goes through one `log/slog` handler that fans out to the console,
+OpenTelemetry and MCAP. Replace the console with any `slog.Handler` — a JSON
+handler for a log shipper, your own logger, or none at all — and the records
+still reach OTLP and MCAP:
+
+```go
+tel, err := telemetry.New().
+    WithService("api", "1.0.0").
+    WithLogHandler(slog.NewJSONHandler(os.Stdout, nil)). // or slog.DiscardHandler
+    Build()
+
+// Already have a *slog.Logger? Hand it over.
+tel, err = telemetry.New().WithLogger(myLogger).Build()
+```
+
+Code written against `log/slog` can log through Telemetry directly; a record
+logged with a context that carries a span is correlated with that trace:
+
+```go
+log := tel.Slog()
+log.InfoContext(ctx, "order placed", "order_id", id, "total", 42.5)
+
+slog.SetDefault(tel.Slog()) // route every library using slog.Default()
+```
+
+`tel.Logger.Info(msg, data)` keeps working as before: map entries become one
+attribute each (so Loki filters on `| user_id = "alice"`), a struct's
+`telemetry:"attribute:<key>"` fields become attributes and the whole value a
+JSON `data` attribute. The service's log level applies to every destination,
+so a filtered-out `Debug` call costs a few nanoseconds.
+
 ### Per-Module Log Levels
 
 Telemetry supports per-module log level control, allowing different services or

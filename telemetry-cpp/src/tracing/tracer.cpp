@@ -5,9 +5,64 @@
 #include "telemetry/otel/exporter.hpp"
 #include <opentelemetry/trace/tracer.h>
 #include <opentelemetry/trace/span.h>
+#include <opentelemetry/trace/span_context.h>
 #endif
 
+#include <algorithm>
+#include <cctype>
+
 namespace telemetry::tracing {
+
+#if TELEMETRY_USE_OTEL
+// The OpenTelemetry span a Span exports through: its ids are the ones
+// propagated, so what a downstream service continues is what was exported.
+struct Span::OtelState {
+    opentelemetry::nostd::shared_ptr<opentelemetry::trace::Span> span;
+};
+#else
+struct Span::OtelState {};
+#endif
+
+namespace {
+
+bool is_lower_hex(const std::string& s) {
+    return std::all_of(s.begin(), s.end(), [](char c) {
+        return (c >= '0' && c <= '9') || (c >= 'a' && c <= 'f');
+    });
+}
+
+bool all_zero(const std::string& s) {
+    return std::all_of(s.begin(), s.end(), [](char c) { return c == '0'; });
+}
+
+std::string trim(const std::string& s) {
+    auto b = s.find_first_not_of(" \t");
+    auto e = s.find_last_not_of(" \t");
+    return b == std::string::npos ? "" : s.substr(b, e - b + 1);
+}
+
+#if TELEMETRY_USE_OTEL
+namespace trace_api = opentelemetry::trace;
+
+template <size_t N>
+void hex_to_bytes(const std::string& hex, uint8_t (&out)[N]) {
+    for (size_t i = 0; i < N; ++i) {
+        out[i] = static_cast<uint8_t>(std::stoul(hex.substr(2 * i, 2), nullptr, 16));
+    }
+}
+
+trace_api::SpanKind to_otel(SpanKind kind) {
+    switch (kind) {
+        case SpanKind::Server: return trace_api::SpanKind::kServer;
+        case SpanKind::Client: return trace_api::SpanKind::kClient;
+        case SpanKind::Producer: return trace_api::SpanKind::kProducer;
+        case SpanKind::Consumer: return trace_api::SpanKind::kConsumer;
+        default: return trace_api::SpanKind::kInternal;
+    }
+}
+#endif
+
+}  // namespace
 
 /**
  * @brief Initializes a tracing span with its identifiers and start timestamp.
@@ -40,8 +95,10 @@ Span::Span(Span&& other) noexcept
     , status_description_(std::move(other.status_description_))
     , attributes_(std::move(other.attributes_))
     , events_(std::move(other.events_))
+    , baggage_(std::move(other.baggage_))
     , ended_(other.ended_)
-    , mcap_writer_(std::move(other.mcap_writer_)) {
+    , mcap_writer_(std::move(other.mcap_writer_))
+    , otel_(std::move(other.otel_)) {
     other.ended_ = true;
 }
 
@@ -60,29 +117,49 @@ Span& Span::operator=(Span&& other) noexcept {
         status_description_ = std::move(other.status_description_);
         attributes_ = std::move(other.attributes_);
         events_ = std::move(other.events_);
+        baggage_ = std::move(other.baggage_);
         ended_ = other.ended_;
         mcap_writer_ = std::move(other.mcap_writer_);
+        otel_ = std::move(other.otel_);
         other.ended_ = true;
     }
     return *this;
 }
 
+void Span::record_attribute(const std::string& key, const std::string& value) {
+    attributes_[key] = value;
+}
+
 void Span::set_attribute(const std::string& key, const std::string& value) {
-    if (!ended_) {
-        attributes_[key] = value;
-    }
+    if (ended_) return;
+    record_attribute(key, value);
+#if TELEMETRY_USE_OTEL
+    if (otel_) otel_->span->SetAttribute(key, value);
+#endif
 }
 
 void Span::set_attribute(const std::string& key, int64_t value) {
-    set_attribute(key, std::to_string(value));
+    if (ended_) return;
+    record_attribute(key, std::to_string(value));
+#if TELEMETRY_USE_OTEL
+    if (otel_) otel_->span->SetAttribute(key, value);
+#endif
 }
 
 void Span::set_attribute(const std::string& key, double value) {
-    set_attribute(key, std::to_string(value));
+    if (ended_) return;
+    record_attribute(key, std::to_string(value));
+#if TELEMETRY_USE_OTEL
+    if (otel_) otel_->span->SetAttribute(key, value);
+#endif
 }
 
 void Span::set_attribute(const std::string& key, bool value) {
-    set_attribute(key, value ? "true" : "false");
+    if (ended_) return;
+    record_attribute(key, value ? "true" : "false");
+#if TELEMETRY_USE_OTEL
+    if (otel_) otel_->span->SetAttribute(key, value);
+#endif
 }
 
 void Span::add_event(const std::string& name) {
@@ -96,6 +173,9 @@ void Span::add_event(const std::string& name, const std::map<std::string, std::s
         event.timestamp_ns = platform::get_timestamp_ns();
         event.attributes = attributes;
         events_.push_back(std::move(event));
+#if TELEMETRY_USE_OTEL
+        if (otel_) otel_->span->AddEvent(name, attributes);
+#endif
     }
 }
 
@@ -103,6 +183,14 @@ void Span::set_status(SpanStatus status, const std::string& description) {
     if (!ended_) {
         status_ = status;
         status_description_ = description;
+#if TELEMETRY_USE_OTEL
+        if (otel_) {
+            otel_->span->SetStatus(status == SpanStatus::Ok      ? trace_api::StatusCode::kOk
+                                   : status == SpanStatus::Error ? trace_api::StatusCode::kError
+                                                                 : trace_api::StatusCode::kUnset,
+                                   description);
+        }
+#endif
     }
 }
 
@@ -116,6 +204,10 @@ void Span::end() {
 
     end_time_ns_ = platform::get_timestamp_ns();
     ended_ = true;
+#if TELEMETRY_USE_OTEL
+    // Before this, spans were written to MCAP only: OTLP never saw a C++ span.
+    if (otel_) otel_->span->End();
+#endif
 
     if (mcap_writer_) {
         mcap_writer_->write_span(name_, trace_id_, span_id_,
@@ -236,11 +328,109 @@ Tracer& Tracer::operator=(Tracer&& other) noexcept {
 }
 
 Span Tracer::start_span(const std::string& name) {
-    return Span(name, generate_trace_id(), generate_span_id(), mcap_writer_);
+    return make_span(name, "", "", false, true, {}, SpanKind::Internal);
 }
 
-Span Tracer::start_span(const std::string& name, const Span& parent) {
-    return Span(name, parent.trace_id(), generate_span_id(), mcap_writer_);
+Span Tracer::start_span(const std::string& name, SpanKind kind) {
+    return make_span(name, "", "", false, true, {}, kind);
+}
+
+Span Tracer::start_span(const std::string& name, const Span& parent, SpanKind kind) {
+    return make_span(name, parent.trace_id(), parent.span_id(), false, true, parent.baggage(), kind);
+}
+
+Span Tracer::start_span(const std::string& name, const RemoteContext& parent, SpanKind kind) {
+    if (!parent.valid()) {
+        return make_span(name, "", "", false, true, parent.baggage, kind);
+    }
+    return make_span(name, parent.trace_id, parent.span_id, true, parent.sampled, parent.baggage, kind);
+}
+
+Span Tracer::make_span(const std::string& name, const std::string& trace_id,
+                       const std::string& parent_span_id, bool remote_parent, bool sampled,
+                       const std::map<std::string, std::string>& baggage, SpanKind kind) {
+#if TELEMETRY_USE_OTEL
+    if (otel_exporter_ && otel_exporter_->is_enabled()) {
+        trace_api::StartSpanOptions opts;
+        opts.kind = to_otel(kind);
+        if (!trace_id.empty() && !parent_span_id.empty()) {
+            uint8_t tid[16];
+            uint8_t sid[8];
+            hex_to_bytes(trace_id, tid);
+            hex_to_bytes(parent_span_id, sid);
+            opts.parent = trace_api::SpanContext(
+                trace_api::TraceId(tid), trace_api::SpanId(sid),
+                trace_api::TraceFlags(sampled ? trace_api::TraceFlags::kIsSampled : 0),
+                remote_parent);
+        }
+        auto otel_span = otel_exporter_->get_tracer()->StartSpan(name, opts);
+        char tid_hex[32];
+        char sid_hex[16];
+        otel_span->GetContext().trace_id().ToLowerBase16(tid_hex);
+        otel_span->GetContext().span_id().ToLowerBase16(sid_hex);
+        Span span(name, std::string(tid_hex, 32), std::string(sid_hex, 16), mcap_writer_);
+        span.parent_span_id_ = parent_span_id;
+        span.baggage_ = baggage;
+        span.otel_ = std::make_shared<Span::OtelState>(Span::OtelState{otel_span});
+        return span;
+    }
+#endif
+    (void)remote_parent;
+    (void)sampled;
+    (void)kind;
+    Span span(name, trace_id.empty() ? generate_trace_id() : trace_id, generate_span_id(), mcap_writer_);
+    span.parent_span_id_ = parent_span_id;
+    span.baggage_ = baggage;
+    return span;
+}
+
+void Tracer::inject(const Span& span, std::map<std::string, std::string>& headers) const {
+    if (span.trace_id().size() != 32 || span.span_id().size() != 16) return;
+    headers["traceparent"] = "00-" + span.trace_id() + "-" + span.span_id() + "-01";
+    if (!span.baggage().empty()) {
+        std::string b;
+        for (const auto& [k, v] : span.baggage()) {
+            if (!b.empty()) b += ",";
+            b += k + "=" + v;
+        }
+        headers["baggage"] = b;
+    }
+}
+
+RemoteContext Tracer::extract(const std::map<std::string, std::string>& headers) const {
+    RemoteContext out;
+    for (const auto& [raw_key, value] : headers) {
+        std::string key = raw_key;
+        std::transform(key.begin(), key.end(), key.begin(), [](unsigned char c) { return std::tolower(c); });
+        if (key == "traceparent") {
+            // version-traceid-spanid-flags, e.g. 00-4bf9...4736-00f0...02b7-01
+            std::string tp = trim(value);
+            if (tp.size() < 55 || tp[2] != '-' || tp[35] != '-' || tp[52] != '-') continue;
+            std::string version = tp.substr(0, 2), tid = tp.substr(3, 32), sid = tp.substr(36, 16), flags = tp.substr(53, 2);
+            if (version == "ff" || !is_lower_hex(version) || !is_lower_hex(tid) || !is_lower_hex(sid) ||
+                !is_lower_hex(flags) || all_zero(tid) || all_zero(sid)) {
+                continue;
+            }
+            out.trace_id = tid;
+            out.span_id = sid;
+            out.sampled = (std::stoul(flags, nullptr, 16) & 1) != 0;
+        } else if (key == "baggage") {
+            // key=value[;properties], comma separated
+            size_t start = 0;
+            while (start <= value.size()) {
+                size_t end = value.find(',', start);
+                std::string member = value.substr(start, end == std::string::npos ? std::string::npos : end - start);
+                member = member.substr(0, member.find(';'));
+                if (auto eq = member.find('='); eq != std::string::npos) {
+                    std::string k = trim(member.substr(0, eq)), v = trim(member.substr(eq + 1));
+                    if (!k.empty()) out.baggage[k] = v;
+                }
+                if (end == std::string::npos) break;
+                start = end + 1;
+            }
+        }
+    }
+    return out;
 }
 
 std::string Tracer::generate_trace_id() {

@@ -44,6 +44,8 @@ class SpanContext:
         tracing: "TelemetryTracing",
         name: str,
         attributes: dict[str, Any] | None = None,
+        parent: context.Context | None = None,
+        kind: trace.SpanKind = trace.SpanKind.INTERNAL,
     ):
         """Initialize the span context.
 
@@ -55,6 +57,8 @@ class SpanContext:
         self.tracing = tracing
         self.name = name
         self.attributes = attributes or {}
+        self.parent = parent
+        self.kind = kind
         self.span = None
         self.token = None
         self.trace_id = None
@@ -78,15 +82,20 @@ class SpanContext:
         ctx = get_trace_context()
         self.parent_span_id = ctx.get("span_id")
 
-        # Start span with proper context for parent-child relationships
-        if current_span and current_span.is_recording():
+        # Start span with proper context for parent-child relationships:
+        # an explicit parent (a remote caller's, from extract()) wins.
+        if self.parent is not None:
+            self.span = self.tracing.tracer.start_span(
+                self.name, context=self.parent, kind=self.kind
+            )
+        elif current_span and current_span.is_recording():
             # Use the current context as parent
             current_context = context.get_current()
             self.span = self.tracing.tracer.start_span(
-                self.name, context=current_context
+                self.name, context=current_context, kind=self.kind
             )
         else:
-            self.span = self.tracing.tracer.start_span(self.name)
+            self.span = self.tracing.tracer.start_span(self.name, kind=self.kind)
 
         # Make this span the current span in the context
         span_context = trace.set_span_in_context(self.span)

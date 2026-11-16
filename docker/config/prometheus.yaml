@@ -38,3 +38,10 @@ scrape_configs:
       - source_labels: [__name__]
         regex: "^(go_.*|process_.*|prometheus_.*|pushgateway_.*|scrape_.*|promhttp_.*|net_.*|up)$"
         action: drop
+
+  # The collector's own pipeline metrics: accepted / refused / failed per
+  # signal and exporter queue depth — where to look first when telemetry
+  # goes missing under load.
+  - job_name: "otelcol"
+    static_configs:
+      - targets: ["localhost:8888"]

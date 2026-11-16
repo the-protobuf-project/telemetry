@@ -17,9 +17,13 @@ datasources:
     isDefault: false
     editable: true
     jsonData:
+      # OTLP log records carry trace_id as structured metadata, not in the
+      # line, so the link matches the field by name: a log from any service,
+      # in any language, opens the trace it was written under.
       derivedFields:
         - datasourceUid: tempo
-          matcherRegex: "trace_id=(\\w+)"
+          matcherType: label
+          matcherRegex: trace_id
           name: TraceID
           url: "$${__value.raw}"
 
@@ -31,15 +35,32 @@ datasources:
     isDefault: false
     editable: true
     jsonData:
+      # Distributed logging: from a span, the logs every service wrote under
+      # its trace — not only the span's own service — by the trace_id
+      # structured metadata each SDK sets on its log records.
       tracesToLogsV2:
         datasourceUid: loki
         spanStartTimeShift: '-1h'
         spanEndTimeShift: '1h'
-        filterByTraceID: true
-        filterBySpanID: false
+        customQuery: true
+        query: '{service_name=~".+"} | trace_id="$${__trace.traceId}"'
+      tracesToProfiles:
+        datasourceUid: pyroscope
+        profileTypeId: 'process_cpu:cpu:nanoseconds:cpu:nanoseconds'
+        tags:
+          - key: service.name
+            value: service_name
       tracesToMetrics:
         datasourceUid: prometheus
       serviceMap:
         datasourceUid: prometheus
       nodeGraph:
         enabled: true
+
+  - name: Pyroscope
+    type: grafana-pyroscope-datasource
+    uid: pyroscope
+    access: proxy
+    url: http://localhost:4040
+    isDefault: false
+    editable: true

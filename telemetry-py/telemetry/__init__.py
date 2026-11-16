@@ -18,6 +18,7 @@ from .options import (
     ModuleOptions,
     OpenTelemetryOptions,
     OTLPOptions,
+    ProfilingOptions,
     ServiceOptions,
     TelemetryOptions,
     TracingOptions,
@@ -40,6 +41,7 @@ __all__ = [
     "OpenTelemetryOptions",
     "FoxgloveOptions",
     "OTLPOptions",
+    "ProfilingOptions",
     "from_config",
     "from_env",
     # Metrics - lowercase (explicit names)

@@ -76,15 +76,13 @@ func runInferenceSimulation(ctx context.Context, p *telemetry.Telemetry, config 
 	requestChan := make(chan InferenceRequest, 100)
 
 	// Start request generator
-	wg.Add(1)
-	go func() {
-		defer wg.Done()
+	wg.Go(func() {
 		generateRequests(requestChan, stopChan)
-	}()
+	})
 
 	// Start inference workers
 	numWorkers := runtime.NumCPU()
-	for i := 0; i < numWorkers; i++ {
+	for i := range numWorkers {
 		wg.Add(1)
 		go func(workerID int) {
 			defer wg.Done()
@@ -204,7 +202,7 @@ func simulateModelLoading() {
 	chunkSize := 5 * 1024 * 1024 // 5MB chunks
 	numChunks := 20              // Load 100MB total
 
-	for i := 0; i < numChunks; i++ {
+	for range numChunks {
 		chunk := make([]byte, chunkSize)
 		for j := 0; j < len(chunk); j += 1000 {
 			chunk[j] = byte(rand.Intn(256))
@@ -222,7 +220,7 @@ func simulateTokenization(prompt string) {
 	tokens := make([]int, 0, 1000)
 
 	// Generate more tokens to make this visible
-	for i := 0; i < 1000; i++ {
+	for range 1000 {
 		tokenID := rand.Intn(50000)
 		tokens = append(tokens, tokenID)
 	}
@@ -234,7 +232,7 @@ func simulateTokenization(prompt string) {
 	}
 
 	// Simulate BPE encoding (CPU intensive)
-	for i := 0; i < 500; i++ {
+	for i := range 500 {
 		text := fmt.Sprintf("%s_%d", prompt, i)
 		for j := 0; j < len(text); j++ {
 			_ = text[j]
@@ -244,40 +242,33 @@ func simulateTokenization(prompt string) {
 	time.Sleep(5 * time.Millisecond)
 }
 
-func min(a, b int) int {
-	if a < b {
-		return a
-	}
-	return b
-}
-
 // simulateCPUInference simulates CPU-bound inference
 func simulateCPUInference(req InferenceRequest) {
 	// Simulate matrix operations (CPU intensive)
 	matrixSize := 256
 
 	// Perform multiple matrix multiplications to simulate layers
-	for layer := 0; layer < 3; layer++ {
+	for range 3 {
 		matrix1 := make([][]float64, matrixSize)
 		matrix2 := make([][]float64, matrixSize)
 		result := make([][]float64, matrixSize)
 
-		for i := 0; i < matrixSize; i++ {
+		for i := range matrixSize {
 			matrix1[i] = make([]float64, matrixSize)
 			matrix2[i] = make([]float64, matrixSize)
 			result[i] = make([]float64, matrixSize)
 
-			for j := 0; j < matrixSize; j++ {
+			for j := range matrixSize {
 				matrix1[i][j] = rand.Float64()
 				matrix2[i][j] = rand.Float64()
 			}
 		}
 
 		// Matrix multiplication (CPU intensive)
-		for i := 0; i < matrixSize; i++ {
-			for j := 0; j < matrixSize; j++ {
+		for i := range matrixSize {
+			for j := range matrixSize {
 				sum := 0.0
-				for k := 0; k < matrixSize; k++ {
+				for k := range matrixSize {
 					sum += matrix1[i][k] * matrix2[k][j]
 				}
 				result[i][j] = sum
@@ -287,7 +278,7 @@ func simulateCPUInference(req InferenceRequest) {
 
 	// Simulate attention mechanism
 	seqLen := min(req.MaxTokens, 100)
-	for i := 0; i < seqLen; i++ {
+	for range seqLen {
 		attention := make([]float64, seqLen)
 		for j := range attention {
 			attention[j] = math.Exp(rand.Float64())
@@ -315,21 +306,21 @@ func simulateGPUInference(config LLMConfig, req InferenceRequest) {
 
 	// Allocate GPU memory (simulated with Go memory)
 	hiddenStates := make([][][]float64, batchSize)
-	for b := 0; b < batchSize; b++ {
+	for b := range batchSize {
 		hiddenStates[b] = make([][]float64, req.MaxTokens)
 		for t := 0; t < req.MaxTokens; t++ {
 			hiddenStates[b][t] = make([]float64, hiddenSize)
-			for h := 0; h < hiddenSize; h++ {
+			for h := range hiddenSize {
 				hiddenStates[b][t][h] = rand.Float64()
 			}
 		}
 	}
 
 	// Simulate GPU computation (faster than CPU)
-	for b := 0; b < batchSize; b++ {
+	for b := range batchSize {
 		for t := 0; t < req.MaxTokens; t++ {
 			// Simulate layer computation
-			for h := 0; h < hiddenSize; h++ {
+			for h := range hiddenSize {
 				hiddenStates[b][t][h] = math.Tanh(hiddenStates[b][t][h])
 			}
 		}
@@ -373,7 +364,7 @@ func simulateDecoding(maxTokens int) {
 	// Simulate token-by-token generation
 	output := make([]string, 0, maxTokens)
 
-	for i := 0; i < maxTokens; i++ {
+	for range maxTokens {
 		// Simulate vocabulary lookup
 		tokenID := rand.Intn(50000)
 		word := fmt.Sprintf("word_%d", tokenID)

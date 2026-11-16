@@ -4,6 +4,7 @@
 #include "telemetry/logging/logger.hpp"
 #include "telemetry/mcap/writer.hpp"
 #include "telemetry/metrics/metrics.hpp"
+#include "telemetry/profiling/profiler.hpp"
 #include "telemetry/tracing/tracer.hpp"
 
 #if TELEMETRY_USE_OTEL
@@ -73,6 +74,9 @@ otel::OtelExporter* otel_exporter() { return otel_exporter_.get(); }
     /// What happened to every log record and span sent for export.
     Stats stats() const;
 
+    /// The CPU profiler, or nullptr when profiling is off.
+    profiling::Profiler* profiler() { return profiler_.get(); }
+
 private:
     std::unique_ptr<logging::Logger> logger_;
     std::unique_ptr<metrics::Metrics> metrics_;
@@ -81,6 +85,7 @@ private:
 #if TELEMETRY_USE_OTEL
     std::unique_ptr<otel::OtelExporter> otel_exporter_;
 #endif
+    std::unique_ptr<profiling::Profiler> profiler_;
     bool closed_ = false;
 };
 
@@ -97,6 +102,9 @@ public:
     /// Prints each log line to stdout, or not; on by default. Off, records
     /// still go to OTLP and MCAP.
     TelemetryBuilder& with_console(bool console);
+    /// Profiles CPU continuously and sends it to the Pyroscope server at
+    /// server_address, as the other SDKs' with_profiling does.
+    TelemetryBuilder& with_profiling(const std::string& server_address = "http://localhost:4040");
 
     Telemetry build();
 
@@ -110,6 +118,7 @@ private:
     std::optional<std::string> mcap_path_;
     ExportOptions export_options_;
     bool console_ = true;
+    std::optional<std::string> profiling_address_;
 };
 
 }  // namespace telemetry

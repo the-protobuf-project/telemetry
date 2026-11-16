@@ -87,9 +87,16 @@ struct OpenTelemetryOptions {
     OtlpOptions otlp;
 };
 
+/// Continuous CPU profiling to Pyroscope (see profiling::Profiler).
+struct ProfilingConfig {
+    bool enabled = false;
+    std::string server_address = "http://localhost:4040";
+};
+
 struct TelemetryOptions {
     OpenTelemetryOptions telemetry;
     FoxgloveOptions foxglove;
+    ProfilingConfig profiling;
     /// Print each log line to stdout. Off, records still go to OTLP and MCAP.
     bool console = true;
 };

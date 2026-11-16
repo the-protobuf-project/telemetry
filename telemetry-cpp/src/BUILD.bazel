@@ -10,6 +10,7 @@ cc_library(
         "//src/mcap",
         "//src/metrics",
         "//src/otel",
+        "//src/profiling",
         "//src/tracing",
     ],
 )

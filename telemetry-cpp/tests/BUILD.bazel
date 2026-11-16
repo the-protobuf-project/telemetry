@@ -17,3 +17,18 @@ cc_test(
         "@catch2//:catch2_main",
     ],
 )
+
+cc_test(
+    name = "profiling_test",
+    srcs = ["profiling_test.cpp"],
+    # Function names in the samples come from the dynamic symbol table, which
+    # GNU ld fills for an executable's own functions only with -rdynamic.
+    linkopts = select({
+        "@platforms//os:linux": ["-rdynamic"],
+        "//conditions:default": [],
+    }),
+    deps = [
+        "//src:telemetry",
+        "@catch2//:catch2_main",
+    ],
+)

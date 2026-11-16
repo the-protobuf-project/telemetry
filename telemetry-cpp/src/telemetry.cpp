@@ -73,6 +73,13 @@ Telemetry::Telemetry(const ServiceOptions& service_opts, const TelemetryOptions&
     );
     global_logger->set_console(telemetry_opts.console);
     logging::GlobalLogger::init(std::move(global_logger));
+
+    if (telemetry_opts.profiling.enabled) {
+        profiling::ProfilingOptions opts;
+        opts.enabled = true;
+        opts.server_address = telemetry_opts.profiling.server_address;
+        profiler_ = std::make_unique<profiling::Profiler>(service_opts, opts);
+    }
 }
 
 /**
@@ -95,6 +102,7 @@ Telemetry::Telemetry(Telemetry&& other) noexcept
 #if TELEMETRY_USE_OTEL
     , otel_exporter_(std::move(other.otel_exporter_))
 #endif
+    , profiler_(std::move(other.profiler_))
     , closed_(other.closed_) {
     other.closed_ = true;
 }
@@ -115,6 +123,7 @@ Telemetry& Telemetry::operator=(Telemetry&& other) noexcept {
 #if TELEMETRY_USE_OTEL
         otel_exporter_ = std::move(other.otel_exporter_);
 #endif
+        profiler_ = std::move(other.profiler_);
         closed_ = other.closed_;
         other.closed_ = true;
     }
@@ -149,6 +158,7 @@ void Telemetry::flush() {
 void Telemetry::close() {
     if (closed_) return;
 
+    if (profiler_) profiler_->stop();  // sends what it has sampled
     logging::GlobalLogger::shutdown();
 
 #if TELEMETRY_USE_OTEL
@@ -253,6 +263,11 @@ TelemetryBuilder& TelemetryBuilder::with_console(bool console) {
     return *this;
 }
 
+TelemetryBuilder& TelemetryBuilder::with_profiling(const std::string& server_address) {
+    profiling_address_ = server_address;
+    return *this;
+}
+
 /**
  * @brief Builds a telemetry instance from the configured service and exporter settings.
  *
@@ -268,6 +283,10 @@ Telemetry TelemetryBuilder::build() {
 
     TelemetryOptions telemetry_opts;
     telemetry_opts.console = console_;
+    if (profiling_address_) {
+        telemetry_opts.profiling.enabled = true;
+        telemetry_opts.profiling.server_address = *profiling_address_;
+    }
     telemetry_opts.telemetry.otlp.export_options = export_options_;
 
     if (otlp_host_ && otlp_port_) {

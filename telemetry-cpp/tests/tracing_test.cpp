@@ -5,6 +5,9 @@
 
 #include <catch2/catch_test_macros.hpp>
 
+#include <map>
+#include <string>
+
 using telemetry::ServiceOptions;
 using telemetry::tracing::SpanKind;
 using telemetry::tracing::Tracer;
@@ -73,4 +76,25 @@ TEST_CASE("an attached span is the thread's current trace context, and scopes ne
         CHECK(telemetry::current_trace_context().span_id == outer.span_id());
     }
     CHECK_FALSE(telemetry::current_trace_context().valid());
+}
+
+TEST_CASE("baggage set on a span reaches the spans under it and the next service") {
+    Tracer tracer(service());
+    auto root = tracer.start_span("checkout");
+    root.set_baggage("tenant", "acme");
+
+    auto explicit_child = tracer.start_span("charge", root);
+    CHECK(explicit_child.baggage().at("tenant") == "acme");
+
+    {
+        auto scope = root.attach();
+        auto implicit_child = tracer.start_span("reserve");
+        CHECK(implicit_child.baggage().at("tenant") == "acme");
+
+        std::map<std::string, std::string> headers;
+        tracer.inject(implicit_child, headers);
+        CHECK(headers.at("baggage") == "tenant=acme");
+        CHECK(tracer.extract(headers).baggage.at("tenant") == "acme");
+    }
+    CHECK(tracer.start_span("after").baggage().empty());
 }

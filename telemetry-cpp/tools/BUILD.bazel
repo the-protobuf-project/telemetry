@@ -1,0 +1,16 @@
+load("@gazelle//:def.bzl", "gazelle", "gazelle_binary")
+
+# Kept out of the root package: gazelle is a dev dependency, and a module
+# that depends on this one loads the root BUILD file to reach //:telemetry.
+# Run from the workspace root: bazel run //tools:gazelle
+gazelle_binary(
+    name = "gazelle_cc",
+    languages = [
+        "@gazelle_cc//language/cc",
+    ],
+)
+
+gazelle(
+    name = "gazelle",
+    gazelle = ":gazelle_cc",
+)

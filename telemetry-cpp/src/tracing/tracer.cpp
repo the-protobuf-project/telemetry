@@ -336,7 +336,7 @@ Span Tracer::start_span(const std::string& name) {
 // none in scope it starts a new trace.
 Span Tracer::start_span(const std::string& name, SpanKind kind) {
     if (const auto& current = current_trace_context(); current.valid()) {
-        return make_span(name, current.trace_id, current.span_id, false, true, {}, kind);
+        return make_span(name, current.trace_id, current.span_id, false, true, current.baggage, kind);
     }
     return make_span(name, "", "", false, true, {}, kind);
 }
@@ -461,7 +461,7 @@ std::string Tracer::generate_span_id() {
 
 ScopedSpan::ScopedSpan(Tracer& tracer, const std::string& name)
     : span_(tracer.start_span(name))
-    , current_({span_.trace_id(), span_.span_id()}) {
+    , current_({span_.trace_id(), span_.span_id(), span_.baggage()}) {
 }
 
 /**

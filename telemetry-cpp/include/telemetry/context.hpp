@@ -1,5 +1,6 @@
 #pragma once
 
+#include <map>
 #include <string>
 #include <utility>
 
@@ -13,6 +14,8 @@ namespace telemetry {
 struct TraceContext {
     std::string trace_id;  ///< 32 lowercase hex digits
     std::string span_id;   ///< 16 lowercase hex digits
+    /// W3C baggage of the span in scope: spans started under it carry it on.
+    std::map<std::string, std::string> baggage;
 
     bool valid() const { return trace_id.size() == 32 && span_id.size() == 16; }
 };

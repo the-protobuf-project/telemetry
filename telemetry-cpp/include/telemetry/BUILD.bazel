@@ -23,6 +23,7 @@ cc_library(
         "//include/telemetry/mcap",
         "//include/telemetry/metrics",
         "//include/telemetry/otel",
+        "//include/telemetry/profiling",
         "//include/telemetry/tracing",
     ],
 )

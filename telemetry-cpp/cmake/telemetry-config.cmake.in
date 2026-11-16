@@ -1,0 +1,17 @@
+@PACKAGE_INIT@
+
+# What the installed library was built with, and so needs found again.
+include(CMakeFindDependencyMacro)
+find_dependency(Threads)
+if(NOT @TELEMETRY_FREERTOS@)
+    find_dependency(spdlog)
+endif()
+if(@TELEMETRY_USE_OTEL@)
+    find_dependency(opentelemetry-cpp CONFIG)
+endif()
+if(@TELEMETRY_PROFILING@ AND NOT @TELEMETRY_FREERTOS@)
+    find_dependency(CURL)
+endif()
+
+include("${CMAKE_CURRENT_LIST_DIR}/telemetry-targets.cmake")
+check_required_components(telemetry)

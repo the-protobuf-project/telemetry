@@ -96,6 +96,12 @@ public:
     const std::string& parent_span_id() const { return parent_span_id_; }
     /// W3C baggage this span carries on to the services it calls.
     const std::map<std::string, std::string>& baggage() const { return baggage_; }
+
+    /// Adds key=value to the baggage this span, the spans started under it and
+    /// the services they call carry (Tracer::inject sends it as the W3C
+    /// baggage header), as Go's SetBaggage and the others' set_baggage do.
+    /// Set it before attach() for spans started in that scope to see it.
+    void set_baggage(const std::string& key, const std::string& value) { baggage_[key] = value; }
     bool is_ended() const { return ended_; }
 
     /// Makes this span current on this thread until the guard is destroyed:
@@ -104,7 +110,7 @@ public:
     ///     auto span = tracer.start_span("reserve", parent, SpanKind::Server);
     ///     auto current = span.attach();
     ///     logger.info("reserved");  // correlated with the span
-    [[nodiscard]] ScopedTraceContext attach() const { return ScopedTraceContext({trace_id_, span_id_}); }
+    [[nodiscard]] ScopedTraceContext attach() const { return ScopedTraceContext({trace_id_, span_id_, baggage_}); }
 
 private:
     friend class Tracer;
@@ -229,9 +235,14 @@ private:
 
 }  // namespace telemetry::tracing
 
+// __LINE__ is expanded before it is pasted only through a second macro, so
+// each TELEMETRY_SPAN gets a variable of its own and two can share a scope.
+#define TELEMETRY_CONCAT_(a, b) a##b
+#define TELEMETRY_CONCAT(a, b) TELEMETRY_CONCAT_(a, b)
+
 #define TELEMETRY_SPAN(tracer, name) \
-    ::telemetry::tracing::ScopedSpan _telemetry_span_##__LINE__(tracer, name)
+    ::telemetry::tracing::ScopedSpan TELEMETRY_CONCAT(_telemetry_span_, __LINE__)(tracer, name)
 
 #define TELEMETRY_SPAN_OK(tracer, name) \
-    ::telemetry::tracing::ScopedSpan _telemetry_span_##__LINE__(tracer, name); \
-    _telemetry_span_##__LINE__.set_ok()
+    ::telemetry::tracing::ScopedSpan TELEMETRY_CONCAT(_telemetry_span_, __LINE__)(tracer, name); \
+    TELEMETRY_CONCAT(_telemetry_span_, __LINE__).set_ok()

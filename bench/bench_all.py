@@ -209,7 +209,7 @@ def main():
     ap.add_argument("--langs", default="go,rust,python,cpp")
     ap.add_argument("--signals", default="logs,spans,metrics")
     ap.add_argument("--timeout", type=int, default=1800, help="seconds per run")
-    ap.add_argument("--out", default=str(ROOT / "docs" / "BENCHMARKS.md"))
+    ap.add_argument("--out", default=str(ROOT / "docs" / "benchmark.md"))
     ap.add_argument("--data", default=str(DATA), help="where the raw results are kept")
     ap.add_argument("--no-mcap", action="store_true", help="skip the MCAP recording runs")
     ap.add_argument("--rounds", type=int, default=3, help="runs per head-to-head configuration; the median is kept")

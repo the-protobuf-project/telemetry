@@ -20,16 +20,16 @@ arrive: the batch processor's 2048-slot queue fills and drops the rest without a
 xychart-beta
     title "Official SDKs: logs delivered of 1,000,000 (%)"
     x-axis ["Go", "Rust", "Python", "C++"]
-    y-axis "% delivered" 0 --> 29.7472
-    bar [27.0429, 11.3724, 14.4896, 20.7592]
+    y-axis "% delivered" 0 --> 28.7232
+    bar [26.112, 10.9113, 14.3872, 22.784]
 ```
 
 ```mermaid
 xychart-beta
     title "Official SDKs: spans delivered of 1,000,000 (%)"
     x-axis ["Go", "Rust", "Python", "C++"]
-    y-axis "% delivered" 0 --> 92.4803
-    bar [42.5909, 14.3917, 28.5696, 84.073]
+    y-axis "% delivered" 0 --> 92.1545
+    bar [40.7326, 12.8538, 28.672, 83.7768]
 ```
 
 ### Step by step, in Go
@@ -40,26 +40,26 @@ one thread, so read this as what each SDK can be made to deliver, not a like-for
 
 | Step | Logs delivered | Logs / s | Spans delivered | Spans / s |
 | ---- | -------------: | -------: | --------------: | --------: |
-| Official Go SDK alone | 270,429 | 1,712,027 | 425,909 | 1,922,065 |
-| This SDK, default: drops counted and reported | 513,091 | 620,935 | 522,752 | 1,693,677 |
-| Lossless: the writer waits for room | 1,000,000 | 332,789 | 1,000,000 | 1,050,896 |
-| Lossless, one goroutine per CPU, batch 8192 | 1,000,000 | 394,537 | 1,000,000 | 1,496,277 |
-| Lossless, plus 4 exporters in parallel | 1,000,000 | 1,206,449 | 1,000,000 | 3,937,499 |
+| Official Go SDK alone | 261,120 | 1,689,596 | 407,326 | 1,964,476 |
+| This SDK, default: drops counted and reported | 501,519 | 612,224 | 558,592 | 1,685,936 |
+| Lossless: the writer waits for room | 1,000,000 | 313,354 | 1,000,000 | 1,031,928 |
+| Lossless, one goroutine per CPU, batch 8192 | 1,000,000 | 386,110 | 1,000,000 | 1,442,794 |
+| Lossless, plus 4 exporters in parallel | 1,000,000 | 1,238,486 | 1,000,000 | 4,001,832 |
 
 ```mermaid
 xychart-beta
     title "Go logs: delivered (%) at each step"
     x-axis ["1", "2", "3", "4", "5"]
     y-axis "% delivered" 0 --> 110
-    bar [27.0429, 51.3091, 100, 100, 100]
+    bar [26.112, 50.1519, 100, 100, 100]
 ```
 
 ```mermaid
 xychart-beta
     title "Go logs: written per second at each step"
     x-axis ["1", "2", "3", "4", "5"]
-    y-axis "thousand / s" 0 --> 1883.23
-    line [1712.03, 620.935, 332.789, 394.537, 1206.45]
+    y-axis "thousand / s" 0 --> 1858.56
+    line [1689.6, 612.224, 313.354, 386.11, 1238.49]
 ```
 
 ```mermaid
@@ -67,15 +67,15 @@ xychart-beta
     title "Go spans: delivered (%) at each step"
     x-axis ["1", "2", "3", "4", "5"]
     y-axis "% delivered" 0 --> 110
-    bar [42.5909, 52.2752, 100, 100, 100]
+    bar [40.7326, 55.8592, 100, 100, 100]
 ```
 
 ```mermaid
 xychart-beta
     title "Go spans: written per second at each step"
     x-axis ["1", "2", "3", "4", "5"]
-    y-axis "thousand / s" 0 --> 4331.25
-    line [1922.06, 1693.68, 1050.9, 1496.28, 3937.5]
+    y-axis "thousand / s" 0 --> 4402.01
+    line [1964.48, 1685.94, 1031.93, 1442.79, 4001.83]
 ```
 
 ### Every language against its official SDK
@@ -88,40 +88,40 @@ records it drops.
 xychart-beta
     title "Logs: calls per second vs the official SDK (x)"
     x-axis ["Go", "Rust", "Python", "C++"]
-    y-axis "x official" 0 --> 4.91824
-    bar [0.36269, 0.533667, 4.47112, 1.07777]
+    y-axis "x official" 0 --> 5.04157
+    bar [0.36235, 0.58823, 4.58325, 1.12191]
 ```
 
 ```mermaid
 xychart-beta
     title "Spans: calls per second vs the official SDK (x)"
     x-axis ["Go", "Rust", "Python", "C++"]
-    y-axis "x official" 0 --> 1.43448
-    bar [0.881176, 0.520523, 1.30407, 0.990905]
+    y-axis "x official" 0 --> 1.23828
+    bar [0.858211, 0.540658, 1.12571, 0.940269]
 ```
 
 ```mermaid
 xychart-beta
     title "Metrics: calls per second vs the official SDK (x)"
     x-axis ["Go", "Rust", "Python", "C++"]
-    y-axis "x official" 0 --> 0.81813
-    bar [0.422611, 0.249946, 0.743754, 0.342989]
+    y-axis "x official" 0 --> 11.0191
+    bar [5.28129, 3.35163, 10.0173, 3.48944]
 ```
 
 | Language | Signal | Official: delivered | Official: rate | This SDK, drop: delivered | rate | Lossless: delivered | rate |
 | -------- | ------ | ------------------: | -------------: | ------------------------: | ---: | ------------------: | ---: |
-| Go | logs | 270,429 | 1,712,027/s | 513,091 | 620,935/s | 1,000,000 | 332,789/s |
-| Rust | logs | 113,724 | 7,662,040/s | 170,540 | 4,088,980/s | 1,000,000 | 909,124/s |
-| Python | logs | 144,896 | 121,144/s | 355,392 | 541,650/s | 1,000,000 | 252,319/s |
-| C++ | logs | 207,592 | 4,665,579/s | 313,314 | 5,028,439/s | — | — |
-| Go | spans | 425,909 | 1,922,065/s | 522,752 | 1,693,677/s | 1,000,000 | 1,050,896/s |
-| Rust | spans | 143,917 | 7,959,605/s | 293,916 | 4,143,154/s | 1,000,000 | 1,824,392/s |
-| Python | spans | 285,696 | 76,605/s | 1,000,000 | 99,898/s | 1,000,000 | 94,400/s |
-| C++ | spans | 840,730 | 2,033,027/s | 908,298 | 2,014,538/s | — | — |
-| Go | metrics | 1,000,000 | 19,191,678/s | 1,000,000 | 8,110,607/s | 1,000,000 | 8,162,349/s |
-| Rust | metrics | 1,000,000 | 143,322,100/s | 1,000,000 | 35,822,767/s | 1,000,000 | 40,276,836/s |
-| Python | metrics | 1,000,000 | 556,169/s | 1,000,000 | 413,653/s | 1,000,000 | 415,276/s |
-| C++ | metrics | 1,000,000 | 75,778,145/s | 1,000,000 | 25,991,044/s | — | — |
+| Go | logs | 261,120 | 1,689,596/s | 501,519 | 612,224/s | 1,000,000 | 313,354/s |
+| Rust | logs | 109,113 | 6,965,310/s | 166,960 | 4,097,206/s | 1,000,000 | 862,015/s |
+| Python | logs | 143,872 | 119,040/s | 351,348 | 545,589/s | 1,000,000 | 247,892/s |
+| C++ | logs | 227,840 | 4,595,766/s | 294,912 | 5,156,051/s | — | — |
+| Go | spans | 407,326 | 1,964,476/s | 558,592 | 1,685,936/s | 1,000,000 | 1,031,928/s |
+| Rust | spans | 128,538 | 7,721,322/s | 289,763 | 4,174,593/s | 1,000,000 | 1,792,062/s |
+| Python | spans | 286,720 | 87,761/s | 1,000,000 | 98,794/s | 1,000,000 | 93,309/s |
+| C++ | spans | 837,768 | 1,982,145/s | 879,555 | 1,863,750/s | — | — |
+| Go | metrics | 1,000,000 | 16,366,802/s | 1,000,000 | 86,437,894/s | 1,000,000 | 172,215,834/s |
+| Rust | metrics | 1,000,000 | 199,279,287/s | 1,000,000 | 667,909,870/s | 1,000,000 | 1,301,376,726/s |
+| Python | metrics | 1,000,000 | 592,438/s | 1,000,000 | 5,934,658/s | 1,000,000 | 5,971,326/s |
+| C++ | metrics | 1,000,000 | 57,495,495/s | 1,000,000 | 200,626,959/s | — | — |
 
 ## Head to head: the official SDKs tuned
 
@@ -136,46 +136,46 @@ each figure is the median of several runs.
 xychart-beta
     title "Goodput vs the tuned official SDK, 1 thread (x)"
     x-axis ["Go logs", "Go metrics", "Go spans", "Rust logs", "Rust metrics", "Rust spans", "Python logs", "Python metrics", "Python spans", "C++ logs", "C++ metrics", "C++ spans"]
-    y-axis "x official" 0 --> 29.8233
-    bar [1.16794, 0.47698, 1.55141, 2.58289, 0.433197, 2.18988, 27.1121, 0.69303, 3.44642, 2.89871, 0.451528, 0.866928]
+    y-axis "x official" 0 --> 30.7114
+    bar [1.19917, 5.16188, 1.50802, 2.70799, 3.1614, 2.296, 27.9195, 9.46361, 3.42447, 3.01104, 2.247, 1.00077]
 ```
 
 ```mermaid
 xychart-beta
     title "Goodput vs the tuned official SDK, 14 threads (x)"
     x-axis ["Go logs", "Go metrics", "Go spans", "Rust logs", "Rust metrics", "Rust spans", "Python logs", "Python metrics", "Python spans", "C++ logs", "C++ metrics", "C++ spans"]
-    y-axis "x official" 0 --> 24.0702
-    bar [2.16561, 0.939262, 3.32222, 2.79578, 0.831118, 2.64948, 21.882, 0.407884, 4.94902, 4.34061, 0.279257, 0.0670573]
+    y-axis "x official" 0 --> 167.882
+    bar [2.2161, 22.8765, 3.17719, 2.92396, 152.62, 2.27273, 22.8862, 9.42255, 5.14132, 4.54067, 17.0457, 1.07647]
 ```
 
 | Language | Signal | Threads | Official, tuned | This SDK | Delivered (both) | vs official |
 | -------- | ------ | ------: | --------------: | -------: | ---------------: | ----------: |
-| Go | logs | 1 | 573,782/s | 670,146/s | 1,000,000 / 1,000,000 | **1.17x** |
-| Go | metrics | 1 | 16,072,928/s | 7,666,470/s | 1,000,000 / 1,000,000 | **0.48x** |
-| Go | spans | 1 | 1,377,204/s | 2,136,603/s | 1,000,000 / 1,000,000 | **1.55x** |
-| Rust | logs | 1 | 1,250,337/s | 3,229,477/s | 1,000,000 / 1,000,000 | **2.58x** |
-| Rust | metrics | 1 | 92,553,677/s | 40,094,019/s | 1,000,000 / 1,000,000 | **0.43x** |
-| Rust | spans | 1 | 1,831,464/s | 4,010,688/s | 1,000,000 / 1,000,000 | **2.19x** |
-| Python | logs | 1 | 17,950/s | 486,650/s | 638,976 / 1,000,000 | **27.11x** |
-| Python | metrics | 1 | 576,917/s | 399,821/s | 1,000,000 / 1,000,000 | **0.69x** |
-| Python | spans | 1 | 25,561/s | 88,093/s | 1,000,000 / 1,000,000 | **3.45x** |
-| C++ | logs | 1 | 1,504,404/s | 4,360,825/s | 1,000,000 / 1,000,000 | **2.90x** |
-| C++ | metrics | 1 | 53,890,803/s | 24,333,219/s | 1,000,000 / 1,000,000 | **0.45x** |
-| C++ | spans | 1 | 2,674,140/s | 2,318,288/s | 1,000,000 / 1,000,000 | **0.87x** |
-| Go | logs | 14 | 573,888/s | 1,242,820/s | 1,000,000 / 1,000,000 | **2.17x** |
-| Go | metrics | 14 | 11,035,589/s | 10,365,308/s | 1,000,000 / 1,000,000 | **0.94x** |
-| Go | spans | 14 | 1,041,592/s | 3,460,394/s | 1,000,000 / 1,000,000 | **3.32x** |
-| Rust | logs | 14 | 1,033,579/s | 2,889,662/s | 1,000,000 / 1,000,000 | **2.80x** |
-| Rust | metrics | 14 | 1,970,526/s | 1,637,740/s | 1,000,000 / 1,000,000 | **0.83x** |
-| Rust | spans | 14 | 1,522,448/s | 4,033,702/s | 1,000,000 / 1,000,000 | **2.65x** |
-| Python | logs | 14 | 17,671/s | 386,684/s | 704,512 / 1,000,000 | **21.88x** |
-| Python | metrics | 14 | 162,051/s | 66,098/s | 1,000,000 / 1,000,000 | **0.41x** |
-| Python | spans | 14 | 24,938/s | 123,420/s | 909,312 / 1,000,000 | **4.95x** |
-| C++ | logs | 14 | 1,025,861/s | 4,452,865/s | 1,000,000 / 1,000,000 | **4.34x** |
-| C++ | metrics | 14 | 29,523,600/s | 8,244,666/s | 1,000,000 / 1,000,000 | **0.28x** |
-| C++ | spans | 14 | 1,423,678/s | 95,468/s | 1,000,000 / 1,000,000 | **0.07x** |
+| Go | logs | 1 | 560,897/s | 672,609/s | 1,000,000 / 1,000,000 | **1.20x** |
+| Go | metrics | 1 | 18,584,338/s | 95,930,172/s | 1,000,000 / 1,000,000 | **5.16x** |
+| Go | spans | 1 | 1,391,787/s | 2,098,840/s | 1,000,000 / 1,000,000 | **1.51x** |
+| Rust | logs | 1 | 1,221,036/s | 3,306,549/s | 1,000,000 / 1,000,000 | **2.71x** |
+| Rust | metrics | 1 | 100,837,801/s | 318,788,603/s | 1,000,000 / 1,000,000 | **3.16x** |
+| Rust | spans | 1 | 1,784,565/s | 4,097,360/s | 1,000,000 / 1,000,000 | **2.30x** |
+| Python | logs | 1 | 17,991/s | 502,303/s | 638,976 / 1,000,000 | **27.92x** |
+| Python | metrics | 1 | 575,677/s | 5,447,979/s | 1,000,000 / 1,000,000 | **9.46x** |
+| Python | spans | 1 | 25,363/s | 86,856/s | 1,000,000 / 1,000,000 | **3.42x** |
+| C++ | logs | 1 | 1,457,395/s | 4,388,280/s | 1,000,000 / 1,000,000 | **3.01x** |
+| C++ | metrics | 1 | 54,530,952/s | 122,530,880/s | 1,000,000 / 1,000,000 | **2.25x** |
+| C++ | spans | 1 | 2,471,053/s | 2,472,956/s | 1,000,000 / 1,000,000 | **1.00x** |
+| Go | logs | 14 | 565,843/s | 1,253,967/s | 1,000,000 / 1,000,000 | **2.22x** |
+| Go | metrics | 14 | 10,960,896/s | 250,746,975/s | 1,000,000 / 1,000,000 | **22.88x** |
+| Go | spans | 14 | 1,051,608/s | 3,341,158/s | 1,000,000 / 1,000,000 | **3.18x** |
+| Rust | logs | 14 | 1,029,024/s | 3,008,829/s | 1,000,000 / 1,000,000 | **2.92x** |
+| Rust | metrics | 14 | 3,561,468/s | 543,552,113/s | 1,000,000 / 1,000,000 | **152.62x** |
+| Rust | spans | 14 | 1,555,172/s | 3,534,487/s | 1,000,000 / 1,000,000 | **2.27x** |
+| Python | logs | 14 | 17,399/s | 398,195/s | 696,320 / 1,000,000 | **22.89x** |
+| Python | metrics | 14 | 159,471/s | 1,502,625/s | 1,000,000 / 1,000,000 | **9.42x** |
+| Python | spans | 14 | 24,305/s | 124,960/s | 917,504 / 1,000,000 | **5.14x** |
+| C++ | logs | 14 | 1,041,319/s | 4,728,283/s | 1,000,000 / 1,000,000 | **4.54x** |
+| C++ | metrics | 14 | 31,410,570/s | 535,415,314/s | 1,000,000 / 1,000,000 | **17.05x** |
+| C++ | spans | 14 | 1,315,206/s | 1,415,776/s | 1,000,000 / 1,000,000 | **1.08x** |
 
-Under 2x: Go metrics, Rust metrics, Python metrics, C++ metrics, C++ spans.
+Under 2x: C++ spans.
 C++ spans are bounded inside opentelemetry-cpp's tracer: every span copies
 reference-counted pointers that all threads share, in the official SDK and this one alike.
 
@@ -188,15 +188,15 @@ xychart-beta
     title "Logs delivered of 1,000,000 (%)"
     x-axis ["Go drop", "Go lossless", "Go lossless x14", "Go 4 exporters", "Rust drop", "Rust lossless", "Python drop", "Python lossless", "C++ drop", "Go OTel SDK", "Rust OTel SDK", "Python OTel SDK", "C++ OTel SDK"]
     y-axis "% delivered" 0 --> 110
-    bar [51.3091, 100, 100, 100, 17.054, 100, 35.5392, 100, 31.3314, 27.0429, 11.3724, 14.4896, 20.7592]
+    bar [50.1519, 100, 100, 100, 16.696, 100, 35.1348, 100, 29.4912, 26.112, 10.9113, 14.3872, 22.784]
 ```
 
 ```mermaid
 xychart-beta
     title "Logs written per second"
     x-axis ["Go drop", "Go lossless", "Go lossless x14", "Go 4 exporters", "Rust drop", "Rust lossless", "Python drop", "Python lossless", "C++ drop", "Go OTel SDK", "Rust OTel SDK", "Python OTel SDK", "C++ OTel SDK"]
-    y-axis "thousand / s" 0 --> 8428.24
-    bar [620.935, 332.789, 394.537, 1206.45, 4088.98, 909.124, 541.65, 252.319, 5028.44, 1712.03, 7662.04, 121.144, 4665.58]
+    y-axis "thousand / s" 0 --> 7661.84
+    bar [612.224, 313.354, 386.11, 1238.49, 4097.21, 862.015, 545.589, 247.892, 5156.05, 1689.6, 6965.31, 119.04, 4595.77]
 ```
 
 ### Spans
@@ -206,15 +206,15 @@ xychart-beta
     title "Spans delivered of 1,000,000 (%)"
     x-axis ["Go drop", "Go lossless", "Go lossless x14", "Go 4 exporters", "Rust drop", "Rust lossless", "Python drop", "Python lossless", "C++ drop", "Go OTel SDK", "Rust OTel SDK", "Python OTel SDK", "C++ OTel SDK"]
     y-axis "% delivered" 0 --> 110
-    bar [52.2752, 100, 100, 100, 29.3916, 100, 100, 100, 90.8298, 42.5909, 14.3917, 28.5696, 84.073]
+    bar [55.8592, 100, 100, 100, 28.9763, 100, 100, 100, 87.9555, 40.7326, 12.8538, 28.672, 83.7768]
 ```
 
 ```mermaid
 xychart-beta
     title "Spans written per second"
     x-axis ["Go drop", "Go lossless", "Go lossless x14", "Go 4 exporters", "Rust drop", "Rust lossless", "Python drop", "Python lossless", "C++ drop", "Go OTel SDK", "Rust OTel SDK", "Python OTel SDK", "C++ OTel SDK"]
-    y-axis "thousand / s" 0 --> 8755.57
-    bar [1693.68, 1050.9, 1496.28, 3937.5, 4143.15, 1824.39, 99.898, 94.3995, 2014.54, 1922.06, 7959.61, 76.6046, 2033.03]
+    y-axis "thousand / s" 0 --> 8493.45
+    bar [1685.94, 1031.93, 1442.79, 4001.83, 4174.59, 1792.06, 98.7938, 93.3089, 1863.75, 1964.48, 7721.32, 87.7613, 1982.15]
 ```
 
 ### Metrics
@@ -225,8 +225,8 @@ Every configuration delivers every increment: a counter exports its running tota
 xychart-beta
     title "Counter increments per second"
     x-axis ["Go drop", "Go lossless", "Go lossless x14", "Go 4 exporters", "Rust drop", "Rust lossless", "Python drop", "Python lossless", "C++ drop", "Go OTel SDK", "Rust OTel SDK", "Python OTel SDK", "C++ OTel SDK"]
-    y-axis "million / s" 0 --> 157.654
-    bar [8.11061, 8.16235, 12.6262, 12.7442, 35.8228, 40.2768, 0.413653, 0.415276, 25.991, 19.1917, 143.322, 0.556169, 75.7781]
+    y-axis "million / s" 0 --> 1431.51
+    bar [86.4379, 172.216, 619.691, 1168.34, 667.91, 1301.38, 5.93466, 5.97133, 200.627, 16.3668, 199.279, 0.592438, 57.4955]
 ```
 
 ### Logs: speed against delivery
@@ -242,19 +242,19 @@ quadrantChart
     quadrant-2 Lossless but slow
     quadrant-3 Slow and lossy
     quadrant-4 Fast but lossy
-    Go drop: [0.698, 0.513]
-    Go lossless: [0.631, 0.980]
-    Go lossless x14: [0.649, 0.980]
-    Go 4 exporters: [0.770, 0.980]
-    Rust drop: [0.903, 0.171]
-    Rust lossless: [0.740, 0.980]
-    Python drop: [0.683, 0.355]
-    Python lossless: [0.600, 0.980]
-    C++ drop: [0.925, 0.313]
-    Go OTel SDK: [0.808, 0.270]
-    Rust OTel SDK: [0.971, 0.114]
-    Python OTel SDK: [0.521, 0.145]
-    C++ OTel SDK: [0.917, 0.208]
+    Go drop: [0.697, 0.502]
+    Go lossless: [0.624, 0.980]
+    Go lossless x14: [0.647, 0.980]
+    Go 4 exporters: [0.773, 0.980]
+    Rust drop: [0.903, 0.167]
+    Rust lossless: [0.734, 0.980]
+    Python drop: [0.684, 0.351]
+    Python lossless: [0.599, 0.980]
+    C++ drop: [0.928, 0.295]
+    Go OTel SDK: [0.807, 0.261]
+    Rust OTel SDK: [0.961, 0.109]
+    Python OTel SDK: [0.519, 0.144]
+    C++ OTel SDK: [0.916, 0.228]
 ```
 
 ### Spans: speed against delivery
@@ -270,19 +270,19 @@ quadrantChart
     quadrant-2 Lossless but slow
     quadrant-3 Slow and lossy
     quadrant-4 Fast but lossy
-    Go drop: [0.807, 0.523]
-    Go lossless: [0.755, 0.980]
-    Go lossless x14: [0.794, 0.980]
-    Go 4 exporters: [0.899, 0.980]
-    Rust drop: [0.904, 0.294]
-    Rust lossless: [0.815, 0.980]
-    Python drop: [0.500, 0.980]
-    Python lossless: [0.494, 0.980]
-    C++ drop: [0.826, 0.908]
-    Go OTel SDK: [0.821, 0.426]
-    Rust OTel SDK: [0.975, 0.144]
-    Python OTel SDK: [0.471, 0.286]
-    C++ OTel SDK: [0.827, 0.841]
+    Go drop: [0.807, 0.559]
+    Go lossless: [0.753, 0.980]
+    Go lossless x14: [0.790, 0.980]
+    Go 4 exporters: [0.901, 0.980]
+    Rust drop: [0.905, 0.290]
+    Rust lossless: [0.813, 0.980]
+    Python drop: [0.499, 0.980]
+    Python lossless: [0.492, 0.980]
+    C++ drop: [0.818, 0.880]
+    Go OTel SDK: [0.823, 0.407]
+    Rust OTel SDK: [0.972, 0.129]
+    Python OTel SDK: [0.486, 0.287]
+    C++ OTel SDK: [0.824, 0.838]
 ```
 
 ### Where the records went (default mode)
@@ -299,42 +299,42 @@ config:
 ---
 sankey-beta
 
-Go drop logs,Delivered,513091
-Go drop logs,Dropped,486909
-Go drop spans,Delivered,522752
-Go drop spans,Dropped,477248
-Rust drop logs,Delivered,170540
-Rust drop logs,Dropped,829460
-Rust drop spans,Delivered,293916
-Rust drop spans,Dropped,706084
-Python drop logs,Delivered,355392
-Python drop logs,Dropped,644608
-C++ drop logs,Delivered,313314
-C++ drop logs,Dropped,686686
-C++ drop spans,Delivered,908298
-C++ drop spans,Dropped,91702
-Go OTel SDK logs,Delivered,270429
-Go OTel SDK logs,Dropped,729571
-Go OTel SDK spans,Delivered,425909
-Go OTel SDK spans,Dropped,574091
-Rust OTel SDK logs,Delivered,113724
-Rust OTel SDK logs,Dropped,886276
-Rust OTel SDK spans,Delivered,143917
-Rust OTel SDK spans,Dropped,856083
-Python OTel SDK logs,Delivered,144896
-Python OTel SDK logs,Dropped,855104
-Python OTel SDK spans,Delivered,285696
-Python OTel SDK spans,Dropped,714304
-C++ OTel SDK logs,Delivered,207592
-C++ OTel SDK logs,Dropped,792408
-C++ OTel SDK spans,Delivered,840730
-C++ OTel SDK spans,Dropped,159270
+Go drop logs,Delivered,501519
+Go drop logs,Dropped,498481
+Go drop spans,Delivered,558592
+Go drop spans,Dropped,441408
+Rust drop logs,Delivered,166960
+Rust drop logs,Dropped,833040
+Rust drop spans,Delivered,289763
+Rust drop spans,Dropped,710237
+Python drop logs,Delivered,351348
+Python drop logs,Dropped,648652
+C++ drop logs,Delivered,294912
+C++ drop logs,Dropped,705088
+C++ drop spans,Delivered,879555
+C++ drop spans,Dropped,120445
+Go OTel SDK logs,Delivered,261120
+Go OTel SDK logs,Dropped,738880
+Go OTel SDK spans,Delivered,407326
+Go OTel SDK spans,Dropped,592674
+Rust OTel SDK logs,Delivered,109113
+Rust OTel SDK logs,Dropped,890887
+Rust OTel SDK spans,Delivered,128538
+Rust OTel SDK spans,Dropped,871462
+Python OTel SDK logs,Delivered,143872
+Python OTel SDK logs,Dropped,856128
+Python OTel SDK spans,Delivered,286720
+Python OTel SDK spans,Dropped,713280
+C++ OTel SDK logs,Delivered,227840
+C++ OTel SDK logs,Dropped,772160
+C++ OTel SDK spans,Delivered,837768
+C++ OTel SDK spans,Dropped,162232
 ```
 
 ```mermaid
 pie showData title Rust OTel SDK: 1,000,000 logs
-    "Delivered" : 113724
-    "Dropped (queue full)" : 886276
+    "Delivered" : 109113
+    "Dropped (queue full)" : 890887
 ```
 
 ### Go: more exporters, more throughput
@@ -356,16 +356,16 @@ xychart-beta
 xychart-beta
     title "MCAP records written per second"
     x-axis ["Go logs", "Go spans", "Go metrics", "Rust logs", "Rust spans", "Rust metrics", "Python logs", "Python spans", "Python metrics"]
-    y-axis "thousand / s" 0 --> 2055.1
-    bar [372.39, 847.057, 1819.47, 849.301, 617.319, 1868.27, 160.647, 56.4089, 158.99]
+    y-axis "thousand / s" 0 --> 2552.66
+    bar [361.554, 819.139, 2320.6, 855.335, 620.727, 1884.76, 161.783, 55.1458, 283.232]
 ```
 
 ```mermaid
 xychart-beta
     title "MCAP bytes per record (zstd)"
     x-axis ["Go logs", "Go spans", "Go metrics", "Rust logs", "Rust spans", "Rust metrics", "Python logs", "Python spans", "Python metrics"]
-    y-axis "bytes" 0 --> 64.6876
-    bar [28.5784, 58.8022, 19.5989, 28.659, 58.3725, 18.9879, 28.913, 58.8069, 23.9084]
+    y-axis "bytes" 0 --> 64.7223
+    bar [28.6033, 58.8385, 18.8272, 28.6493, 58.3609, 18.962, 28.9075, 58.8152, 23.7019]
 ```
 
 ### Go: cost of one call
@@ -373,54 +373,54 @@ xychart-beta
 ```mermaid
 xychart-beta
     title "Go SDK nanoseconds per call"
-    x-axis ["LogInfo/export=false", "LogInfo/export=false-8", "LogInfo/export=true", "LogInfo/export=true-8", "Span/export=false", "Span/export=false-8", "Span/export=true", "Span/export=true-8", "Counter", "Counter-8"]
-    y-axis "ns / op" 0 --> 1546.6
-    bar [99.66, 75.45, 1406, 662.4, 100.3, 30.09, 539.2, 209.8, 116.9, 75.74]
+    x-axis ["LogInfo/export=false", "LogInfo/export=false-8", "LogInfo/export=true", "LogInfo/export=true-8", "Span/export=false", "Span/export=false-8", "Span/export=true", "Span/export=true-8", "Counter", "Counter-8", "CounterHandle", "CounterHandle-8"]
+    y-axis "ns / op" 0 --> 1519.1
+    bar [99.77, 76.87, 1381, 642.5, 104.4, 30.38, 545, 233.1, 15.11, 3.624, 3.795, 0.9569]
 ```
 
 ## OTLP export
 
 | SDK | Mode | Signal | Delivered | Lost | Emit rate | Per call | Flush on close |
 | --- | ---- | ------ | --------: | ---: | --------: | -------: | -------------: |
-| Go | default (drop when full), 1 goroutine | logs | 513,091 | 48.7% | 620,935/s | 1,610 ns | 0.01 s |
-| Go | default (drop when full), 1 goroutine | spans | 522,752 | 47.7% | 1,693,677/s | 590 ns | 0.00 s |
-| Go | default (drop when full), 1 goroutine | metrics | 1,000,000 | 0.0% | 8,110,607/s | 123 ns | 0.00 s |
-| Go | Lossless, 1 goroutine | logs | 1,000,000 | 0.0% | 332,789/s | 3,005 ns | 0.01 s |
-| Go | Lossless, 1 goroutine | spans | 1,000,000 | 0.0% | 1,050,896/s | 952 ns | 0.00 s |
-| Go | Lossless, 1 goroutine | metrics | 1,000,000 | 0.0% | 8,162,349/s | 123 ns | 0.00 s |
-| Go | Lossless, 14 goroutines, batch 8192 | logs | 1,000,000 | 0.0% | 394,537/s | 2,535 ns | 0.15 s |
-| Go | Lossless, 14 goroutines, batch 8192 | spans | 1,000,000 | 0.0% | 1,496,277/s | 668 ns | 0.04 s |
-| Go | Lossless, 14 goroutines, batch 8192 | metrics | 1,000,000 | 0.0% | 12,626,183/s | 79 ns | 0.00 s |
-| Go | Lossless, 14 goroutines, batch 8192, 4 exporters | logs | 1,000,000 | 0.0% | 1,206,449/s | 829 ns | 0.02 s |
-| Go | Lossless, 14 goroutines, batch 8192, 4 exporters | spans | 1,000,000 | 0.0% | 3,937,499/s | 254 ns | 0.04 s |
-| Go | Lossless, 14 goroutines, batch 8192, 4 exporters | metrics | 1,000,000 | 0.0% | 12,744,157/s | 78 ns | 0.00 s |
-| Rust | default (drop when full) | logs | 170,540 | 82.9% | 4,088,980/s | 245 ns | 0.00 s |
-| Rust | default (drop when full) | spans | 293,916 | 70.6% | 4,143,154/s | 241 ns | 0.00 s |
-| Rust | default (drop when full) | metrics | 1,000,000 | 0.0% | 35,822,767/s | 28 ns | 0.00 s |
-| Rust | Lossless | logs | 1,000,000 | 0.0% | 909,124/s | 1,100 ns | 0.07 s |
-| Rust | Lossless | spans | 1,000,000 | 0.0% | 1,824,392/s | 548 ns | 0.03 s |
-| Rust | Lossless | metrics | 1,000,000 | 0.0% | 40,276,836/s | 25 ns | 0.00 s |
-| Python | default (drop when full) | logs | 355,392 | 64.5% | 541,650/s | 1,846 ns | 0.01 s |
-| Python | default (drop when full) | spans | 1,000,000 | 0.0% | 99,898/s | 10,010 ns | 0.00 s |
-| Python | default (drop when full) | metrics | 1,000,000 | 0.0% | 413,653/s | 2,417 ns | 0.00 s |
-| Python | Lossless | logs | 1,000,000 | 0.0% | 252,319/s | 3,963 ns | 0.29 s |
-| Python | Lossless | spans | 1,000,000 | 0.0% | 94,400/s | 10,593 ns | 0.03 s |
-| Python | Lossless | metrics | 1,000,000 | 0.0% | 415,276/s | 2,408 ns | 0.00 s |
-| C++ | default (drop when full) | logs | 313,314 | 68.7% | 5,028,439/s | 199 ns | 0.00 s |
-| C++ | default (drop when full) | spans | 908,298 | 9.2% | 2,014,538/s | 496 ns | 0.00 s |
-| C++ | default (drop when full) | metrics | 1,000,000 | 0.0% | 25,991,044/s | 38 ns | 0.00 s |
-| Go | official OpenTelemetry SDK alone (default batch processor) | logs | 270,429 | 73.0% | 1,712,027/s | 584 ns | 0.00 s |
-| Go | official OpenTelemetry SDK alone (default batch processor) | spans | 425,909 | 57.4% | 1,922,065/s | 520 ns | 0.00 s |
-| Go | official OpenTelemetry SDK alone (default batch processor) | metrics | 1,000,000 | 0.0% | 19,191,678/s | 52 ns | 0.00 s |
-| Rust | official OpenTelemetry SDK alone (default batch processor) | logs | 113,724 | 88.6% | 7,662,040/s | 131 ns | 0.00 s |
-| Rust | official OpenTelemetry SDK alone (default batch processor) | spans | 143,917 | 85.6% | 7,959,605/s | 126 ns | 0.00 s |
-| Rust | official OpenTelemetry SDK alone (default batch processor) | metrics | 1,000,000 | 0.0% | 143,322,100/s | 7 ns | 0.00 s |
-| Python | official OpenTelemetry SDK alone (default batch processor) | logs | 144,896 | 85.5% | 121,144/s | 8,255 ns | 0.13 s |
-| Python | official OpenTelemetry SDK alone (default batch processor) | spans | 285,696 | 71.4% | 76,605/s | 13,054 ns | 0.10 s |
-| Python | official OpenTelemetry SDK alone (default batch processor) | metrics | 1,000,000 | 0.0% | 556,169/s | 1,798 ns | 0.01 s |
-| C++ | official OpenTelemetry SDK alone (default batch processor) | logs | 207,592 | 79.2% | 4,665,579/s | 214 ns | 0.00 s |
-| C++ | official OpenTelemetry SDK alone (default batch processor) | spans | 840,730 | 15.9% | 2,033,027/s | 492 ns | 0.00 s |
-| C++ | official OpenTelemetry SDK alone (default batch processor) | metrics | 1,000,000 | 0.0% | 75,778,145/s | 13 ns | 0.00 s |
+| Go | default (drop when full), 1 goroutine | logs | 501,519 | 49.8% | 612,224/s | 1,633 ns | 0.01 s |
+| Go | default (drop when full), 1 goroutine | spans | 558,592 | 44.1% | 1,685,936/s | 593 ns | 0.00 s |
+| Go | default (drop when full), 1 goroutine | metrics | 1,000,000 | 0.0% | 86,437,894/s | 12 ns | 0.00 s |
+| Go | Lossless, 1 goroutine | logs | 1,000,000 | 0.0% | 313,354/s | 3,191 ns | 0.01 s |
+| Go | Lossless, 1 goroutine | spans | 1,000,000 | 0.0% | 1,031,928/s | 969 ns | 0.00 s |
+| Go | Lossless, 1 goroutine | metrics | 1,000,000 | 0.0% | 172,215,834/s | 6 ns | 0.00 s |
+| Go | Lossless, 14 goroutines, batch 8192 | logs | 1,000,000 | 0.0% | 386,110/s | 2,590 ns | 0.15 s |
+| Go | Lossless, 14 goroutines, batch 8192 | spans | 1,000,000 | 0.0% | 1,442,794/s | 693 ns | 0.04 s |
+| Go | Lossless, 14 goroutines, batch 8192 | metrics | 1,000,000 | 0.0% | 619,690,799/s | 2 ns | 0.00 s |
+| Go | Lossless, 14 goroutines, batch 8192, 4 exporters | logs | 1,000,000 | 0.0% | 1,238,486/s | 807 ns | 0.03 s |
+| Go | Lossless, 14 goroutines, batch 8192, 4 exporters | spans | 1,000,000 | 0.0% | 4,001,832/s | 250 ns | 0.04 s |
+| Go | Lossless, 14 goroutines, batch 8192, 4 exporters | metrics | 1,000,000 | 0.0% | 1,168,337,584/s | 1 ns | 0.00 s |
+| Rust | default (drop when full) | logs | 166,960 | 83.3% | 4,097,206/s | 244 ns | 0.00 s |
+| Rust | default (drop when full) | spans | 289,763 | 71.0% | 4,174,593/s | 240 ns | 0.00 s |
+| Rust | default (drop when full) | metrics | 1,000,000 | 0.0% | 667,909,870/s | 1 ns | 0.00 s |
+| Rust | Lossless | logs | 1,000,000 | 0.0% | 862,015/s | 1,160 ns | 0.07 s |
+| Rust | Lossless | spans | 1,000,000 | 0.0% | 1,792,062/s | 558 ns | 0.03 s |
+| Rust | Lossless | metrics | 1,000,000 | 0.0% | 1,301,376,726/s | 1 ns | 0.00 s |
+| Python | default (drop when full) | logs | 351,348 | 64.9% | 545,589/s | 1,833 ns | 0.01 s |
+| Python | default (drop when full) | spans | 1,000,000 | 0.0% | 98,794/s | 10,122 ns | 0.00 s |
+| Python | default (drop when full) | metrics | 1,000,000 | 0.0% | 5,934,658/s | 169 ns | 0.01 s |
+| Python | Lossless | logs | 1,000,000 | 0.0% | 247,892/s | 4,034 ns | 0.29 s |
+| Python | Lossless | spans | 1,000,000 | 0.0% | 93,309/s | 10,717 ns | 0.02 s |
+| Python | Lossless | metrics | 1,000,000 | 0.0% | 5,971,326/s | 167 ns | 0.01 s |
+| C++ | default (drop when full) | logs | 294,912 | 70.5% | 5,156,051/s | 194 ns | 0.00 s |
+| C++ | default (drop when full) | spans | 879,555 | 12.0% | 1,863,750/s | 537 ns | 0.00 s |
+| C++ | default (drop when full) | metrics | 1,000,000 | 0.0% | 200,626,959/s | 5 ns | 0.00 s |
+| Go | official OpenTelemetry SDK alone (default batch processor) | logs | 261,120 | 73.9% | 1,689,596/s | 592 ns | 0.00 s |
+| Go | official OpenTelemetry SDK alone (default batch processor) | spans | 407,326 | 59.3% | 1,964,476/s | 509 ns | 0.00 s |
+| Go | official OpenTelemetry SDK alone (default batch processor) | metrics | 1,000,000 | 0.0% | 16,366,802/s | 61 ns | 0.00 s |
+| Rust | official OpenTelemetry SDK alone (default batch processor) | logs | 109,113 | 89.1% | 6,965,310/s | 144 ns | 0.00 s |
+| Rust | official OpenTelemetry SDK alone (default batch processor) | spans | 128,538 | 87.1% | 7,721,322/s | 130 ns | 0.00 s |
+| Rust | official OpenTelemetry SDK alone (default batch processor) | metrics | 1,000,000 | 0.0% | 199,279,287/s | 5 ns | 0.00 s |
+| Python | official OpenTelemetry SDK alone (default batch processor) | logs | 143,872 | 85.6% | 119,040/s | 8,401 ns | 0.12 s |
+| Python | official OpenTelemetry SDK alone (default batch processor) | spans | 286,720 | 71.3% | 87,761/s | 11,395 ns | 0.09 s |
+| Python | official OpenTelemetry SDK alone (default batch processor) | metrics | 1,000,000 | 0.0% | 592,438/s | 1,688 ns | 0.01 s |
+| C++ | official OpenTelemetry SDK alone (default batch processor) | logs | 227,840 | 77.2% | 4,595,766/s | 218 ns | 0.00 s |
+| C++ | official OpenTelemetry SDK alone (default batch processor) | spans | 837,768 | 16.2% | 1,982,145/s | 505 ns | 0.00 s |
+| C++ | official OpenTelemetry SDK alone (default batch processor) | metrics | 1,000,000 | 0.0% | 57,495,495/s | 17 ns | 0.00 s |
 
 **Lost** is what never reached the collector. Metrics are aggregated in-process (a counter
 exports its running total), so they cannot lose increments; logs and spans are exported one by
@@ -434,15 +434,15 @@ then read back with the `mcap` library: **Recorded** is what the file holds.
 
 | SDK | Signal | Recorded | Write rate | Per call | File size | Bytes / record |
 | --- | ------ | -------: | ---------: | -------: | --------: | -------------: |
-| Go | logs | 1,000,000 | 372,390/s | 2,685 ns | 27.3 MiB | 29 |
-| Go | spans | 1,000,000 | 847,057/s | 1,181 ns | 56.1 MiB | 59 |
-| Go | metrics | 1,000,000 | 1,819,471/s | 550 ns | 18.7 MiB | 20 |
-| Rust | logs | 1,000,000 | 849,301/s | 1,177 ns | 27.3 MiB | 29 |
-| Rust | spans | 1,000,000 | 617,319/s | 1,620 ns | 55.7 MiB | 58 |
-| Rust | metrics | 1,000,000 | 1,868,271/s | 535 ns | 18.1 MiB | 19 |
-| Python | logs | 1,000,000 | 160,647/s | 6,225 ns | 27.6 MiB | 29 |
-| Python | spans | 1,000,000 | 56,409/s | 17,728 ns | 56.1 MiB | 59 |
-| Python | metrics | 1,000,000 | 158,990/s | 6,290 ns | 22.8 MiB | 24 |
+| Go | logs | 1,000,000 | 361,554/s | 2,766 ns | 27.3 MiB | 29 |
+| Go | spans | 1,000,000 | 819,139/s | 1,221 ns | 56.1 MiB | 59 |
+| Go | metrics | 1,000,000 | 2,320,604/s | 431 ns | 18.0 MiB | 19 |
+| Rust | logs | 1,000,000 | 855,335/s | 1,169 ns | 27.3 MiB | 29 |
+| Rust | spans | 1,000,000 | 620,727/s | 1,611 ns | 55.7 MiB | 58 |
+| Rust | metrics | 1,000,000 | 1,884,758/s | 531 ns | 18.1 MiB | 19 |
+| Python | logs | 1,000,000 | 161,783/s | 6,181 ns | 27.6 MiB | 29 |
+| Python | spans | 1,000,000 | 55,146/s | 18,134 ns | 56.1 MiB | 59 |
+| Python | metrics | 1,000,000 | 283,232/s | 3,531 ns | 22.6 MiB | 24 |
 
 ## Go: cost per call
 
@@ -451,13 +451,15 @@ exported; `export=true` exports to an in-process collector. `-8` runs 8 goroutin
 
 | Benchmark | ns/op | B/op | allocs/op |
 | --------- | ----: | ---: | --------: |
-| `BenchmarkLogInfo/export=false` | 99.66 | 336 | 2 |
-| `BenchmarkLogInfo/export=false-8` | 75.45 | 336 | 2 |
-| `BenchmarkLogInfo/export=true` | 1406 | 1386 | 5 |
-| `BenchmarkLogInfo/export=true-8` | 662.4 | 1813 | 14 |
-| `BenchmarkSpan/export=false` | 100.3 | 240 | 5 |
-| `BenchmarkSpan/export=false-8` | 30.09 | 240 | 5 |
-| `BenchmarkSpan/export=true` | 539.2 | 1139 | 7 |
-| `BenchmarkSpan/export=true-8` | 209.8 | 1209 | 7 |
-| `BenchmarkCounter` | 116.9 | 40 | 2 |
-| `BenchmarkCounter-8` | 75.74 | 40 | 2 |
+| `BenchmarkLogInfo/export=false` | 99.77 | 336 | 2 |
+| `BenchmarkLogInfo/export=false-8` | 76.87 | 336 | 2 |
+| `BenchmarkLogInfo/export=true` | 1381 | 1380 | 5 |
+| `BenchmarkLogInfo/export=true-8` | 642.5 | 1811 | 13 |
+| `BenchmarkSpan/export=false` | 104.4 | 240 | 5 |
+| `BenchmarkSpan/export=false-8` | 30.38 | 240 | 5 |
+| `BenchmarkSpan/export=true` | 545.0 | 1139 | 7 |
+| `BenchmarkSpan/export=true-8` | 233.1 | 1270 | 8 |
+| `BenchmarkCounter` | 15.11 | 0 | 0 |
+| `BenchmarkCounter-8` | 3.624 | 0 | 0 |
+| `BenchmarkCounterHandle` | 3.795 | 0 | 0 |
+| `BenchmarkCounterHandle-8` | 0.9569 | 0 | 0 |

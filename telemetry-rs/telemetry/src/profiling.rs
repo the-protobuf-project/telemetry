@@ -61,7 +61,9 @@ impl Profiler {
     #[cfg(not(feature = "profiling"))]
     pub fn start(_service: &ServiceOptions, opts: &ProfilingOptions) -> Result<Option<Self>> {
         if opts.enabled {
-            anyhow::bail!("profiling is enabled but telemetry was built without the `profiling` feature");
+            anyhow::bail!(
+                "profiling is enabled but telemetry was built without the `profiling` feature"
+            );
         }
         Ok(None)
     }

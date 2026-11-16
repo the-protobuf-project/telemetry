@@ -9,6 +9,13 @@ cc_library(
         "//include/telemetry/tracing",
         "@opentelemetry-cpp//api",
     ],
+    # The implementations, not only their headers: tracer.cpp calls into both,
+    # and GNU ld resolves static archives in dependency order — a binary that
+    # uses the tracer alone (examples:crosslang) otherwise fails to link.
+    deps = [
+        "//src/mcap",
+        "//src/otel",
+    ],
     strip_include_prefix = "/include",
     visibility = ["//visibility:public"],
 )

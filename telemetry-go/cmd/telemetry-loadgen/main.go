@@ -323,6 +323,9 @@ func writeProfile(name, path string) error {
 	if err != nil {
 		return err
 	}
-	defer f.Close()
-	return pprof.Lookup(name).WriteTo(f, 0)
+	if err := pprof.Lookup(name).WriteTo(f, 0); err != nil {
+		_ = f.Close()
+		return err
+	}
+	return f.Close()
 }

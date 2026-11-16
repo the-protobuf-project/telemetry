@@ -22,10 +22,10 @@ async fn main() -> anyhow::Result<()> {
     let headers: HashMap<String, String> = serde_json::from_str(&input)?;
 
     let mut builder = telemetry::Telemetry::builder("inventory-rs", "1.0.0").with_tracing();
-    if let Some((host, port)) = std::env::var("TELEMETRY_DEMO_OTLP")
-        .ok()
-        .and_then(|ep| ep.rsplit_once(':').map(|(h, p)| (h.to_string(), p.parse().unwrap_or(4317))))
-    {
+    if let Some((host, port)) = std::env::var("TELEMETRY_DEMO_OTLP").ok().and_then(|ep| {
+        ep.rsplit_once(':')
+            .map(|(h, p)| (h.to_string(), p.parse().unwrap_or(4317)))
+    }) {
         builder = builder.with_otlp(host, port);
     }
     let telemetry = builder.build()?;
@@ -36,7 +36,9 @@ async fn main() -> anyhow::Result<()> {
     let tracing = match telemetry.tracing.as_ref().filter(|t| t.is_enabled()) {
         Some(t) => t,
         None => {
-            local = TelemetryTracing::new(Some(SdkTracerProvider::builder().build().tracer("inventory-rs")));
+            local = TelemetryTracing::new(Some(
+                SdkTracerProvider::builder().build().tracer("inventory-rs"),
+            ));
             &local
         }
     };

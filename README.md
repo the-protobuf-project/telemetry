@@ -294,17 +294,61 @@ export TELEMETRY_LOGGING_MODULES_VISION_LEVEL=3
 
 ### Every signal, every language
 
+Each band is one signal an SDK supports, so a language's width is how much of
+the framework it covers and a signal's width is how many SDKs have it. The
+table below gives the API for each, and what is still missing.
+
+```mermaid
+---
+config:
+  sankey:
+    showValues: false
+---
+sankey-beta
+
+Go,Traces,1
+Go,Metrics,1
+Go,Logs,1
+Go,Trace propagation,1
+Go,Baggage,1
+Go,Distributed logging,1
+Go,Profiles,1
+Go,MCAP,1
+Rust,Traces,1
+Rust,Metrics,1
+Rust,Logs,1
+Rust,Trace propagation,1
+Rust,Baggage,1
+Rust,Distributed logging,1
+Rust,Profiles,1
+Rust,MCAP,1
+Python,Traces,1
+Python,Metrics,1
+Python,Logs,1
+Python,Trace propagation,1
+Python,Baggage,1
+Python,Distributed logging,1
+Python,Profiles,1
+Python,MCAP,1
+C++,Traces,1
+C++,Metrics,1
+C++,Logs,1
+C++,Trace propagation,1
+C++,Baggage,1
+C++,MCAP,1
+```
+
 | Signal | Go | Rust | Python | C++ |
 | ------ | -- | ---- | ------ | --- |
-| Traces → OTLP | ✅ | ✅ | ✅ | ✅ (OTLP export added; was MCAP-only) |
-| Metrics → OTLP | ✅ | ✅ | ✅ | ✅ |
-| Logs → OTLP | ✅ | ✅ | ✅ | ✅ |
-| Trace context across services (W3C `traceparent`) | ✅ `Inject` / `Extract` | ✅ `inject` / `extract` | ✅ `inject` / `extract` | ✅ `inject` / `extract` |
-| Baggage | ✅ `SetBaggage` / `Baggage` | ✅ `set_baggage` / `baggage` | ✅ `set_baggage` / `get_baggage` | ✅ carried through `extract` → `inject` |
-| Distributed logging (logs carry the trace id) | ✅ `InfoContext(ctx, …)`, `Logger.WithContext` | ✅ inside `span.attach()` | ✅ inside `start_span` | ❌ not yet |
-| Profiles → Pyroscope | ✅ `WithProfiling` | ✅ `with_profiling` (`profiling` feature) | ✅ `with_profiling` (`[profiling]` extra) | ❌ not yet |
+| Traces → OTLP | Yes | Yes | Yes | Yes (OTLP export added; was MCAP-only) |
+| Metrics → OTLP | Yes | Yes | Yes | Yes |
+| Logs → OTLP | Yes | Yes | Yes | Yes |
+| Trace context across services (W3C `traceparent`) | Yes: `Inject` / `Extract` | Yes: `inject` / `extract` | Yes: `inject` / `extract` | Yes: `inject` / `extract` |
+| Baggage | Yes: `SetBaggage` / `Baggage` | Yes: `set_baggage` / `baggage` | Yes: `set_baggage` / `get_baggage` | Yes: carried through `extract` → `inject` |
+| Distributed logging (logs carry the trace id) | Yes: `InfoContext(ctx, …)`, `Logger.WithContext` | Yes: inside `span.attach()` | Yes: inside `start_span` | No (not yet) |
+| Profiles → Pyroscope | Yes: `WithProfiling` | Yes: `with_profiling` (`profiling` feature) | Yes: `with_profiling` (`[profiling]` extra) | No (not yet) |
 | MCAP recording | logs, metrics, spans | logs, metrics | logs, metrics, spans | logs, metrics, spans |
-| Drops counted and reported | ✅ `Stats()`, `Close` error | ❌ silent | ❌ silent | ❌ silent |
+| Drops counted and reported | Yes: `Stats()`, `Close` error | No (silent) | No (silent) | No (silent) |
 
 `bench/crosslang-demo.sh` checks one trace across all four (Go → Rust →
 Python → C++), and CI runs it on every change.
@@ -315,11 +359,16 @@ A trace crosses a service boundary in three headers defined by the
 [W3C Trace Context](https://www.w3.org/TR/trace-context/) and
 [Baggage](https://www.w3.org/TR/baggage/) standards:
 
-```text
-traceparent: 00-4bf92f3577b34da6a3ce929d0e0e4736-00f067aa0ba902b7-01
-             │  └── trace id (shared by every span) └── parent span id └ sampled
-tracestate:  vendor-specific data, passed through untouched
-baggage:     key=value pairs that travel with the request (tenant=acme)
+```mermaid
+flowchart TB
+    subgraph TP["traceparent: 00-4bf92f3577b34da6a3ce929d0e0e4736-00f067aa0ba902b7-01"]
+        direction LR
+        V["00<br/>version"] --- T["4bf92f3577b34da6a3ce929d0e0e4736<br/>trace id, shared by every span"]
+        T --- P["00f067aa0ba902b7<br/>parent span id: the caller's span"]
+        P --- F["01<br/>flags: sampled"]
+    end
+    TS["tracestate<br/>vendor-specific data, passed through untouched"]
+    BG["baggage<br/>key=value pairs that travel with the request, e.g. tenant=acme"]
 ```
 
 Every Telemetry SDK installs this propagator when it is built. The **caller
@@ -377,13 +426,16 @@ Things that break the chain:
 - **A proxy strips unknown headers.** Allow `traceparent`, `tracestate` and
   `baggage` through gateways and load balancers.
 
-Try it locally. A Go service starts a trace, and a Rust service continues it:
+Try it locally. One trace through four services, each written with a
+different SDK:
 
 ```bash
 bench/crosslang-demo.sh
-# go   (orders-go)    trace 7cd054b6…  span a8fb30b7…
-# rust (inventory-rs) trace 7cd054b6…  parent a8fb30b7…
-# OK: one trace across Go and Rust
+# go     (orders-go)       trace cd3b5eda…  span ef132842…
+# rust   (inventory-rs)    trace cd3b5eda…  span 70f84c9e…  parent ef132842…
+# python (billing-py)      trace cd3b5eda…  span 0585d24b…  parent 70f84c9e…
+# c++    (shipping-cpp)    trace cd3b5eda…  span 4c7cf38d…  parent 0585d24b…
+# OK: one trace across every service
 ```
 
 CI runs the same check on every change, so a regression in either SDK's

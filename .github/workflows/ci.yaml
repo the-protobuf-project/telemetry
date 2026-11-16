@@ -163,7 +163,7 @@ jobs:
         run: cargo test --all-features --verbose
 
   cross-language-trace:
-    name: Trace continues Go → Rust
+    name: One trace across Go, Rust, Python and C++
     runs-on: blacksmith-4vcpu-ubuntu-2404
     steps:
       - name: Check out code
@@ -186,7 +186,17 @@ jobs:
             telemetry-rs/target/
           key: ${{ runner.os }}-cargo-crosslang-${{ hashFiles('**/Cargo.lock') }}
 
-      - name: A Go span's trace is continued by a Rust span
+      - name: Set up uv (Python hop)
+        uses: astral-sh/setup-uv@v6
+
+      - name: Set up Bazel (C++ hop)
+        uses: bazel-contrib/setup-bazel@0.15.0
+        with:
+          bazelisk-cache: true
+          disk-cache: ${{ github.workflow }}-crosslang
+          repository-cache: true
+
+      - name: One trace through Go, Rust, Python and C++
         run: bench/crosslang-demo.sh
 
   build-python:

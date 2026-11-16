@@ -13,7 +13,10 @@ use telemetry::logger;
 async fn main() -> anyhow::Result<()> {
     let args: Vec<String> = std::env::args().collect();
     let signal = args.get(1).map(String::as_str).unwrap_or("logs");
-    let n: usize = args.get(2).and_then(|s| s.parse().ok()).unwrap_or(1_000_000);
+    let n: usize = args
+        .get(2)
+        .and_then(|s| s.parse().ok())
+        .unwrap_or(1_000_000);
     let (host, port) = args
         .get(3)
         .and_then(|ep| ep.rsplit_once(':'))
@@ -57,7 +60,11 @@ async fn main() -> anyhow::Result<()> {
         // its trace id. Prints the trace id for the caller to look for.
         "correlated" => {
             let tracing = telemetry.tracing.as_ref().expect("tracing enabled");
-            let span = tracing.start_span_with("load.correlated", telemetry::tracing::SpanKind::Internal, None);
+            let span = tracing.start_span_with(
+                "load.correlated",
+                telemetry::tracing::SpanKind::Internal,
+                None,
+            );
             {
                 let _current = span.attach();
                 for i in 0..n {

@@ -265,20 +265,28 @@ jobs:
         with:
           path: artifacts
 
+      - name: Write install notes
+        env:
+          VERSION: ${{ needs.version.outputs.version }}
+          MODULE: github.com/${{ github.repository }}/telemetry-go
+        run: |
+          {
+            echo "## Install $VERSION"
+            echo
+            echo "| Language | |"
+            echo "| -------- | - |"
+            echo "| Go       | \`go get $MODULE@v$VERSION\` |"
+            echo "| Rust     | \`cargo add telemetry@$VERSION\` |"
+            echo "| Python   | \`pip install telemetry-py==$VERSION\` |"
+            echo "| C++      | \`telemetry-cpp-$VERSION.tar.gz\` below |"
+          } > release-notes.md
+
       - name: Create release
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ github.event.inputs.tag || github.ref_name }}
           generate_release_notes: true
-          body: |
-            ## Install ${{ needs.version.outputs.version }}
-
-            | Language | |
-            | -------- | - |
-            | Go       | `go get github.com/${{ github.repository }}/telemetry-go@v${{ needs.version.outputs.version }}` |
-            | Rust     | `cargo add telemetry@${{ needs.version.outputs.version }}` |
-            | Python   | `pip install telemetry-py==${{ needs.version.outputs.version }}` |
-            | C++      | `telemetry-cpp-${{ needs.version.outputs.version }}.tar.gz` below |
+          body_path: release-notes.md
           files: |
             artifacts/python-dist/*
             artifacts/cpp-dist/*

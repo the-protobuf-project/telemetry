@@ -22,7 +22,9 @@ from telemetry import Telemetry
 
 def main() -> None:
     headers = json.load(sys.stdin)
-    host, _, port = os.environ.get("TELEMETRY_DEMO_OTLP", "127.0.0.1:4317").rpartition(":")
+    host, _, port = os.environ.get("TELEMETRY_DEMO_OTLP", "127.0.0.1:4317").rpartition(
+        ":"
+    )
 
     t = (
         Telemetry.new()
@@ -34,7 +36,9 @@ def main() -> None:
 
     # The one call that joins the caller's trace.
     parent = t.tracing.extract(headers)
-    with t.tracing.start_span("billing.charge", parent=parent, kind=SpanKind.SERVER) as span:
+    with t.tracing.start_span(
+        "billing.charge", parent=parent, kind=SpanKind.SERVER
+    ) as span:
         span.span.set_attribute("order.id", "o-42")
         downstream = t.tracing.inject()  # and the next hop continues it in turn
         print(

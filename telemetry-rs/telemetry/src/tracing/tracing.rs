@@ -7,8 +7,8 @@ use std::borrow::Cow;
 use std::collections::HashMap;
 
 use anyhow::Result;
-use opentelemetry::propagation::TextMapCompositePropagator;
 use opentelemetry::baggage::BaggageExt;
+use opentelemetry::propagation::TextMapCompositePropagator;
 use opentelemetry::trace::{Span as _, SpanKind, Status, TraceContextExt, Tracer as _};
 use opentelemetry::{Context, ContextGuard, KeyValue};
 use opentelemetry_sdk::propagation::{BaggagePropagator, TraceContextPropagator};
@@ -175,17 +175,23 @@ impl TelemetryTracing {
         parent: Option<&Context>,
     ) -> Span {
         let parent = parent.cloned().unwrap_or_default();
-        let span = self
-            .tracer
-            .as_ref()
-            .map(|t| t.span_builder(name).with_kind(kind).start_with_context(t, &parent));
+        let span = self.tracer.as_ref().map(|t| {
+            t.span_builder(name)
+                .with_kind(kind)
+                .start_with_context(t, &parent)
+        });
         Span { span, parent }
     }
 
     /// Returns `cx` with `key=value` added to its W3C baggage: it travels with
     /// the trace to every service downstream (inject writes it, extract reads
     /// it), in any language. Start spans under the returned context.
-    pub fn set_baggage(&self, cx: &Context, key: impl Into<String>, value: impl Into<String>) -> Context {
+    pub fn set_baggage(
+        &self,
+        cx: &Context,
+        key: impl Into<String>,
+        value: impl Into<String>,
+    ) -> Context {
         // with_baggage replaces the whole set: carry the existing entries over.
         let key = key.into();
         let mut entries: Vec<KeyValue> = cx
@@ -200,7 +206,10 @@ impl TelemetryTracing {
 
     /// The W3C baggage `cx` carries.
     pub fn baggage(&self, cx: &Context) -> HashMap<String, String> {
-        cx.baggage().iter().map(|(k, (v, _))| (k.to_string(), v.to_string())).collect()
+        cx.baggage()
+            .iter()
+            .map(|(k, (v, _))| (k.to_string(), v.to_string()))
+            .collect()
     }
 
     /// Reads the trace context a caller sent in `headers` (`traceparent`,
@@ -244,14 +253,19 @@ impl Span {
     ) -> Self {
         let span = tracer.map(|t| t.start(name));
 
-        Self { span, parent: Context::new() }
+        Self {
+            span,
+            parent: Context::new(),
+        }
     }
 
     /// A context carrying this span, to start child spans under it or to
     /// inject into outgoing headers.
     pub fn context(&self) -> Context {
         match &self.span {
-            Some(span) => self.parent.with_remote_span_context(span.span_context().clone()),
+            Some(span) => self
+                .parent
+                .with_remote_span_context(span.span_context().clone()),
             None => self.parent.clone(),
         }
     }
@@ -274,12 +288,16 @@ impl Span {
 
     /// The span's trace id as 32 hex digits, or `None` when tracing is off.
     pub fn trace_id(&self) -> Option<String> {
-        self.span.as_ref().map(|s| s.span_context().trace_id().to_string())
+        self.span
+            .as_ref()
+            .map(|s| s.span_context().trace_id().to_string())
     }
 
     /// The span's id as 16 hex digits, or `None` when tracing is off.
     pub fn span_id(&self) -> Option<String> {
-        self.span.as_ref().map(|s| s.span_context().span_id().to_string())
+        self.span
+            .as_ref()
+            .map(|s| s.span_context().span_id().to_string())
     }
 
     /// Sets an attribute on the span.
@@ -337,8 +355,8 @@ impl Drop for Span {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use opentelemetry_sdk::trace::SdkTracerProvider;
     use opentelemetry::trace::TracerProvider as _;
+    use opentelemetry_sdk::trace::SdkTracerProvider;
 
     fn tracing() -> TelemetryTracing {
         install_propagator();
@@ -355,22 +373,38 @@ mod tests {
         let headers = HashMap::from([("traceparent".to_string(), TRACEPARENT.to_string())]);
         let parent = t.extract(&headers);
         let span = t.start_span_with("handle", SpanKind::Server, Some(&parent));
-        assert_eq!(span.trace_id().as_deref(), Some("4bf92f3577b34da6a3ce929d0e0e4736"));
+        assert_eq!(
+            span.trace_id().as_deref(),
+            Some("4bf92f3577b34da6a3ce929d0e0e4736")
+        );
         assert_ne!(span.span_id().as_deref(), Some("00f067aa0ba902b7"));
 
         let mut out = HashMap::new();
         t.inject(&span, &mut out);
         let sent = out.get("traceparent").expect("traceparent injected");
-        assert!(sent.starts_with("00-4bf92f3577b34da6a3ce929d0e0e4736-"), "{sent}");
+        assert!(
+            sent.starts_with("00-4bf92f3577b34da6a3ce929d0e0e4736-"),
+            "{sent}"
+        );
         assert!(sent.ends_with("-01"), "{sent}");
-        assert!(sent.contains(span.span_id().unwrap().as_str()), "the downstream parent is this span: {sent}");
+        assert!(
+            sent.contains(span.span_id().unwrap().as_str()),
+            "the downstream parent is this span: {sent}"
+        );
     }
 
     #[test]
     fn without_headers_a_new_trace_starts() {
         let t = tracing();
-        let span = t.start_span_with("root", SpanKind::Internal, Some(&t.extract(&HashMap::new())));
-        assert_ne!(span.trace_id().as_deref(), Some("4bf92f3577b34da6a3ce929d0e0e4736"));
+        let span = t.start_span_with(
+            "root",
+            SpanKind::Internal,
+            Some(&t.extract(&HashMap::new())),
+        );
+        assert_ne!(
+            span.trace_id().as_deref(),
+            Some("4bf92f3577b34da6a3ce929d0e0e4736")
+        );
         let child = t.start_span_with("child", SpanKind::Client, Some(&span.context()));
         assert_eq!(child.trace_id(), span.trace_id());
     }
@@ -383,13 +417,19 @@ mod tests {
             ("baggage".to_string(), "tenant=acme".to_string()),
         ]);
         let parent = t.extract(&headers);
-        assert_eq!(t.baggage(&parent).get("tenant").map(String::as_str), Some("acme"));
+        assert_eq!(
+            t.baggage(&parent).get("tenant").map(String::as_str),
+            Some("acme")
+        );
         let parent = t.set_baggage(&parent, "region", "eu");
         let span = t.start_span_with("handle", SpanKind::Server, Some(&parent));
         let mut out = HashMap::new();
         t.inject(&span, &mut out);
         let sent = out.get("baggage").expect("baggage injected");
-        assert!(sent.contains("tenant=acme") && sent.contains("region=eu"), "{sent}");
+        assert!(
+            sent.contains("tenant=acme") && sent.contains("region=eu"),
+            "{sent}"
+        );
     }
 
     #[test]

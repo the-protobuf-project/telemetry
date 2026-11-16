@@ -18,7 +18,9 @@ from telemetry import Telemetry
 def main() -> None:
     signal = sys.argv[1] if len(sys.argv) > 1 else "logs"
     n = int(sys.argv[2]) if len(sys.argv) > 2 else 1_000_000
-    host, _, port = (sys.argv[3] if len(sys.argv) > 3 else "127.0.0.1:4317").rpartition(":")
+    host, _, port = (sys.argv[3] if len(sys.argv) > 3 else "127.0.0.1:4317").rpartition(
+        ":"
+    )
 
     # LOADGEN_MCAP=path records to MCAP; an endpoint of "none" skips OTLP,
     # to measure MCAP recording alone.

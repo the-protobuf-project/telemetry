@@ -7,7 +7,6 @@ import (
 )
 
 //go:fix inline
-func boolPtr(b bool) *bool { return new(b) }
 
 func TestInferLabel(t *testing.T) {
 	tests := []struct {

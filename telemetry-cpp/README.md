@@ -373,7 +373,7 @@ auto telemetry = telemetry::Telemetry::builder("ingest", "1.0.0")
 `telemetry.stats()` gives what happened to each signal at any time: emitted,
 exported, failed, and pending (dropped, once closed). Against the official
 OpenTelemetry C++ SDK tuned to drop nothing, this delivers logs at three to
-four times its rate; see [BENCHMARKS.md](../docs/BENCHMARKS.md).
+four times its rate; see [BENCHMARKS.md](../docs/benchmark.md).
 
 ## MCAP recording
 

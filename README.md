@@ -592,7 +592,7 @@ go tool pprof -http=: cpu.out
 
 It reports emitted vs. delivered per signal, against an in-process collector
 or a real one (`-endpoint host:4317`). Results for every SDK are in
-[BENCHMARKS.md](docs/BENCHMARKS.md).
+[BENCHMARKS.md](docs/benchmark.md).
 
 ## Observability stack
 

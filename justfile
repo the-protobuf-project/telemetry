@@ -103,11 +103,11 @@ crosslang:
 
 # Load and benchmarks
 
-# Every SDK writes n records per signal over OTLP and to MCAP; writes docs/BENCHMARKS.md.
+# Every SDK writes n records per signal over OTLP and to MCAP; writes docs/benchmark.md.
 bench n="1000000" *args:
     python3 bench/bench_all.py --n {{ n }} {{ args }}
 
-# Redraw docs/BENCHMARKS.md, charts included, from docs/benchmarks.json without running anything.
+# Redraw docs/benchmark.md, charts included, from docs/benchmark.json without running anything.
 bench-render:
     python3 bench/bench_all.py --render
 

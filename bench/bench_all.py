@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Load-tests every SDK the same way and writes docs/BENCHMARKS.md.
+"""Load-tests every SDK the same way and writes docs/benchmark.md.
 
 Each SDK writes N log records, N spans and N counter increments over OTLP
 (gRPC; HTTP for C++) to one counting collector (telemetry-go's
@@ -603,7 +603,7 @@ def write(data, out_path):
         f"Every SDK writes **{n:,}** log records, spans and counter increments over OTLP/gRPC to one",
         "in-process counting collector, so the numbers show what each SDK **delivered**, not only how",
         "fast the calls returned. Regenerate with `just bench`; redraw this page from the saved",
-        "numbers (`docs/benchmarks.json`) with `just bench-render`.",
+        "numbers (`docs/benchmark.json`) with `just bench-render`.",
         "",
         f"Measured {data['date']} on {data['platform']}, {data['cpus']} CPUs, Python {data['python']}.",
         "Console log output is off in every load generator (Go formats it to io.Discard), so the terminal is",

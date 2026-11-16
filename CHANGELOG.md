@@ -73,7 +73,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `memory_limiter`, and its own metrics scraped by Prometheus.
 - `bench/`: `bench_all.py` (every SDK, OTLP and MCAP), `stack_bench.py` (the
   single image under load), `just crosslang`, and `telemetry-loadgen` with
-  built-in pprof profiling; `docs/BENCHMARKS.md`.
+  built-in pprof profiling; `docs/benchmark.md`.
 - Rust: `ExportOptions::exporters` sends each signal through several
   exporters at once, as Go's `Exporters` does.
 - C++: `with_export(ExportOptions{...})` (queue, batch, lossless, several

@@ -1,0 +1,494 @@
+{
+  "n": 1000000,
+  "date": "2026-11-16",
+  "platform": "Darwin arm64",
+  "cpus": 14,
+  "python": "3.15.2",
+  "results": [
+    {
+      "close_s": 0.010766875,
+      "dropped_reported": 446302,
+      "emit_s": 1.793627125,
+      "lang": "Go",
+      "n": 1000000,
+      "signal": "logs",
+      "workers": 1,
+      "mode": "default (drop when full), 1 goroutine",
+      "label": "Go drop",
+      "delivered": 553698
+    },
+    {
+      "close_s": 0.003558458,
+      "dropped_reported": 454738,
+      "emit_s": 0.563860917,
+      "lang": "Go",
+      "n": 1000000,
+      "signal": "spans",
+      "workers": 1,
+      "mode": "default (drop when full), 1 goroutine",
+      "label": "Go drop",
+      "delivered": 545262
+    },
+    {
+      "close_s": 0.001350084,
+      "dropped_reported": 0,
+      "emit_s": 0.113629958,
+      "lang": "Go",
+      "n": 1000000,
+      "signal": "metrics",
+      "workers": 1,
+      "mode": "default (drop when full), 1 goroutine",
+      "label": "Go drop",
+      "delivered": 1000000
+    },
+    {
+      "close_s": 0.009008542,
+      "dropped_reported": 0,
+      "emit_s": 3.145448083,
+      "lang": "Go",
+      "n": 1000000,
+      "signal": "logs",
+      "workers": 1,
+      "mode": "Lossless, 1 goroutine",
+      "label": "Go lossless",
+      "delivered": 1000000
+    },
+    {
+      "close_s": 0.003623167,
+      "dropped_reported": 0,
+      "emit_s": 0.968600459,
+      "lang": "Go",
+      "n": 1000000,
+      "signal": "spans",
+      "workers": 1,
+      "mode": "Lossless, 1 goroutine",
+      "label": "Go lossless",
+      "delivered": 1000000
+    },
+    {
+      "close_s": 0.001937792,
+      "dropped_reported": 0,
+      "emit_s": 0.115479917,
+      "lang": "Go",
+      "n": 1000000,
+      "signal": "metrics",
+      "workers": 1,
+      "mode": "Lossless, 1 goroutine",
+      "label": "Go lossless",
+      "delivered": 1000000
+    },
+    {
+      "close_s": 0.209045584,
+      "dropped_reported": 0,
+      "emit_s": 2.644987583,
+      "lang": "Go",
+      "n": 1000000,
+      "signal": "logs",
+      "workers": 14,
+      "mode": "Lossless, 14 goroutines, batch 8192",
+      "label": "Go lossless x14",
+      "delivered": 1000000
+    },
+    {
+      "close_s": 0.052396792,
+      "dropped_reported": 0,
+      "emit_s": 0.694768208,
+      "lang": "Go",
+      "n": 1000000,
+      "signal": "spans",
+      "workers": 14,
+      "mode": "Lossless, 14 goroutines, batch 8192",
+      "label": "Go lossless x14",
+      "delivered": 1000000
+    },
+    {
+      "close_s": 0.001395584,
+      "dropped_reported": 0,
+      "emit_s": 0.110664125,
+      "lang": "Go",
+      "n": 1000000,
+      "signal": "metrics",
+      "workers": 14,
+      "mode": "Lossless, 14 goroutines, batch 8192",
+      "label": "Go lossless x14",
+      "delivered": 1000000
+    },
+    {
+      "close_s": 0.232752666,
+      "dropped_reported": 0,
+      "emit_s": 0.769231583,
+      "lang": "Go",
+      "n": 1000000,
+      "signal": "logs",
+      "workers": 14,
+      "mode": "Lossless, 14 goroutines, batch 8192, 4 exporters",
+      "label": "Go 4 exporters",
+      "delivered": 1000000
+    },
+    {
+      "close_s": 0.064303,
+      "dropped_reported": 0,
+      "emit_s": 0.262237917,
+      "lang": "Go",
+      "n": 1000000,
+      "signal": "spans",
+      "workers": 14,
+      "mode": "Lossless, 14 goroutines, batch 8192, 4 exporters",
+      "label": "Go 4 exporters",
+      "delivered": 1000000
+    },
+    {
+      "close_s": 0.001942875,
+      "dropped_reported": 0,
+      "emit_s": 0.115103209,
+      "lang": "Go",
+      "n": 1000000,
+      "signal": "metrics",
+      "workers": 14,
+      "mode": "Lossless, 14 goroutines, batch 8192, 4 exporters",
+      "label": "Go 4 exporters",
+      "delivered": 1000000
+    },
+    {
+      "close_error": "telemetry: 321917 of 1000000 log records dropped (export queue full); use with_export(ExportOptions { lossless: true, .. }) or a larger queue_size to keep them",
+      "close_s": 0.005393209,
+      "dropped_reported": 321917,
+      "emit_s": 1.8694371250000001,
+      "lang": "Rust",
+      "n": 1000000,
+      "signal": "logs",
+      "workers": 1,
+      "mode": "default (drop when full)",
+      "label": "Rust drop",
+      "delivered": 678083
+    },
+    {
+      "close_error": "telemetry: 738847 of 1000000 spans dropped (export queue full); use with_export(ExportOptions { lossless: true, .. }) or a larger queue_size to keep them",
+      "close_s": 0.001808041,
+      "dropped_reported": 738847,
+      "emit_s": 0.226615292,
+      "lang": "Rust",
+      "n": 1000000,
+      "signal": "spans",
+      "workers": 1,
+      "mode": "default (drop when full)",
+      "label": "Rust drop",
+      "delivered": 261153
+    },
+    {
+      "close_error": null,
+      "close_s": 0.001302167,
+      "dropped_reported": 0,
+      "emit_s": 0.02762975,
+      "lang": "Rust",
+      "n": 1000000,
+      "signal": "metrics",
+      "workers": 1,
+      "mode": "default (drop when full)",
+      "label": "Rust drop",
+      "delivered": 1000000
+    },
+    {
+      "close_error": null,
+      "close_s": 0.138207,
+      "dropped_reported": 0,
+      "emit_s": 2.304489042,
+      "lang": "Rust",
+      "n": 1000000,
+      "signal": "logs",
+      "workers": 1,
+      "mode": "Lossless",
+      "label": "Rust lossless",
+      "delivered": 1000000
+    },
+    {
+      "close_error": null,
+      "close_s": 0.035177625,
+      "dropped_reported": 0,
+      "emit_s": 0.5593805,
+      "lang": "Rust",
+      "n": 1000000,
+      "signal": "spans",
+      "workers": 1,
+      "mode": "Lossless",
+      "label": "Rust lossless",
+      "delivered": 1000000
+    },
+    {
+      "close_error": null,
+      "close_s": 0.005645125,
+      "dropped_reported": 0,
+      "emit_s": 0.037516042,
+      "lang": "Rust",
+      "n": 1000000,
+      "signal": "metrics",
+      "workers": 1,
+      "mode": "Lossless",
+      "label": "Rust lossless",
+      "delivered": 1000000
+    },
+    {
+      "lang": "Python",
+      "signal": "logs",
+      "n": 1000000,
+      "workers": 1,
+      "emit_s": 44.08769387501525,
+      "close_s": 0.022629499959293753,
+      "dropped_reported": 174093,
+      "mode": "default (drop when full)",
+      "label": "Python drop",
+      "delivered": 825907
+    },
+    {
+      "lang": "Python",
+      "signal": "spans",
+      "n": 1000000,
+      "workers": 1,
+      "emit_s": 37.849648541014176,
+      "close_s": 0.027815415989607573,
+      "dropped_reported": 121916,
+      "mode": "default (drop when full)",
+      "label": "Python drop",
+      "delivered": 878084
+    },
+    {
+      "lang": "Python",
+      "signal": "metrics",
+      "n": 1000000,
+      "workers": 1,
+      "emit_s": 3.643035042041447,
+      "close_s": 0.005205416993703693,
+      "dropped_reported": 0,
+      "mode": "default (drop when full)",
+      "label": "Python drop",
+      "delivered": 1000000
+    },
+    {
+      "lang": "Python",
+      "signal": "logs",
+      "n": 1000000,
+      "workers": 1,
+      "emit_s": 38.67188170796726,
+      "close_s": 0.11216537503059953,
+      "dropped_reported": 0,
+      "mode": "Lossless",
+      "label": "Python lossless",
+      "delivered": 1000000
+    },
+    {
+      "lang": "Python",
+      "signal": "spans",
+      "n": 1000000,
+      "workers": 1,
+      "emit_s": 19.563775999995414,
+      "close_s": 0.06303879199549556,
+      "dropped_reported": 0,
+      "mode": "Lossless",
+      "label": "Python lossless",
+      "delivered": 1000000
+    },
+    {
+      "lang": "Python",
+      "signal": "metrics",
+      "n": 1000000,
+      "workers": 1,
+      "emit_s": 2.3912466670153663,
+      "close_s": 0.00029374996665865183,
+      "dropped_reported": 0,
+      "mode": "Lossless",
+      "label": "Python lossless",
+      "delivered": 1000000
+    }
+  ],
+  "mcap": [
+    {
+      "close_s": 60.014087959,
+      "dropped_reported": 996416,
+      "emit_s": 3.181212667,
+      "lang": "go",
+      "n": 1000000,
+      "signal": "logs",
+      "workers": 1,
+      "recorded": 1000000,
+      "size": 28664274
+    },
+    {
+      "close_s": 60.007158125,
+      "dropped_reported": 996416,
+      "emit_s": 1.247211625,
+      "lang": "go",
+      "n": 1000000,
+      "signal": "spans",
+      "workers": 1,
+      "recorded": 1000000,
+      "size": 58893922
+    },
+    {
+      "close_s": 20.002753958,
+      "dropped_reported": 0,
+      "emit_s": 0.5653265,
+      "lang": "go",
+      "n": 1000000,
+      "signal": "metrics",
+      "workers": 1,
+      "recorded": 1000000,
+      "size": 19630987
+    },
+    {
+      "close_error": null,
+      "close_s": 0.00086425,
+      "dropped_reported": 0,
+      "emit_s": 3.167303917,
+      "lang": "rust",
+      "n": 1000000,
+      "signal": "logs",
+      "workers": 1,
+      "recorded": 1000000,
+      "size": 28963882
+    },
+    {
+      "close_error": null,
+      "close_s": 0.00126825,
+      "dropped_reported": 0,
+      "emit_s": 2.901422917,
+      "lang": "rust",
+      "n": 1000000,
+      "signal": "spans",
+      "workers": 1,
+      "recorded": 1000000,
+      "size": 58523086
+    },
+    {
+      "close_error": null,
+      "close_s": 0.000843125,
+      "dropped_reported": 0,
+      "emit_s": 0.735104916,
+      "lang": "rust",
+      "n": 1000000,
+      "signal": "metrics",
+      "workers": 1,
+      "recorded": 1000000,
+      "size": 19591601
+    },
+    {
+      "lang": "python",
+      "signal": "logs",
+      "n": 1000000,
+      "workers": 1,
+      "emit_s": 40.85253562498838,
+      "close_s": 30.007007082982454,
+      "dropped_reported": 995392,
+      "recorded": 1000000,
+      "size": 30215817
+    },
+    {
+      "lang": "python",
+      "signal": "spans",
+      "n": 1000000,
+      "workers": 1,
+      "emit_s": 19.199355041026138,
+      "close_s": 32.30622550001135,
+      "dropped_reported": 996416,
+      "recorded": 1000000,
+      "size": 58824666
+    },
+    {
+      "lang": "python",
+      "signal": "metrics",
+      "n": 1000000,
+      "workers": 1,
+      "emit_s": 6.339154166984372,
+      "close_s": 0.0025765830068849027,
+      "dropped_reported": 0,
+      "recorded": 1000000,
+      "size": 24360022
+    }
+  ],
+  "micro": [
+    [
+      "BenchmarkLogInfo/export=false",
+      "105.8",
+      "336",
+      "2"
+    ],
+    [
+      "BenchmarkLogInfo/export=false-8",
+      "78.29",
+      "336",
+      "2"
+    ],
+    [
+      "BenchmarkLogInfo/export=true",
+      "1581",
+      "1649",
+      "7"
+    ],
+    [
+      "BenchmarkLogInfo/export=true-8",
+      "419.7",
+      "1847",
+      "10"
+    ],
+    [
+      "BenchmarkSpan/export=false",
+      "107.0",
+      "240",
+      "5"
+    ],
+    [
+      "BenchmarkSpan/export=false-8",
+      "30.42",
+      "240",
+      "5"
+    ],
+    [
+      "BenchmarkSpan/export=true",
+      "551.2",
+      "1156",
+      "7"
+    ],
+    [
+      "BenchmarkSpan/export=true-8",
+      "176.9",
+      "1148",
+      "7"
+    ],
+    [
+      "BenchmarkCounter",
+      "116.7",
+      "43",
+      "2"
+    ],
+    [
+      "BenchmarkCounter-8",
+      "62.57",
+      "42",
+      "2"
+    ]
+  ],
+  "exporter_sweep": {
+    "note": "Measured 2026-11-16: 2,000,000 records per signal, lossless, 14 goroutines, batch 8192, to the in-process collector.",
+    "points": [
+      {
+        "exporters": 1,
+        "logs": 372413,
+        "spans": 1486299
+      },
+      {
+        "exporters": 2,
+        "logs": 792012,
+        "spans": 2745003
+      },
+      {
+        "exporters": 4,
+        "logs": 1514110,
+        "spans": 3631300
+      },
+      {
+        "exporters": 8,
+        "logs": 1571910,
+        "spans": 4423090
+      }
+    ]
+  }
+}

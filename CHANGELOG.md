@@ -58,7 +58,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `memory_limiter`, and its own metrics scraped by Prometheus.
 - `bench/`: `bench_all.py` (every SDK, OTLP and MCAP), `stack_bench.py` (the
   single image under load), `just crosslang`, and `telemetry-loadgen` with
-  built-in pprof profiling; `BENCHMARKS.md`.
+  built-in pprof profiling; `docs/BENCHMARKS.md`.
 - Releases: one `vX.Y.Z` tag releases every SDK at that version, including the
   `telemetry-go/vX.Y.Z` tag Go needs to resolve the module.
 - A `justfile` runs every task — tests, lint, benchmarks, the cross-language
@@ -71,6 +71,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   an unrelated project); code still imports it as `telemetry`.
 - Python: log records no longer repeat the service attributes and labels the
   resource already carries.
+- Rust: `with_tracing()` no longer turns on OTLP export, and neither does
+  `[telemetry] enabled = true` alone; export needs `with_otlp`,
+  `telemetry_local_otel!` or `[telemetry.otlp] enabled = true`, as in Go.
+  Spans still get real ids without a collector, for propagation and MCAP.
 
 ## [1.0.0] - 2025-11-09
 

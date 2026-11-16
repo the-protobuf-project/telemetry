@@ -107,6 +107,10 @@ crosslang:
 bench n="1000000" *args:
     python3 bench/bench_all.py --n {{ n }} {{ args }}
 
+# Redraw docs/BENCHMARKS.md, charts included, from docs/benchmarks.json without running anything.
+bench-render:
+    python3 bench/bench_all.py --render
+
 # Load-test the single-image stack end to end (builds the image first).
 stack-bench n="1000000" cpus="8" memory="6g": image-dev
     python3 bench/stack_bench.py --n {{ n }} --cpus {{ cpus }} --memory {{ memory }}

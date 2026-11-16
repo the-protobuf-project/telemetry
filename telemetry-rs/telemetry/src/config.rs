@@ -425,8 +425,10 @@ impl TelemetryConfig {
         let (host, port) = Self::parse_endpoint(&self.telemetry.otlp.endpoint);
 
         let mut otlp = OTLPOptions::default();
-        // OTLP is enabled if telemetry is enabled (no need for separate otlp.enabled)
-        otlp.enabled = self.telemetry.enabled;
+        // OTLP exports only when asked for ([telemetry.otlp] enabled = true),
+        // as in telemetry-go: telemetry on with no collector configured must
+        // not dial localhost and report every span as failed.
+        otlp.enabled = self.telemetry.enabled && self.telemetry.otlp.enabled;
         otlp.endpoint = self.telemetry.otlp.endpoint.clone();
         otlp.host = host;
         otlp.port = port;
@@ -501,6 +503,15 @@ mod tests {
         assert_eq!(config.service.environment, "development");
         assert!(!config.telemetry.otlp.enabled);
         assert!(!config.foxglove.enabled);
+    }
+
+    #[test]
+    fn otlp_exports_only_when_enabled() {
+        let mut config = TelemetryConfig::default();
+        config.telemetry.enabled = true;
+        assert!(!config.to_telemetry_options().telemetry.otlp.enabled);
+        config.telemetry.otlp.enabled = true;
+        assert!(config.to_telemetry_options().telemetry.otlp.enabled);
     }
 
     #[test]

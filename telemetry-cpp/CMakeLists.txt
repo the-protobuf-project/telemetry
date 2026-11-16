@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.14...4.5)
-project(telemetry-cpp VERSION 1.0.0 LANGUAGES CXX)
+project(telemetry-cpp VERSION 1.3.0 LANGUAGES CXX)
 
 # Examples build when this is the project being built, not when another
 # project pulls it in with FetchContent or add_subdirectory.

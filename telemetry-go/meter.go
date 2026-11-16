@@ -37,8 +37,8 @@ func (p *Telemetry) Meter() telemetry.Meter {
 
 // meterAdapter implements telemetry.Meter over a real OTel SDK metric.Meter,
 // dual-writing every measurement to mcap the same way this SDK's own
-// struct-tag Metrics.Record path does (see internal/metrics.Metrics.
-// recordCounter/recordHistogram/recordGauge) — mcap is never nil (Meter()
+// Counter, Gauge and Histogram handles do (see internal/metrics/handles.go)
+// — mcap is never nil (Meter()
 // only constructs a meterAdapter once p.Metrics exists), but its own
 // WriteMcap is a no-op when MCAP wasn't enabled at Build() time.
 type meterAdapter struct {
@@ -167,11 +167,9 @@ type upDownCounterAdapter struct {
 
 func (a upDownCounterAdapter) Add(ctx context.Context, delta float64, labels telemetry.Labels) {
 	a.c.Add(ctx, delta, metric.WithAttributes(attrsFromLabels(labels)...))
-	// MCAP has no separate up-down-counter shape; this SDK's own struct-tag
-	// path (internal/metrics.Metrics.recordGauge) already records an
-	// UpDownCounter under its "gauge" MCAP kind for the same reason (a value
-	// that goes up and down), so this mirrors that rather than inventing a
-	// fourth MCAP kind.
+	// MCAP has no separate up-down-counter shape; a value that goes up and
+	// down is recorded under the "gauge" MCAP kind, as this SDK's own Gauge
+	// handle does, rather than inventing a fourth MCAP kind.
 	_ = a.mcap.WriteMcap("gauge", a.name, delta)
 }
 

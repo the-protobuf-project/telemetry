@@ -7,6 +7,45 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.3.1] - 2026-11-16
+
+### Fixed
+
+- C++: metrics were exported without the service's resource, so every one
+  reached the backend as `unknown_service`.
+- Python: `Telemetry.close()` left metrics to be exported at interpreter
+  exit; it now exports them before returning.
+
+### Added
+
+- Go: `tel.Metrics.Counter(name, attrs...)`, `Gauge` and `Histogram` bind a
+  metric series once, so recording does no reflection, lookup or allocation;
+  the recommended API for hot paths.
+- Rust: `Metrics::counter_handle`, `gauge_handle` and `histogram_handle` look
+  up an instrument once, so hot paths record to it directly.
+
+### Changed
+
+- Counters and gauges record into the SDK, in per-thread or per-CPU slots,
+  and OpenTelemetry reads them when it collects, rather than every value
+  going through OpenTelemetry's synchronous instruments. Every increment is
+  still exported, at shutdown included. Against the official SDKs on one
+  million counter increments: Go 7.3x on one goroutine and 44x on 14 with
+  handles (2.5x and 21x with struct tags), Rust 3.6x on one thread and far
+  more on 14, Python 9.7x and 19x on free-threaded 3.14, C++ 2.6x and 20x.
+  Histograms still record through OpenTelemetry.
+- Go and Rust: counters ignore negative and NaN values; a counter only goes
+  up.
+- Go: the struct-tag `Record` path parses each struct type's tags once.
+- C++: gauges are exported as OpenTelemetry gauges holding the last value
+  set, rather than as up-down counters; `Metrics::counter`, `histogram`,
+  `gauge` and the `get_*` lookups take a `std::string_view`, which changes
+  the library's ABI.
+- Python: if this `Telemetry` created the global meter provider, `close()`
+  shuts it down.
+
+## [1.3.0] - 2026-11-16
+
 ### Fixed
 
 - Go: logs and spans written faster than the collector accepted them were
@@ -220,6 +259,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## Release Links
 
+[Unreleased]: https://github.com/the-protobuf-project/telemetry/compare/v1.3.1...HEAD
+[1.3.1]: https://github.com/the-protobuf-project/telemetry/releases/tag/v1.3.1
+[1.3.0]: https://github.com/the-protobuf-project/telemetry/releases/tag/v1.3.0
 [1.0.0]: https://github.com/the-protobuf-project/telemetry/releases/tag/v1.0.0
 
 ---

@@ -83,6 +83,15 @@ var WithAttributes = metrics.WithAttributes
 // Re-export OpenTelemetry attribute creation functions from internal metrics package
 var StringAttribute = metrics.StringAttribute
 
+// Counter, Gauge and Histogram are metric handles from Metrics.Counter,
+// Metrics.Gauge and Metrics.Histogram: a series bound once, so recording
+// does no reflection or lookup. They are the fast way to record on a hot path.
+type (
+	Counter   = metrics.Counter
+	Gauge     = metrics.Gauge
+	Histogram = metrics.Histogram
+)
+
 // Log level constants for modules.
 //
 //   - ModuleLevel_1 (Error)  — stable, production-ready module

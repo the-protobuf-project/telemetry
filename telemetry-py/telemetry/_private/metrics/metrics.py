@@ -1,7 +1,23 @@
+"""Counters, gauges and histograms over OpenTelemetry, and Pydantic models of them.
+
+On a free-threaded build the SDK's synchronous counter is slow when threads
+count at once: every add takes the instrument's locks and touches state all
+threads share, so 14 threads counted slower than one. Here a counter or gauge
+write touches only the calling thread's own totals, found through a context
+variable; the SDK reads every thread's totals through an asynchronous
+instrument when it collects, so the threads never meet on the write path.
+Histograms keep the SDK's synchronous instrument.
+"""
+
+import contextvars
+import threading
 import time
+import weakref
+from threading import get_ident
 from typing import Any
 
 from opentelemetry import metrics
+from opentelemetry.metrics import Observation
 from opentelemetry.sdk.metrics import MeterProvider
 from opentelemetry.sdk.metrics.export import PeriodicExportingMetricReader
 from opentelemetry.sdk.resources import Resource
@@ -10,6 +26,38 @@ from pydantic import BaseModel
 from ...options import MetricsOptions, OTLPOptions, ServiceOptions
 from ..exporters import metric_exporter
 from ..foxglove import UnifiedMcapWriter
+
+# Providers made here: their owner shuts them down on close, so a later
+# instance makes its own instead of reusing one.
+_OWN_PROVIDERS: "weakref.WeakSet[MeterProvider]" = weakref.WeakSet()
+
+
+def _attr_key(labels: dict[str, Any]) -> tuple:
+    """A hashable key for a label set, the same whatever the labels' order."""
+    try:
+        key = tuple(sorted(labels.items()))
+        hash(key)
+        return key
+    except TypeError:  # a list value: kept as a tuple, which OTLP sends alike
+        return tuple(
+            sorted(
+                (k, tuple(v) if isinstance(v, list) else v) for k, v in labels.items()
+            )
+        )
+
+
+class _Totals:
+    """One thread's counter sums and last gauge values, by metric name and then
+    by label set. Only its thread writes them; the collection reads copies."""
+
+    __slots__ = ("ident", "thread", "sums", "gauges")
+
+    def __init__(self) -> None:
+        self.ident = get_ident()
+        self.thread = threading.current_thread()
+        self.sums: dict[str, dict[tuple, float]] = {}
+        # (monotonic ns, value): the latest write across threads wins
+        self.gauges: dict[str, dict[tuple, tuple[int, float]]] = {}
 
 
 class TelemetryMetrics:
@@ -35,10 +83,17 @@ class TelemetryMetrics:
 
         # Initialize OpenTelemetry metrics if enabled
         self.meter = None
-        self._counters: dict[str, Any] = {}
+        self._provider: MeterProvider | None = None  # set when this instance owns it
+        self._closed = False
         self._histograms: dict[str, Any] = {}
-        self._gauges: dict[str, Any] = {}  # Stores UpDownCounter instruments
-        self._gauge_values: dict[str, float] = {}  # Tracks current gauge values
+        self._observed: dict[str, Any] = {}  # asynchronous instruments by name
+        self._mine = contextvars.ContextVar(
+            f"telemetry-metric-totals-{id(self)}", default=None
+        )
+        self._lock = threading.Lock()
+        self._threads: list[_Totals] = []
+        # What threads that have exited counted, folded together
+        self._retired = _Totals()
 
         if otlp_opts and otlp_opts.enabled:
             self._setup_otel_metrics(service_opts, metrics_opts, otlp_opts)
@@ -50,9 +105,10 @@ class TelemetryMetrics:
         otlp_opts: OTLPOptions,
     ):
         """Setup OpenTelemetry metrics with OTLP exporter"""
-        # If a real MeterProvider is already set, reuse it to avoid override warnings
+        # A MeterProvider the application set is reused, to avoid override
+        # warnings; it is flushed on close, not shut down.
         current = metrics.get_meter_provider()
-        if isinstance(current, MeterProvider):
+        if isinstance(current, MeterProvider) and current not in _OWN_PROVIDERS:
             self.meter = metrics.get_meter(service_opts.name)
             return
 
@@ -81,9 +137,13 @@ class TelemetryMetrics:
         )
 
         provider = MeterProvider(resource=resource, metric_readers=[reader])
-        metrics.set_meter_provider(provider)
-
-        self.meter = metrics.get_meter(service_opts.name)
+        _OWN_PROVIDERS.add(provider)
+        self._provider = provider
+        # The first one becomes the global provider; a later one, made while
+        # ours is global, stays private to this instance.
+        if not isinstance(current, MeterProvider):
+            metrics.set_meter_provider(provider)
+        self.meter = provider.get_meter(service_opts.name)
 
     def record(self, model: BaseModel, labels: dict[str, Any] | None = None):
         """
@@ -142,15 +202,32 @@ class TelemetryMetrics:
             elif metric_type == "gauge":
                 self._record_gauge(metric_name, float(value), labels)
 
+    # The writer side: each thread writes its own totals, without locks.
+
+    def _totals(self) -> _Totals:
+        """This thread's totals. Threads may inherit a copy of their creator's
+        context, and with it the creator's totals; the thread id tells."""
+        mine = self._mine.get()
+        if mine is None or mine.ident != get_ident():
+            mine = _Totals()
+            with self._lock:
+                self._threads.append(mine)
+            self._mine.set(mine)
+        return mine
+
     def _record_counter(
         self, name: str, value: float, labels: dict[str, Any] | None = None
     ):
         """Record a counter metric"""
-        # OTEL counter
-        if self.meter:
-            if name not in self._counters:
-                self._counters[name] = self.meter.create_counter(name)
-            self._counters[name].add(value, attributes=labels or {})
+        if self.meter is not None:
+            mine = self._mine.get()
+            if mine is None or mine.ident != get_ident():
+                mine = self._totals()
+            sums = mine.sums.get(name)
+            if sums is None:
+                sums = mine.sums[name] = self._observe(name, "counter")
+            key = _attr_key(labels) if labels else ()
+            sums[key] = sums.get(key, 0.0) + value
 
         # MCAP
         if self.mcap_writer and not self.mcap_writer.is_closed():
@@ -172,7 +249,8 @@ class TelemetryMetrics:
         """Record a histogram metric"""
         # OTEL histogram
         if self.meter:
-            if name not in self._histograms:
+            histogram = self._histograms.get(name)
+            if histogram is None:
                 # Extract buckets from field_info if available
                 buckets = None
                 if (
@@ -187,12 +265,19 @@ class TelemetryMetrics:
                 if buckets:
                     kwargs["explicit_bucket_boundaries_advisory"] = buckets
 
-                self._histograms[name] = self.meter.create_histogram(
-                    name,
-                    description=(field_info.description or "") if field_info else "",
-                    **kwargs,
-                )
-            self._histograms[name].record(value, attributes=labels or {})
+                with self._lock:
+                    histogram = self._histograms.get(name)
+                    if histogram is None:
+                        histogram = self._histograms[name] = (
+                            self.meter.create_histogram(
+                                name,
+                                description=(field_info.description or "")
+                                if field_info
+                                else "",
+                                **kwargs,
+                            )
+                        )
+            histogram.record(value, attributes=labels or {})
 
         # MCAP
         if self.mcap_writer and not self.mcap_writer.is_closed():
@@ -207,33 +292,16 @@ class TelemetryMetrics:
     def _record_gauge(
         self, name: str, value: float, labels: dict[str, Any] | None = None
     ):
-        """Record a gauge metric using UpDownCounter (matches Go implementation)"""
-        # OTEL gauge (using UpDownCounter like Go does)
-        if self.meter:
-            if name not in self._gauges:
-                # Create the UpDownCounter instrument
-                self._gauges[name] = self.meter.create_up_down_counter(
-                    name, unit="1", description=f"Gauge metric: {name}"
-                )
-
-            # Create a unique key for tracking this gauge instance with its labels
-            label_key = name
-            if labels:
-                # Sort labels to ensure consistent key regardless of dictionary order
-                label_key = f"{name}:{sorted(labels.items())}"
-
-            if label_key not in self._gauge_values:
-                self._gauge_values[label_key] = 0.0
-
-            # Calculate delta to reach the target value
-            current_value = self._gauge_values[label_key]
-            delta = value - current_value
-
-            # Add the delta to reach the new value
-            self._gauges[name].add(delta, attributes=labels or {})
-
-            # Update tracked value
-            self._gauge_values[label_key] = value
+        """Record a gauge metric: its last value, exported as an up-down
+        counter's sum (matches the Go implementation)"""
+        if self.meter is not None:
+            mine = self._mine.get()
+            if mine is None or mine.ident != get_ident():
+                mine = self._totals()
+            values = mine.gauges.get(name)
+            if values is None:
+                values = mine.gauges[name] = self._observe(name, "gauge")
+            values[_attr_key(labels) if labels else ()] = (time.monotonic_ns(), value)
 
         # MCAP
         if self.mcap_writer and not self.mcap_writer.is_closed():
@@ -259,6 +327,81 @@ class TelemetryMetrics:
         """Manually record a gauge metric"""
         self._record_gauge(name, value, labels)
 
+    # The collection side: the SDK calls these when it collects.
+
+    def _observe(self, name: str, kind: str) -> dict:
+        """Creates the asynchronous instrument reporting a metric the first time
+        any thread writes it; returns a new, empty set of the thread's totals."""
+        with self._lock:
+            if name not in self._observed:
+                if kind == "counter":
+                    self._observed[name] = self.meter.create_observable_counter(
+                        name, callbacks=[lambda _options: self._sums(name)]
+                    )
+                else:
+                    self._observed[name] = self.meter.create_observable_up_down_counter(
+                        name,
+                        callbacks=[lambda _options: self._gauges(name)],
+                        unit="1",
+                        description=f"Gauge metric: {name}",
+                    )
+        return {}
+
+    def _live(self) -> list[_Totals]:
+        """Every thread's totals, the exited threads' folded into one. An exited
+        thread's are first marked, so a thread inheriting them (with a reused
+        thread id) makes its own, and folded at the next collection; called
+        with the lock held."""
+        live = []
+        for t in self._threads:
+            if t.thread.is_alive():
+                live.append(t)
+            elif t.ident:
+                t.ident = 0
+                live.append(t)
+            else:
+                for name, sums in t.sums.items():
+                    into = self._retired.sums.setdefault(name, {})
+                    for key, v in sums.items():
+                        into[key] = into.get(key, 0.0) + v
+                for name, values in t.gauges.items():
+                    into = self._retired.gauges.setdefault(name, {})
+                    for key, tv in values.items():
+                        if key not in into or tv[0] > into[key][0]:
+                            into[key] = tv
+        self._threads = live
+        return [self._retired, *live]
+
+    def _sums(self, name: str) -> list[Observation]:
+        totals: dict[tuple, float] = {}
+        with self._lock:
+            for t in self._live():
+                sums = t.sums.get(name)
+                if sums:
+                    for key, v in sums.copy().items():
+                        totals[key] = totals.get(key, 0.0) + v
+        return [Observation(v, dict(key)) for key, v in totals.items()]
+
+    def _gauges(self, name: str) -> list[Observation]:
+        latest: dict[tuple, tuple[int, float]] = {}
+        with self._lock:
+            for t in self._live():
+                values = t.gauges.get(name)
+                if values:
+                    for key, tv in values.copy().items():
+                        if key not in latest or tv[0] > latest[key][0]:
+                            latest[key] = tv
+        return [Observation(tv[1], dict(key)) for key, tv in latest.items()]
+
     def close(self):
-        """Close metrics system"""
-        pass
+        """Exports every counter, gauge and histogram as it stands. A provider
+        this instance made is shut down; one the application set is flushed."""
+        if self._closed or self.meter is None:
+            return
+        self._closed = True
+        if self._provider is not None:
+            self._provider.shutdown()
+        else:
+            flush = getattr(metrics.get_meter_provider(), "force_flush", None)
+            if flush:
+                flush()

@@ -38,6 +38,10 @@ colored.workspace = true
 figment.workspace = true
 pyroscope = { version = "2.1.5", default-features = false, features = ["rustls-tls", "backend-pprof-rs"], optional = true }
 
+[dev-dependencies]
+# The in-memory exporter, to check what metrics export.
+opentelemetry_sdk = { workspace = true, features = ["testing"] }
+
 [[example]]
 name = "logging"
 path = "examples/logging.rs"

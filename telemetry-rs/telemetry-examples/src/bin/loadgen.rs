@@ -77,9 +77,10 @@ async fn main() -> anyhow::Result<()> {
             });
         }
         "metrics" => {
-            let metrics = &telemetry.metrics;
+            // Looked up once, as a service recording on a hot path would.
+            let ops = telemetry.metrics.counter_handle("ops");
             fan_out(n, workers, |_| {
-                let _ = metrics.counter("ops", 1.0);
+                let _ = ops.add(1.0);
             });
         }
         // Distributed logging: records logged while a span is attached carry

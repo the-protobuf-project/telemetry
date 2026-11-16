@@ -324,78 +324,54 @@ export TELEMETRY_LOGGING_MODULES_NATS_MODULE_LEVEL=1  # Highest priority
 ### Metrics
 
 Telemetry supports OpenTelemetry metrics including counters, gauges, and histograms.
+Metric names get the service name as a prefix (`api-server.http_requests_total`),
+and every series carries the service labels.
 
-#### Counter Metrics
+#### Metric Handles
 
-Track cumulative values that only increase:
+A handle binds a name and attributes once; recording through it does no
+reflection and no lookup. Use handles on hot paths:
 
 ```go
-// Create a counter
-requestCounter, err := p.Metrics.Counter("http_requests_total",
-    metric.WithDescription("Total HTTP requests"),
-    metric.WithUnit("1"),
+requests := p.Metrics.Counter("http_requests_total",
+    telemetry.StringAttribute("method", "GET"),
+    telemetry.StringAttribute("endpoint", "/api/users"),
 )
-if err != nil {
-    panic(err)
+latency := p.Metrics.Histogram("http_request_duration_ms")
+active := p.Metrics.Gauge("active_connections")
+
+requests.Add(1)      // a counter only goes up; a negative value is dropped
+latency.Record(12.5)
+active.Set(42)       // a gauge reports the value last set
+```
+
+Keep the handle (one per name and attribute set) rather than calling
+`Counter` per increment. Counters and gauges are summed in the SDK, in
+per-CPU shards so concurrent goroutines don't contend, and reported to
+OpenTelemetry at each collection and at `Close`, so a counter `Add` costs a
+few nanoseconds and every increment is exported. Histograms record through
+OpenTelemetry's own instrument.
+
+#### Struct Tags
+
+`Record` records every tagged field of a struct, which suits recording
+several related values at once:
+
+```go
+type RequestMetrics struct {
+    Requests int     `telemetry:"metric:counter:http_requests_total"`
+    Latency  float64 `telemetry:"metric:histogram:http_request_duration_ms"`
+    Active   int     `telemetry:"metric:gauge:active_connections"`
 }
 
-// Increment counter with labels
-requestCounter.Add(ctx, 1,
-    metric.WithAttributes(
-        attribute.String("method", "GET"),
-        attribute.String("endpoint", "/api/users"),
-        attribute.Int("status_code", 200),
-    ),
+_ = p.Metrics.Record(RequestMetrics{Requests: 1, Latency: 12.5, Active: 42},
+    telemetry.WithAttributes(telemetry.StringAttribute("endpoint", "/api/users")),
 )
 ```
 
-#### Histogram Metrics
-
-Measure distributions of values (e.g., latencies):
-
-```go
-// Create a histogram
-latencyHistogram, err := p.Metrics.Histogram("http_request_duration_ms",
-    metric.WithDescription("HTTP request duration in milliseconds"),
-    metric.WithUnit("ms"),
-)
-if err != nil {
-    panic(err)
-}
-
-// Record values
-start := time.Now()
-// ... process request ...
-duration := time.Since(start).Milliseconds()
-
-latencyHistogram.Record(ctx, duration,
-    metric.WithAttributes(
-        attribute.String("endpoint", "/api/users"),
-        attribute.String("method", "GET"),
-    ),
-)
-```
-
-#### Gauge Metrics
-
-Track values that can go up or down:
-
-```go
-// Create an observable gauge
-activeConnections, err := p.Metrics.Gauge("active_connections",
-    metric.WithDescription("Number of active connections"),
-)
-if err != nil {
-    panic(err)
-}
-
-// Register callback to report current value
-meter.RegisterCallback(func(ctx context.Context, o metric.Observer) error {
-    count := getActiveConnectionCount()
-    o.ObserveInt64(activeConnections, count)
-    return nil
-}, activeConnections)
-```
+A tag and a handle of the same name and attributes record the same series.
+`Record` reads the struct through reflection on each call (the tags are
+parsed once per type), so it costs more than a handle.
 
 #### Typed Instruments via `Meter()` (for generated code)
 
@@ -1003,11 +979,8 @@ func generateResponse(
 package main
 
 import (
-    "context"
     "time"
     "github.com/the-protobuf-project/telemetry/telemetry-go"
-    "go.opentelemetry.io/otel/attribute"
-    "go.opentelemetry.io/otel/metric"
 )
 
 func main() {
@@ -1017,11 +990,15 @@ func main() {
         Build()
     defer p.Close()
 
-    ctx := context.Background()
-
     // Create metrics
-    requestCounter, _ := p.Metrics.Counter("http_requests_total")
-    requestDuration, _ := p.Metrics.Histogram("http_request_duration_ms")
+    requestCounter := p.Metrics.Counter("http_requests_total",
+        telemetry.StringAttribute("method", "GET"),
+        telemetry.StringAttribute("path", "/api/users"),
+    )
+    requestDuration := p.Metrics.Histogram("http_request_duration_ms",
+        telemetry.StringAttribute("method", "GET"),
+        telemetry.StringAttribute("path", "/api/users"),
+    )
 
     // Simulate HTTP requests
     for i := 0; i < 10; i++ {
@@ -1039,19 +1016,8 @@ func main() {
 
         // Record metrics
         duration := time.Since(start).Milliseconds()
-        requestCounter.Add(ctx, 1,
-            metric.WithAttributes(
-                attribute.String("method", "GET"),
-                attribute.String("path", "/api/users"),
-                attribute.Int("status", 200),
-            ),
-        )
-        requestDuration.Record(ctx, duration,
-            metric.WithAttributes(
-                attribute.String("method", "GET"),
-                attribute.String("path", "/api/users"),
-            ),
-        )
+        requestCounter.Add(1)
+        requestDuration.Record(float64(duration))
 
         p.Logger.Info("Request completed", map[string]interface{}{
             "request_id":  i,

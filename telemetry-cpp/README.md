@@ -234,10 +234,20 @@ m.histogram("request_duration_ms", 42.5);
 m.gauge("queue_depth", 17);              // set to 17
 ```
 
-Recording is safe from any thread. Each name's instrument is made on first use
-and found under a shared lock after that; counters and gauges add atomically.
-A gauge is exported as an up-down counter given each change, so the backend
-shows the last value set.
+Recording is safe from any thread. Each name's instrument is made on first use;
+after that each thread finds it in a small cache of its own, without a lock or
+an allocation. A counter keeps one cell per core, so threads seldom write the
+same cache line, and OpenTelemetry reads the sum when it collects (an
+observable counter) instead of being called on every increment. A gauge is
+exported as an observable gauge holding the last value set; histograms record
+each value as it comes.
+
+Keeping a reference to the instrument skips the lookup altogether:
+
+```cpp
+auto& requests = m.get_counter("requests_total");
+requests.add();
+```
 
 A type can describe several metrics at once:
 

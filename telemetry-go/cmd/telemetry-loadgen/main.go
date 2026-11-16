@@ -79,6 +79,7 @@ func run() error {
 		serve        = flag.String("serve", "", "only run the counting collector on this OTLP gRPC address (for other SDKs' load tests)")
 		countsAddr   = flag.String("counts", "127.0.0.1:4320", "with -serve: HTTP address answering GET /counts (JSON) and POST /reset")
 		httpAddr     = flag.String("http", "", "with -serve: also receive OTLP/HTTP on this address, e.g. 127.0.0.1:4318")
+		recordAPI    = flag.Bool("record-api", false, "metrics through the struct-tag Record API instead of a Counter handle")
 	)
 	flag.Parse()
 
@@ -142,18 +143,27 @@ func run() error {
 		if !want[sig] {
 			continue
 		}
-		t0 := time.Now()
-		fanOut(*n, *workers, func(w, i int) {
-			switch sig {
-			case "logs":
-				tel.Logger.Info("load", map[string]any{"i": i, "worker": w})
-			case "spans":
+		var emit func(w, i int)
+		switch sig {
+		case "logs":
+			emit = func(w, i int) { tel.Logger.Info("load", map[string]any{"i": i, "worker": w}) }
+		case "spans":
+			emit = func(int, int) {
 				_, s := tel.Tracing.StartSpan(ctx, "load.op")
 				s.End()
-			case "metrics":
-				_ = tel.Metrics.Record(loadMetric{Ops: 1})
 			}
-		})
+		case "metrics":
+			// The handle API recommended for a hot path; -record-api measures
+			// the struct-tag API instead.
+			if *recordAPI {
+				emit = func(int, int) { _ = tel.Metrics.Record(loadMetric{Ops: 1}) }
+			} else {
+				ops := tel.Metrics.Counter("ops")
+				emit = func(int, int) { ops.Add(1) }
+			}
+		}
+		t0 := time.Now()
+		fanOut(*n, *workers, emit)
 		durations[sig] = time.Since(t0)
 	}
 	emitted := time.Since(start)

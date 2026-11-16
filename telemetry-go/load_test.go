@@ -296,6 +296,46 @@ func BenchmarkCounter(b *testing.B) {
 	})
 }
 
+func BenchmarkCounterHandle(b *testing.B) {
+	ops := benchTelemetry(b, true).Metrics.Counter("ops")
+	b.ReportAllocs()
+	b.RunParallel(func(pb *testing.PB) {
+		for pb.Next() {
+			ops.Add(1)
+		}
+	})
+}
+
+// Counter increments are summed in the SDK and read at collection time, so
+// the final collection on Close must see every one, however recent.
+func TestCounterDeliversEveryIncrementOnClose(t *testing.T) {
+	tel, col := exporting(t, telemetry.ExportOptions{})
+	type ops struct {
+		N int `telemetry:"metric:counter:ops"`
+	}
+	const workers, per = 12, 50_000
+	c := tel.Metrics.Counter("ops")
+	var wg sync.WaitGroup
+	for w := range workers {
+		wg.Go(func() {
+			for range per {
+				if w%3 == 0 {
+					_ = tel.Metrics.Record(ops{N: 1})
+				} else {
+					c.Add(1)
+				}
+			}
+		})
+	}
+	wg.Wait()
+	if err := tel.Close(); err != nil {
+		t.Fatalf("Close: %v", err)
+	}
+	if got := col.Counts().Sums["load-test.ops"]; got != workers*per {
+		t.Errorf("collector sum %v, want %d", got, workers*per)
+	}
+}
+
 // Several exporters share the records and still lose none.
 func TestShardedExportersDeliverEverything(t *testing.T) {
 	tel, col := exporting(t, telemetry.ExportOptions{Lossless: true, QueueSize: 128, BatchSize: 32, Exporters: 3})

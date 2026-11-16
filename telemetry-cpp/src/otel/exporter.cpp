@@ -3,6 +3,7 @@
 #if TELEMETRY_USE_OTEL
 
 #include <opentelemetry/sdk/logs/batch_log_record_processor.h>
+#include <opentelemetry/sdk/metrics/view/view_registry.h>
 #include <opentelemetry/sdk/trace/batch_span_processor.h>
 
 #include <algorithm>
@@ -338,7 +339,10 @@ void OtelExporter::init_metrics(const resource::Resource& resource) {
     auto reader = std::make_unique<metrics_sdk::PeriodicExportingMetricReader>(
         std::move(exporter), reader_opts);
 
-    meter_provider_ = std::make_shared<metrics_sdk::MeterProvider>();
+    // With the service's resource, as the tracer and logger providers have;
+    // without it every metric reached the backend as unknown_service.
+    meter_provider_ = std::make_shared<metrics_sdk::MeterProvider>(
+        std::make_unique<metrics_sdk::ViewRegistry>(), resource);
     meter_provider_->AddMetricReader(std::move(reader));
 
     metrics_api::Provider::SetMeterProvider(

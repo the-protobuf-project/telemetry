@@ -58,11 +58,20 @@ class ExportOptions:
         lossless: Wait for room when a queue is full instead of dropping.
         queue_size: Records each signal may hold awaiting export.
         batch_size: Records sent per export request.
+        exporters: Exporters sharing each signal's records, each with its own
+            queue and connection: one sends one batch at a time, n send n at
+            once. They run in parallel on free-threaded Python (3.14t); with
+            the GIL they share one core and more of them do not help.
+        timeout: Seconds one export request may take, retries included,
+            before its batch counts as failed (the OpenTelemetry exporters'
+            own default is 10, which a large batch could exceed under load).
     """
 
     lossless: bool = False
     queue_size: int = 2048
     batch_size: int = 512
+    exporters: int = 1
+    timeout: float = 30.0
 
 
 @dataclass
@@ -149,12 +158,15 @@ class LoggingOptions:
         level: Log level string. Can be: DEBUG, INFO, WARNING, ERROR, CRITICAL.
         module_level: Global LogLevel (overrides environment-based default).
         modules: Per-module log level overrides keyed by service name.
+        console: Print each log line to stderr. Off, records still go to OTLP
+            and MCAP.
     """
 
     enabled: bool = True
     level: str = "INFO"
     module_level: LogLevel = LogLevel.UNSET
     modules: dict[str, ModuleOptions] = field(default_factory=dict)
+    console: bool = True
 
 
 @dataclass

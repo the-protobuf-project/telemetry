@@ -11,6 +11,7 @@ The OpenTelemetry tracer and logger providers are process-wide, so the
 counters are too: ``LOGS`` and ``SPANS``.
 """
 
+import itertools
 import threading
 import time
 from collections.abc import Sequence
@@ -38,24 +39,46 @@ class SignalStats:
 
 
 class Counters:
-    """Counters for one signal, shared by its processor and exporter."""
+    """Counters for one signal, shared by its processor and exporter.
+
+    With several exporters each has its own (``part()``) and the signal's
+    stats add them up, so writer threads on different exporters do not
+    contend for one lock: without the GIL they run at once.
+    """
 
     def __init__(self) -> None:
         self._lock = threading.Lock()
         self.emitted = 0
         self.exported = 0
         self.failed = 0
+        self._parts: list[Counters] = []
+
+    def part(self) -> "Counters":
+        """New counters for one exporter, counted in this signal's stats."""
+        c = Counters()
+        with self._lock:
+            self._parts.append(c)
+        return c
 
     def pending(self) -> int:
         return self.emitted - self.exported - self.failed
 
     def stats(self) -> SignalStats:
         with self._lock:
-            return SignalStats(self.emitted, self.exported, self.failed, self.pending())
+            emitted, exported, failed = self.emitted, self.exported, self.failed
+            parts = list(self._parts)
+        for p in parts:
+            s = p.stats()
+            emitted, exported, failed = (
+                emitted + s.emitted,
+                exported + s.exported,
+                failed + s.failed,
+            )
+        return SignalStats(emitted, exported, failed, emitted - exported - failed)
 
-    def add_emitted(self) -> None:
+    def add_emitted(self, n: int = 1) -> None:
         with self._lock:
-            self.emitted += 1
+            self.emitted += n
 
     def add_result(self, n: int, ok: bool) -> None:
         with self._lock:
@@ -180,6 +203,47 @@ class AccountedLogProcessor(LogRecordProcessor):
 
     def force_flush(self, timeout_millis: int = 30000) -> bool:
         return self._inner.force_flush(timeout_millis)
+
+
+class ShardedSpanProcessor(SpanProcessor):
+    """Spreads spans over several processors, each with its own exporter,
+    round robin: one exporter sends one batch at a time, so n of them send n
+    batches at once, on separate cores when the GIL is off."""
+
+    def __init__(self, shards: list[SpanProcessor]) -> None:
+        self._shards = shards
+        self._next = itertools.count()
+
+    def on_start(self, span, parent_context=None) -> None:
+        pass
+
+    def on_end(self, span) -> None:
+        self._shards[next(self._next) % len(self._shards)].on_end(span)
+
+    def shutdown(self) -> None:
+        for p in self._shards:
+            p.shutdown()
+
+    def force_flush(self, timeout_millis: int = 30000) -> bool:
+        return all([p.force_flush(timeout_millis) for p in self._shards])
+
+
+class ShardedLogProcessor(LogRecordProcessor):
+    """Spreads log records over several processors; see ShardedSpanProcessor."""
+
+    def __init__(self, shards: list[LogRecordProcessor]) -> None:
+        self._shards = shards
+        self._next = itertools.count()
+
+    def on_emit(self, log_record) -> None:
+        self._shards[next(self._next) % len(self._shards)].on_emit(log_record)
+
+    def shutdown(self) -> None:
+        for p in self._shards:
+            p.shutdown()
+
+    def force_flush(self, timeout_millis: int = 30000) -> bool:
+        return all([p.force_flush(timeout_millis) for p in self._shards])
 
 
 def loss_report(logs: SignalStats, spans: SignalStats) -> str | None:

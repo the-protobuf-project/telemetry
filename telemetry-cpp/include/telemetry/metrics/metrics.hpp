@@ -3,11 +3,16 @@
 #include "telemetry/platform.hpp"
 #include "telemetry/config.hpp"
 
-#include <string>
-#include <memory>
-#include <map>
-#include <vector>
+#include <atomic>
 #include <cstdint>
+#include <functional>
+#include <map>
+#include <memory>
+#include <string>
+#include <vector>
+#if !TELEMETRY_PLATFORM_FREERTOS
+#include <shared_mutex>
+#endif
 
 namespace telemetry {
 namespace mcap {
@@ -48,25 +53,29 @@ public:
     virtual std::vector<MetricField> metric_fields() const = 0;
 };
 
+/// Where an instrument also sends what it records: the OpenTelemetry
+/// instrument made with it, or nothing.
+using Sink = std::function<void(double)>;
+
 class Counter {
 public:
-    Counter(const std::string& name, const std::string& description = "");
+    Counter(const std::string& name, const std::string& description = "", Sink sink = {});
 
     void add(double value = 1.0);
-    double value() const { return value_; }
+    double value() const { return value_.load(std::memory_order_relaxed); }
     const std::string& name() const { return name_; }
 
 private:
     std::string name_;
     std::string description_;
-    double value_ = 0.0;
-    platform::Mutex mutex_;
+    std::atomic<double> value_{0.0};
+    Sink sink_;
 };
 
 class Histogram {
 public:
     Histogram(const std::string& name, const std::string& description = "",
-              const std::vector<double>& buckets = {});
+              const std::vector<double>& buckets = {}, Sink sink = {});
 
     void record(double value);
     uint64_t count() const { return count_; }
@@ -81,23 +90,26 @@ private:
     uint64_t count_ = 0;
     double sum_ = 0.0;
     platform::Mutex mutex_;
+    Sink sink_;
 };
 
 class Gauge {
 public:
-    Gauge(const std::string& name, const std::string& description = "");
+    /// sink is given each change, so an up-down counter behind it holds the
+    /// gauge's value.
+    Gauge(const std::string& name, const std::string& description = "", Sink sink = {});
 
     void set(double value);
     void increment(double value = 1.0);
     void decrement(double value = 1.0);
-    double value() const { return value_; }
+    double value() const { return value_.load(std::memory_order_relaxed); }
     const std::string& name() const { return name_; }
 
 private:
     std::string name_;
     std::string description_;
-    double value_ = 0.0;
-    platform::Mutex mutex_;
+    std::atomic<double> value_{0.0};
+    Sink sink_;
 };
 
 class Metrics {
@@ -137,9 +149,7 @@ public:
 private:
     void record_dynamic(const std::string& name, MetricType type, double value);
     void write_to_mcap(const std::string& name, MetricType type, double value);
-#if TELEMETRY_USE_OTEL
-    void write_to_otel(const std::string& name, MetricType type, double value);
-#endif
+    Sink otel_sink(const std::string& name, MetricType type);
 
     std::string service_name_;
     std::shared_ptr<mcap::McapWriter> mcap_writer_;
@@ -151,6 +161,12 @@ private:
     std::map<std::string, std::unique_ptr<Histogram>> histograms_;
     std::map<std::string, std::unique_ptr<Gauge>> gauges_;
 
+    // Guards the maps above. Instruments are found far more often than made,
+    // so where the platform has one, a reader-writer lock lets threads find
+    // them at once.
+#if !TELEMETRY_PLATFORM_FREERTOS
+    mutable std::shared_mutex instruments_;
+#endif
     platform::Mutex mutex_;
 };
 

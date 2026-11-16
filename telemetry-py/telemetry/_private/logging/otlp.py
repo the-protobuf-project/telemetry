@@ -21,6 +21,7 @@ Typical usage example:
     otlp_logger.write_log("INFO", "User logged in", {"user_id": "123"})
 """
 
+import json
 import logging
 import time
 from typing import Any
@@ -31,13 +32,19 @@ from opentelemetry._logs import (
     get_logger_provider,
     set_logger_provider,
 )
-from opentelemetry.exporter.otlp.proto.grpc._log_exporter import OTLPLogExporter
 from opentelemetry.sdk._logs import LoggerProvider, LoggingHandler
 from opentelemetry.sdk._logs.export import BatchLogRecordProcessor
 from opentelemetry.sdk.resources import Resource
 
 from ...options import ExportOptions
-from ..accounting import AccountedLogProcessor, CountingLogExporter
+from ..accounting import (
+    LOGS,
+    AccountedLogProcessor,
+    CountingLogExporter,
+    ShardedLogProcessor,
+)
+from ..exporters import _protocol, log_exporter
+from .pipeline import LogPipeline
 
 _SEVERITY = {
     "DEBUG": SeverityNumber.DEBUG,
@@ -46,6 +53,38 @@ _SEVERITY = {
     "ERROR": SeverityNumber.ERROR,
     "CRITICAL": SeverityNumber.FATAL,
 }
+# The same as plain numbers, for the pipeline: ints, unlike enum members, are
+# not shared objects every writer thread has to count references to.
+_SEVERITY_NUMBER = {k: v.value for k, v in _SEVERITY.items()}
+_LEVEL = {
+    "DEBUG": logging.DEBUG,
+    "INFO": logging.INFO,
+    "WARNING": logging.WARNING,
+    "ERROR": logging.ERROR,
+    "CRITICAL": logging.CRITICAL,
+}
+_RESERVED = frozenset(
+    {
+        "name",
+        "msg",
+        "args",
+        "created",
+        "filename",
+        "funcName",
+        "levelname",
+        "levelno",
+        "lineno",
+        "module",
+        "msecs",
+        "message",
+        "pathname",
+        "process",
+        "processName",
+        "relativeCreated",
+        "thread",
+        "threadName",
+    }
+)
 
 
 class OTLPLogger:
@@ -73,6 +112,8 @@ class OTLPLogger:
         service_description: str = "",
         service_labels: dict[str, str] = None,
         export=None,
+        use_http: bool = False,
+        headers: dict[str, str] | None = None,
     ):
         """Configure an OpenTelemetry logger for a service.
 
@@ -102,38 +143,52 @@ class OTLPLogger:
 
         logger_provider = LoggerProvider(resource=resource)
 
-        # Build headers for authentication
-        headers = []
+        headers = dict(headers or {})
         if auth_token:
-            headers.append(("authorization", f"Bearer {auth_token}"))
+            headers["authorization"] = f"Bearer {auth_token}"
 
-        # Determine endpoint URL - auto-add port 4317 for gRPC if not specified
-        if "://" in endpoint:
-            otlp_endpoint = endpoint
-        elif ":" in endpoint:
-            # Port already specified
-            otlp_endpoint = endpoint
-        else:
-            # No port - default to 4317 for gRPC
-            otlp_endpoint = f"{endpoint}:4317"
-
-        otlp_exporter = OTLPLogExporter(
-            endpoint=otlp_endpoint,
-            insecure=not secure,
-            headers=headers if headers else None,
-        )
+        # Without a port: 4317 for gRPC, 4318 for HTTP.
+        if "://" not in endpoint and ":" not in endpoint:
+            endpoint = f"{endpoint}:{4318 if use_http else 4317}"
 
         # Counted, and lossless when asked: the SDK's batch processor alone
         # drops what overflows its queue with no more than a single warning.
+        # Each exporter has its own queue, counters and gate.
         export = export or ExportOptions()
-        batch = BatchLogRecordProcessor(
-            CountingLogExporter(otlp_exporter),
-            max_queue_size=export.queue_size,
-            max_export_batch_size=min(export.batch_size, export.queue_size),
-        )
+        # Over HTTP, this logger's own records take the pipeline: per-thread
+        # buffers encoded straight to OTLP bytes. The provider's processors
+        # still carry what the stdlib logging bridge emits, so one exporter
+        # is enough for them then.
+        endpoint, use_http = _protocol(endpoint, use_http)
+        self._pipeline = None
+        if use_http:
+            try:
+                self._pipeline = LogPipeline(
+                    resource, service_name, endpoint, headers, export
+                )
+            except AttributeError:  # the exporter's transport is not where it was
+                self._pipeline = None
+        shards = []
+        for _ in range(1 if self._pipeline else max(1, export.exporters)):
+            counters = LOGS.part()
+            batch = BatchLogRecordProcessor(
+                CountingLogExporter(
+                    log_exporter(endpoint, secure, use_http, headers, export.timeout),
+                    counters,
+                ),
+                max_queue_size=export.queue_size,
+                max_export_batch_size=min(export.batch_size, export.queue_size),
+            )
+            shards.append(
+                AccountedLogProcessor(
+                    batch, export.lossless, export.queue_size, counters
+                )
+            )
         logger_provider.add_log_record_processor(
-            AccountedLogProcessor(batch, export.lossless, export.queue_size)
+            shards[0] if len(shards) == 1 else ShardedLogProcessor(shards)
         )
+        if self._pipeline:
+            logger_provider.add_log_record_processor(self._pipeline)
 
         # Only set the global logger provider once to avoid override warnings.
         # Each service still gets its own LoggerProvider with correct service.name resource.
@@ -197,20 +252,7 @@ class OTLPLogger:
             caller_file (str): Source file path associated with the entry.
             caller_line (int): Source line number associated with the entry.
         """
-        import json
-        import logging as std_logging
-
-        # Map logbook levels to standard logging levels
-        level_map = {
-            "DEBUG": std_logging.DEBUG,
-            "INFO": std_logging.INFO,
-            "WARNING": std_logging.WARNING,
-            "ERROR": std_logging.ERROR,
-            "CRITICAL": std_logging.CRITICAL,
-        }
-
-        std_level = level_map.get(level, std_logging.INFO)
-        if std_level < self._min_level:
+        if _LEVEL.get(level, logging.INFO) < self._min_level:
             return
 
         # Service name, version, environment, description and labels are on
@@ -226,29 +268,8 @@ class OTLPLogger:
             extra_attrs["data"] = json.dumps(data)
 
             # Also add individual fields for easier querying
-            reserved_keys = {
-                "name",
-                "msg",
-                "args",
-                "created",
-                "filename",
-                "funcName",
-                "levelname",
-                "levelno",
-                "lineno",
-                "module",
-                "msecs",
-                "message",
-                "pathname",
-                "process",
-                "processName",
-                "relativeCreated",
-                "thread",
-                "threadName",
-            }
-
             for key, value in data.items():
-                attr_key = f"field.{key}" if key in reserved_keys else key
+                attr_key = f"field.{key}" if key in _RESERVED else key
 
                 if isinstance(value, (dict, list)):
                     extra_attrs[attr_key] = json.dumps(value)
@@ -259,6 +280,11 @@ class OTLPLogger:
         # logger built a logging.LogRecord only for LoggingHandler to translate
         # it back. The current span, if any, is picked up from the context.
         now = time.time_ns()
+        if self._pipeline:
+            self._pipeline.emit(
+                now, _SEVERITY_NUMBER.get(level, 9), level, message, extra_attrs
+            )
+            return
         self.logger.emit(
             LogRecord(
                 timestamp=now,

@@ -208,7 +208,8 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        python-version: ['3.12', '3.13']
+        # The t builds are free-threaded: no GIL, and no grpcio, so they export over HTTP.
+        python-version: ['3.12', '3.13', '3.14', '3.14t', '3.15', '3.15t']
 
     steps:
       - name: Check out code
@@ -225,6 +226,10 @@ jobs:
 
       - name: Import smoke test
         run: python -c "import telemetry; print('telemetry', telemetry.__all__)"
+
+      - name: Tests
+        working-directory: ./telemetry-py
+        run: pip install pytest && pytest -q tests
 
   build-cpp:
     name: Build C++ SDK

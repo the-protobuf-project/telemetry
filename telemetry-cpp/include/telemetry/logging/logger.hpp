@@ -4,6 +4,7 @@
 #include "telemetry/config.hpp"
 
 #include <string>
+#include <atomic>
 #include <memory>
 #include <functional>
 #include <cstdint>
@@ -92,6 +93,9 @@ public:
 
     void add_sink(LogSink sink);
 
+    /// Prints each line to stdout, or not; on by default.
+    void set_console(bool console) { console_ = console; }
+
     void trace(const char* message, const char* file = "", uint32_t line = 0);
     void debug(const char* message, const char* file = "", uint32_t line = 0);
     void info(const char* message, const char* file = "", uint32_t line = 0);
@@ -132,6 +136,8 @@ private:
 
     std::shared_ptr<mcap::McapWriter> mcap_writer_;
     std::vector<LogSink> sinks_;
+    std::atomic<bool> has_sinks_{false}; // so a log call takes the lock only when a sink is added
+    bool console_ = true;
 
 #if !TELEMETRY_PLATFORM_FREERTOS
     std::shared_ptr<spdlog::logger> spdlog_logger_;

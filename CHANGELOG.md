@@ -35,6 +35,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - C++: a span started without an explicit parent always began a new trace, even
   inside another span.
 - Python: `close()` did not flush pending spans.
+- Rust: in lossless mode with several exporters, one exporter draining slower
+  than the rest could overflow its queue and drop records; each exporter is
+  now gated on its own queue.
+- Python: `with_otlp_http()` was ignored; every signal exported over gRPC.
+- Python: an export that took longer than 10 seconds, retries included, lost
+  its whole batch; a large batch under load could. The deadline is
+  `with_export(timeout=...)`, 30 seconds by default as in Go.
+- Rust: `Metrics::record` leaked a copy of every metric name on every call;
+  names are now kept once per instrument.
+- C++: every counter, histogram or gauge value created its OpenTelemetry
+  instrument anew; each is now made once. A gauge was exported as an
+  up-down counter given the full value each time, so setting it to 5 twice
+  read 10; it is now given each change, and reads the last value set.
+- Rust: log attributes were all sent as strings (an integer became `"42"`);
+  they keep their type.
 - Single image: Loki's and Tempo's default ingest limits refused almost all of
   a high-volume load; Grafana's trace ↔ log links matched text that OTLP logs
   do not contain.
@@ -59,6 +74,27 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `bench/`: `bench_all.py` (every SDK, OTLP and MCAP), `stack_bench.py` (the
   single image under load), `just crosslang`, and `telemetry-loadgen` with
   built-in pprof profiling; `docs/BENCHMARKS.md`.
+- Rust: `ExportOptions::exporters` sends each signal through several
+  exporters at once, as Go's `Exporters` does.
+- C++: `with_export(ExportOptions{...})` (queue, batch, lossless, several
+  exporters), `Telemetry::stats()`, and a report on `close()` of any log
+  records or spans that never reached the collector.
+- Rust, Python, C++: `with_console(false)` turns off printing every log line,
+  for services read in Loki rather than a terminal; records still go to OTLP
+  and MCAP.
+- Python: free-threaded Python 3.14 (`3.14t`) is supported, and is what
+  development uses. Logs and spans sent over OTLP/HTTP are encoded straight to
+  protobuf bytes rather than through the exporters' message objects, which
+  protobuf builds in pure Python on 3.14t; `with_export(exporters=n)` spreads
+  a signal over several exporters.
+- Python: on free-threaded builds, the logger's records go through
+  per-thread buffers encoded straight to OTLP bytes, rather than the SDK's
+  shared queue, which every writer thread waited on.
+- Python 3.15 and 3.15t are supported and tested, end to end: logs and spans
+  from several threads to a collector, every record once, logs carrying the
+  span they were written in.
+- `bench/bench_all.py` runs each SDK head to head against its official SDK
+  tuned to drop nothing (`--rounds` sets the runs per configuration).
 - Releases: one `vX.Y.Z` tag releases every SDK at that version, including the
   `telemetry-go/vX.Y.Z` tag Go needs to resolve the module.
 - A `justfile` runs every task — tests, lint, benchmarks, the cross-language
@@ -67,6 +103,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- Python: gRPC export is the `grpc` extra (`telemetry-py[grpc]`), since grpcio
+  cannot be installed on free-threaded Python; without it, gRPC export falls
+  back to OTLP/HTTP, from port 4317 to 4318, and warns once.
+- Go: the export queue hands records to the exporter a batch at a time rather
+  than one by one over a channel, which spent a third of the CPU waking
+  goroutines; a log call's file and line are resolved once per call site.
+- Rust: a log call prints its console line in one write with a cached
+  timestamp and service tag, and no longer repeats the service name, version
+  and environment as record attributes (the resource carries them).
+- Rust: `Metrics::counter`, `histogram`, `gauge` and `record` take `&self`, so
+  one `Metrics` records from any number of threads.
+- C++: counters and gauges add atomically rather than under a lock, and
+  instruments are found under a reader-writer lock.
+- C++: the tracer and logger are looked up once; looking them up per span took
+  the provider's lock on every span.
 - Rust: the crate is published as `telemetry-rs` (`telemetry` on crates.io is
   an unrelated project); code still imports it as `telemetry`.
 - Python: log records no longer repeat the service attributes and labels the

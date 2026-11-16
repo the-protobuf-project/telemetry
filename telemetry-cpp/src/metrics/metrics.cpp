@@ -14,27 +14,39 @@ namespace telemetry::metrics {
  * @param name Name of the counter.
  * @param description Description of the counter.
  */
-Counter::Counter(const std::string& name, const std::string& description)
+Counter::Counter(const std::string& name, const std::string& description, Sink sink)
     : name_(name)
     , description_(description)
-    , mutex_(platform::create_mutex()) {
+    , sink_(std::move(sink)) {
 }
 
+namespace {
+// atomic<double>::fetch_add is C++20; this is it for C++17.
+double add_to(std::atomic<double>& v, double delta) {
+    double old = v.load(std::memory_order_relaxed);
+    while (!v.compare_exchange_weak(old, old + delta, std::memory_order_relaxed)) {
+    }
+    return old + delta;
+}
+}  // namespace
+
 void Counter::add(double value) {
-    platform::ScopedLock lock(mutex_);
-    value_ += value;
+    add_to(value_, value);
+    if (sink_) sink_(value);
 }
 
 Histogram::Histogram(const std::string& name, const std::string& description,
-                     const std::vector<double>& buckets)
+                     const std::vector<double>& buckets, Sink sink)
     : name_(name)
     , description_(description)
     , buckets_(buckets.empty() ? std::vector<double>{0.005, 0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 1.0, 2.5, 5.0, 10.0} : buckets)
     , bucket_counts_(buckets_.size() + 1, 0)
-    , mutex_(platform::create_mutex()) {
+    , mutex_(platform::create_mutex())
+    , sink_(std::move(sink)) {
 }
 
 void Histogram::record(double value) {
+    if (sink_) sink_(value);
     platform::ScopedLock lock(mutex_);
     count_++;
     sum_ += value;
@@ -48,25 +60,25 @@ void Histogram::record(double value) {
     bucket_counts_.back()++;
 }
 
-Gauge::Gauge(const std::string& name, const std::string& description)
+Gauge::Gauge(const std::string& name, const std::string& description, Sink sink)
     : name_(name)
     , description_(description)
-    , mutex_(platform::create_mutex()) {
+    , sink_(std::move(sink)) {
 }
 
 void Gauge::set(double value) {
-    platform::ScopedLock lock(mutex_);
-    value_ = value;
+    const double old = value_.exchange(value, std::memory_order_relaxed);
+    if (sink_) sink_(value - old);
 }
 
 void Gauge::increment(double value) {
-    platform::ScopedLock lock(mutex_);
-    value_ += value;
+    add_to(value_, value);
+    if (sink_) sink_(value);
 }
 
 void Gauge::decrement(double value) {
-    platform::ScopedLock lock(mutex_);
-    value_ -= value;
+    add_to(value_, -value);
+    if (sink_) sink_(-value);
 }
 
 Metrics::Metrics(const ServiceOptions& service_opts)
@@ -147,9 +159,6 @@ Metrics& Metrics::operator=(Metrics&& other) noexcept {
 void Metrics::counter(const std::string& name, double value) {
     get_counter(name).add(value);
     write_to_mcap(name, MetricType::Counter, value);
-#if TELEMETRY_USE_OTEL
-    write_to_otel(name, MetricType::Counter, value);
-#endif
 }
 
 /**
@@ -161,9 +170,6 @@ void Metrics::counter(const std::string& name, double value) {
 void Metrics::histogram(const std::string& name, double value) {
     get_histogram(name).record(value);
     write_to_mcap(name, MetricType::Histogram, value);
-#if TELEMETRY_USE_OTEL
-    write_to_otel(name, MetricType::Histogram, value);
-#endif
 }
 
 /**
@@ -175,41 +181,55 @@ void Metrics::histogram(const std::string& name, double value) {
 void Metrics::gauge(const std::string& name, double value) {
     get_gauge(name).set(value);
     write_to_mcap(name, MetricType::Gauge, value);
-#if TELEMETRY_USE_OTEL
-    write_to_otel(name, MetricType::Gauge, value);
-#endif
 }
 
-Counter& Metrics::get_counter(const std::string& name, const std::string& description) {
-    platform::ScopedLock lock(mutex_);
-    auto it = counters_.find(name);
-    if (it == counters_.end()) {
-        auto [inserted, _] = counters_.emplace(name, std::make_unique<Counter>(name, description));
-        return *inserted->second;
+namespace {
+// Finds name in instruments, or makes it with make; found under a shared
+// lock, made under an exclusive one.
+template <class T, class Lock, class Make>
+T& find_or_make(std::map<std::string, std::unique_ptr<T>>& instruments, const std::string& name,
+                Lock& lock, Make make) {
+#if !TELEMETRY_PLATFORM_FREERTOS
+    {
+        std::shared_lock<std::shared_mutex> read(lock);
+        if (auto it = instruments.find(name); it != instruments.end()) return *it->second;
     }
+    std::unique_lock<std::shared_mutex> write(lock);
+#else
+    platform::ScopedLock write(lock);
+#endif
+    auto it = instruments.find(name);
+    if (it == instruments.end()) it = instruments.emplace(name, make()).first;
     return *it->second;
+}
+}  // namespace
+
+#if !TELEMETRY_PLATFORM_FREERTOS
+#define TELEMETRY_INSTRUMENTS_LOCK instruments_
+#else
+#define TELEMETRY_INSTRUMENTS_LOCK mutex_
+#endif
+
+Counter& Metrics::get_counter(const std::string& name, const std::string& description) {
+    return find_or_make(counters_, name, TELEMETRY_INSTRUMENTS_LOCK, [&] {
+        return std::make_unique<Counter>(name, description, otel_sink(name, MetricType::Counter));
+    });
 }
 
 Histogram& Metrics::get_histogram(const std::string& name, const std::string& description,
                                    const std::vector<double>& buckets) {
-    platform::ScopedLock lock(mutex_);
-    auto it = histograms_.find(name);
-    if (it == histograms_.end()) {
-        auto [inserted, _] = histograms_.emplace(name, std::make_unique<Histogram>(name, description, buckets));
-        return *inserted->second;
-    }
-    return *it->second;
+    return find_or_make(histograms_, name, TELEMETRY_INSTRUMENTS_LOCK, [&] {
+        return std::make_unique<Histogram>(name, description, buckets, otel_sink(name, MetricType::Histogram));
+    });
 }
 
 Gauge& Metrics::get_gauge(const std::string& name, const std::string& description) {
-    platform::ScopedLock lock(mutex_);
-    auto it = gauges_.find(name);
-    if (it == gauges_.end()) {
-        auto [inserted, _] = gauges_.emplace(name, std::make_unique<Gauge>(name, description));
-        return *inserted->second;
-    }
-    return *it->second;
+    return find_or_make(gauges_, name, TELEMETRY_INSTRUMENTS_LOCK, [&] {
+        return std::make_unique<Gauge>(name, description, otel_sink(name, MetricType::Gauge));
+    });
 }
+
+#undef TELEMETRY_INSTRUMENTS_LOCK
 
 void Metrics::record_dynamic(const std::string& name, MetricType type, double value) {
     switch (type) {
@@ -238,39 +258,41 @@ void Metrics::write_to_mcap(const std::string& name, MetricType type, double val
                                 platform::get_timestamp_ns());
 }
 
-#if TELEMETRY_USE_OTEL
 /**
- * @brief Exports a metric value to OpenTelemetry.
+ * @brief The OpenTelemetry instrument a local one also records to, made once
+ * with it; empty without an exporter.
  *
  * @param name Metric name.
  * @param type Metric type determining the OpenTelemetry instrument.
- * @param value Metric value to export.
  */
-void Metrics::write_to_otel(const std::string& name, MetricType type, double value) {
-    if (!otel_exporter_) return;
-
+Sink Metrics::otel_sink(const std::string& name, MetricType type) {
+#if TELEMETRY_USE_OTEL
+    if (!otel_exporter_) return {};
     auto meter = otel_exporter_->get_meter();
-    if (!meter) return;
-
+    if (!meter) return {};
     switch (type) {
         case MetricType::Counter: {
-            auto counter = meter->CreateDoubleCounter(name);
-            counter->Add(value);
-            break;
+            std::shared_ptr<opentelemetry::metrics::Counter<double>> c(meter->CreateDoubleCounter(name).release());
+            return [c](double v) { c->Add(v); };
         }
         case MetricType::Histogram: {
-            auto histogram = meter->CreateDoubleHistogram(name);
-            histogram->Record(value, {});
-            break;
+            std::shared_ptr<opentelemetry::metrics::Histogram<double>> h(
+                meter->CreateDoubleHistogram(name).release());
+            return [h](double v) { h->Record(v, opentelemetry::context::Context{}); };
         }
         case MetricType::Gauge: {
-            // Use UpDownCounter as gauge alternative (CreateDoubleGauge not available in this OTEL version)
-            auto gauge = meter->CreateDoubleUpDownCounter(name);
-            gauge->Add(value, {});
-            break;
+            // An up-down counter given each change holds the gauge's value
+            // (the synchronous gauge needs the newer OpenTelemetry ABI).
+            std::shared_ptr<opentelemetry::metrics::UpDownCounter<double>> g(
+                meter->CreateDoubleUpDownCounter(name).release());
+            return [g](double v) { g->Add(v); };
         }
     }
-}
+#else
+    (void)name;
+    (void)type;
 #endif
+    return {};
+}
 
 }  // namespace telemetry::metrics

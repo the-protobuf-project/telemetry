@@ -41,7 +41,7 @@ pub struct LlmMetrics {
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
     // Auto-discovers telemetry.toml config file
-    let mut telemetry = Telemetry::new()
+    let telemetry = Telemetry::new()
         .with_service("metrics-example", "1.0.0")
         .description("Metrics example service")
         .environment(Environment::Development)

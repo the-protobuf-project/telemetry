@@ -49,9 +49,11 @@ class TelemetryLogger:
         self.logger.level = log_level
 
         # Enable colored output with custom format
-        handler = StderrHandler(level=log_level, bubble=False)
-        handler.formatter = get_custom_formatter()
-        handler.push_application()
+        self._console = logging_opts.console
+        if self._console:
+            handler = StderrHandler(level=log_level, bubble=False)
+            handler.formatter = get_custom_formatter()
+            handler.push_application()
 
         # Initialize OTLP logging if enabled
         self.otel_logger = None
@@ -66,6 +68,8 @@ class TelemetryLogger:
                 auth_token=otlp_opts.auth_token,
                 secure=otlp_opts.secure,
                 export=otlp_opts.export,
+                use_http=otlp_opts.use_http,
+                headers=otlp_opts.headers,
             )
 
         # Initialize MCAP logging if enabled
@@ -129,8 +133,9 @@ class TelemetryLogger:
         """Log debug message"""
         caller_file, caller_line = get_caller_info()
         _caller_info.file, _caller_info.line = caller_file, caller_line
-        msg = f"{message}{format_data(data)}" if data else message
-        self.logger.debug(msg)
+        if self._console:
+            msg = f"{message}{format_data(data)}" if data else message
+            self.logger.debug(msg)
 
         if self.otel_logger:
             self.otel_logger.write_log("DEBUG", message, data, caller_file, caller_line)
@@ -141,8 +146,9 @@ class TelemetryLogger:
         """Log info message"""
         caller_file, caller_line = get_caller_info()
         _caller_info.file, _caller_info.line = caller_file, caller_line
-        msg = f"{message}{format_data(data)}" if data else message
-        self.logger.info(msg)
+        if self._console:
+            msg = f"{message}{format_data(data)}" if data else message
+            self.logger.info(msg)
 
         if self.otel_logger:
             self.otel_logger.write_log("INFO", message, data, caller_file, caller_line)
@@ -153,8 +159,9 @@ class TelemetryLogger:
         """Log warning message"""
         caller_file, caller_line = get_caller_info()
         _caller_info.file, _caller_info.line = caller_file, caller_line
-        msg = f"{message}{format_data(data)}" if data else message
-        self.logger.warning(msg)
+        if self._console:
+            msg = f"{message}{format_data(data)}" if data else message
+            self.logger.warning(msg)
 
         if self.otel_logger:
             self.otel_logger.write_log(
@@ -167,8 +174,9 @@ class TelemetryLogger:
         """Log error message"""
         caller_file, caller_line = get_caller_info()
         _caller_info.file, _caller_info.line = caller_file, caller_line
-        msg = f"{message}{format_data(data)}" if data else message
-        self.logger.error(msg)
+        if self._console:
+            msg = f"{message}{format_data(data)}" if data else message
+            self.logger.error(msg)
 
         if self.otel_logger:
             self.otel_logger.write_log("ERROR", message, data, caller_file, caller_line)
@@ -179,8 +187,9 @@ class TelemetryLogger:
         """Log critical message"""
         caller_file, caller_line = get_caller_info()
         _caller_info.file, _caller_info.line = caller_file, caller_line
-        msg = f"{message}{format_data(data)}" if data else message
-        self.logger.critical(msg)
+        if self._console:
+            msg = f"{message}{format_data(data)}" if data else message
+            self.logger.critical(msg)
 
         if self.otel_logger:
             self.otel_logger.write_log(

@@ -45,7 +45,7 @@ pub struct LlmMetrics {
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
     let mcap_path = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("target/metrics-example.mcap");
-    let mut telemetry = telemetry::telemetry_local_otel!()
+    let telemetry = telemetry::telemetry_local_otel!()
         .with_service("metrics-example", "1.0.0")
         .environment(Environment::Development)
         .with_mcap(mcap_path.to_string_lossy())

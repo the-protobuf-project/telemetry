@@ -7,7 +7,7 @@ use anyhow::Result;
 use opentelemetry::metrics::{Counter, Gauge, Histogram, Meter, MeterProvider};
 use opentelemetry_sdk::metrics::SdkMeterProvider;
 use std::collections::HashMap;
-use std::sync::{Arc, Mutex};
+use std::sync::{Arc, Mutex, RwLock};
 
 use super::mcap::MetricMcapWriter;
 use crate::foxglove::UnifiedMcapWriter;
@@ -55,7 +55,7 @@ pub use crate::traits::RecordMetrics;
 /// use telemetry::options::ServiceOptions;
 ///
 /// let service_opts = ServiceOptions::new("my-service", "1.0.0");
-/// let mut metrics = Metrics::new(service_opts, None, None).unwrap();
+/// let metrics = Metrics::new(service_opts, None, None).unwrap();
 ///
 /// metrics.counter("requests_total", 1.0).unwrap();
 /// metrics.histogram("request_duration_ms", 42.5).unwrap();
@@ -64,10 +64,47 @@ pub use crate::traits::RecordMetrics;
 pub struct Metrics {
     mcap_writer: Option<Arc<Mutex<MetricMcapWriter>>>,
     meter: Option<Meter>,
-    counters: HashMap<String, Counter<f64>>,
-    histograms: HashMap<String, Histogram<f64>>,
-    gauges: HashMap<String, Gauge<f64>>,
+    counters: Instruments<Counter<f64>>,
+    histograms: Instruments<Histogram<f64>>,
+    gauges: Instruments<Gauge<f64>>,
     service_name: String,
+}
+
+/// One kind of instrument by name, made on first use. Shared, so `Metrics`
+/// records from any thread through `&self`: an existing instrument is found
+/// under a read lock, which threads take at once.
+struct Instruments<I> {
+    by_name: RwLock<HashMap<String, I>>,
+}
+
+impl<I> Default for Instruments<I> {
+    fn default() -> Self {
+        Self {
+            by_name: RwLock::new(HashMap::new()),
+        }
+    }
+}
+
+impl<I> Instruments<I> {
+    /// Calls `f` with the instrument named `name`, made with `make` the first
+    /// time; `make` is given the name to keep.
+    fn with(&self, name: &str, make: impl FnOnce(&'static str) -> I, f: impl FnOnce(&I)) {
+        if let Some(i) = self
+            .by_name
+            .read()
+            .unwrap_or_else(|e| e.into_inner())
+            .get(name)
+        {
+            return f(i);
+        }
+        let mut by_name = self.by_name.write().unwrap_or_else(|e| e.into_inner());
+        // OpenTelemetry keeps instrument names for the program's life; leaked
+        // once per instrument, not once per value.
+        let i = by_name
+            .entry(name.to_string())
+            .or_insert_with(|| make(Box::leak(name.to_string().into_boxed_str())));
+        f(i)
+    }
 }
 
 impl Metrics {
@@ -96,9 +133,9 @@ impl Metrics {
         Ok(Self {
             mcap_writer: mcap_metric_writer,
             meter,
-            counters: HashMap::new(),
-            histograms: HashMap::new(),
-            gauges: HashMap::new(),
+            counters: Instruments::default(),
+            histograms: Instruments::default(),
+            gauges: Instruments::default(),
             service_name,
         })
     }
@@ -122,11 +159,11 @@ impl Metrics {
     /// }
     ///
     /// let service_opts = ServiceOptions::new("my-service", "1.0.0");
-    /// let mut metrics = Metrics::new(service_opts, None, None).unwrap();
+    /// let metrics = Metrics::new(service_opts, None, None).unwrap();
     /// let my_metrics = MyMetrics { counter: 42 };
     /// metrics.record(&my_metrics).unwrap();
     /// ```
-    pub fn record<T: RecordMetrics>(&mut self, model: &T) -> Result<()> {
+    pub fn record<T: RecordMetrics>(&self, model: &T) -> Result<()> {
         for field in model.metric_fields() {
             // Prefix metric name with service name
             let prefixed_name = format!("{}.{}", self.service_name, field.name);
@@ -136,103 +173,55 @@ impl Metrics {
     }
 
     /// Records a metric dynamically with runtime type determination.
-    fn record_dynamic(&mut self, name: &str, metric_type: MetricType, value: f64) -> Result<()> {
-        // Convert to 'static by leaking - this is acceptable for metric names which are typically
-        // a small, fixed set defined at compile time via the derive macro
-        let static_name: &'static str = Box::leak(name.to_string().into_boxed_str());
-
-        // OTel with static name
-        if let Some(ref meter) = self.meter {
-            match metric_type {
-                MetricType::Counter => {
-                    let counter = self
-                        .counters
-                        .entry(name.to_string())
-                        .or_insert_with(|| meter.f64_counter(static_name).build());
-                    counter.add(value, &[]);
-                }
-                MetricType::Histogram => {
-                    let histogram = self
-                        .histograms
-                        .entry(name.to_string())
-                        .or_insert_with(|| meter.f64_histogram(static_name).build());
-                    histogram.record(value, &[]);
-                }
-                MetricType::Gauge => {
-                    let gauge = self
-                        .gauges
-                        .entry(name.to_string())
-                        .or_insert_with(|| meter.f64_gauge(static_name).build());
-                    gauge.record(value, &[]);
-                }
-            }
+    fn record_dynamic(&self, name: &str, metric_type: MetricType, value: f64) -> Result<()> {
+        match metric_type {
+            MetricType::Counter => self.record_counter(name, value),
+            MetricType::Histogram => self.record_histogram(name, value),
+            MetricType::Gauge => self.record_gauge(name, value),
         }
+    }
 
-        // MCAP
+    /// Records a counter metric.
+    fn record_counter(&self, name: &str, value: f64) -> Result<()> {
+        if let Some(ref meter) = self.meter {
+            self.counters.with(
+                name,
+                |n| meter.f64_counter(n).build(),
+                |c| c.add(value, &[]),
+            );
+        }
         if let Some(ref writer) = self.mcap_writer {
-            let mut w = writer.lock().unwrap();
-            match metric_type {
-                MetricType::Counter => w.write_counter(name, value)?,
-                MetricType::Histogram => w.write_histogram(name, value)?,
-                MetricType::Gauge => w.write_gauge(name, value)?,
-            }
+            writer.lock().unwrap().write_counter(name, value)?;
         }
         Ok(())
     }
 
-    /// Records a counter metric with static name.
-    fn record_counter(&mut self, name: &'static str, value: f64) -> Result<()> {
-        // OTel counter - create once and cache
+    /// Records a histogram metric.
+    fn record_histogram(&self, name: &str, value: f64) -> Result<()> {
         if let Some(ref meter) = self.meter {
-            let counter = self
-                .counters
-                .entry(name.to_string())
-                .or_insert_with(|| meter.f64_counter(name).build());
-            counter.add(value, &[]);
+            self.histograms.with(
+                name,
+                |n| meter.f64_histogram(n).build(),
+                |h| h.record(value, &[]),
+            );
         }
-
-        // MCAP
         if let Some(ref writer) = self.mcap_writer {
-            let mut w = writer.lock().unwrap();
-            w.write_counter(name, value)?;
+            writer.lock().unwrap().write_histogram(name, value)?;
         }
         Ok(())
     }
 
-    /// Records a histogram metric with static name.
-    fn record_histogram(&mut self, name: &'static str, value: f64) -> Result<()> {
-        // OTel histogram - create once and cache
+    /// Records a gauge metric.
+    fn record_gauge(&self, name: &str, value: f64) -> Result<()> {
         if let Some(ref meter) = self.meter {
-            let histogram = self
-                .histograms
-                .entry(name.to_string())
-                .or_insert_with(|| meter.f64_histogram(name).build());
-            histogram.record(value, &[]);
+            self.gauges.with(
+                name,
+                |n| meter.f64_gauge(n).build(),
+                |g| g.record(value, &[]),
+            );
         }
-
-        // MCAP
         if let Some(ref writer) = self.mcap_writer {
-            let mut w = writer.lock().unwrap();
-            w.write_histogram(name, value)?;
-        }
-        Ok(())
-    }
-
-    /// Records a gauge metric with static name.
-    fn record_gauge(&mut self, name: &'static str, value: f64) -> Result<()> {
-        // OTel gauge - create once and cache
-        if let Some(ref meter) = self.meter {
-            let gauge = self
-                .gauges
-                .entry(name.to_string())
-                .or_insert_with(|| meter.f64_gauge(name).build());
-            gauge.record(value, &[]);
-        }
-
-        // MCAP
-        if let Some(ref writer) = self.mcap_writer {
-            let mut w = writer.lock().unwrap();
-            w.write_gauge(name, value)?;
+            writer.lock().unwrap().write_gauge(name, value)?;
         }
         Ok(())
     }
@@ -245,7 +234,7 @@ impl Metrics {
     ///
     /// * `name` - Metric name (must be static)
     /// * `value` - Value to add to the counter
-    pub fn counter(&mut self, name: &'static str, value: f64) -> Result<()> {
+    pub fn counter(&self, name: &'static str, value: f64) -> Result<()> {
         self.record_counter(name, value)
     }
 
@@ -257,7 +246,7 @@ impl Metrics {
     ///
     /// * `name` - Metric name (must be static)
     /// * `value` - Value to record
-    pub fn histogram(&mut self, name: &'static str, value: f64) -> Result<()> {
+    pub fn histogram(&self, name: &'static str, value: f64) -> Result<()> {
         self.record_histogram(name, value)
     }
 
@@ -269,7 +258,7 @@ impl Metrics {
     ///
     /// * `name` - Metric name (must be static)
     /// * `value` - Current value
-    pub fn gauge(&mut self, name: &'static str, value: f64) -> Result<()> {
+    pub fn gauge(&self, name: &'static str, value: f64) -> Result<()> {
         self.record_gauge(name, value)
     }
 }

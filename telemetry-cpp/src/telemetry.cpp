@@ -1,5 +1,8 @@
 #include "telemetry/telemetry.hpp"
 
+#include <cstdio>
+#include <utility>
+
 namespace telemetry {
 
 /**
@@ -20,7 +23,8 @@ Telemetry::Telemetry(const ServiceOptions& service_opts, const TelemetryOptions&
     if (telemetry_opts.telemetry.otlp.enabled) {
         std::string endpoint = "http://" + telemetry_opts.telemetry.otlp.host + ":" +
                                std::to_string(telemetry_opts.telemetry.otlp.port);
-        otel_exporter_ = std::make_unique<otel::OtelExporter>(service_opts, endpoint);
+        otel_exporter_ = std::make_unique<otel::OtelExporter>(service_opts, endpoint,
+                                                              telemetry_opts.telemetry.otlp.export_options);
     }
 #endif
 
@@ -33,6 +37,8 @@ Telemetry::Telemetry(const ServiceOptions& service_opts, const TelemetryOptions&
         , otel_exporter_.get()
 #endif
     );
+
+    logger_->set_console(telemetry_opts.console);
 
     metrics_ = std::make_unique<metrics::Metrics>(service_opts, mcap_writer_
 #if TELEMETRY_USE_OTEL
@@ -65,6 +71,7 @@ Telemetry::Telemetry(const ServiceOptions& service_opts, const TelemetryOptions&
         , otel_exporter_.get()
 #endif
     );
+    global_logger->set_console(telemetry_opts.console);
     logging::GlobalLogger::init(std::move(global_logger));
 }
 
@@ -147,6 +154,21 @@ void Telemetry::close() {
 #if TELEMETRY_USE_OTEL
     if (otel_exporter_) {
         otel_exporter_->shutdown();
+        const auto s = otel_exporter_->stats();
+        for (const auto& [name, sig] : {std::pair{"log records", s.logs}, std::pair{"spans", s.spans}}) {
+            if (sig.pending() > 0) {
+                std::fprintf(stderr,
+                             "telemetry: %llu of %llu %s dropped (export queue full); use "
+                             "with_export(ExportOptions{.lossless = true}) or a larger queue_size to keep them\n",
+                             static_cast<unsigned long long>(sig.pending()),
+                             static_cast<unsigned long long>(sig.emitted), name);
+            }
+            if (sig.failed > 0) {
+                std::fprintf(stderr, "telemetry: %llu of %llu %s failed to export\n",
+                             static_cast<unsigned long long>(sig.failed),
+                             static_cast<unsigned long long>(sig.emitted), name);
+            }
+        }
     }
 #endif
 
@@ -155,6 +177,13 @@ void Telemetry::close() {
     }
 
     closed_ = true;
+}
+
+Stats Telemetry::stats() const {
+#if TELEMETRY_USE_OTEL
+    if (otel_exporter_) return otel_exporter_->stats();
+#endif
+    return {};
 }
 
 /**
@@ -214,6 +243,16 @@ TelemetryBuilder& TelemetryBuilder::with_mcap(const std::string& path) {
     return *this;
 }
 
+TelemetryBuilder& TelemetryBuilder::with_export(const ExportOptions& options) {
+    export_options_ = options;
+    return *this;
+}
+
+TelemetryBuilder& TelemetryBuilder::with_console(bool console) {
+    console_ = console;
+    return *this;
+}
+
 /**
  * @brief Builds a telemetry instance from the configured service and exporter settings.
  *
@@ -228,6 +267,8 @@ Telemetry TelemetryBuilder::build() {
     }
 
     TelemetryOptions telemetry_opts;
+    telemetry_opts.console = console_;
+    telemetry_opts.telemetry.otlp.export_options = export_options_;
 
     if (otlp_host_ && otlp_port_) {
         telemetry_opts.telemetry.otlp.enabled = true;

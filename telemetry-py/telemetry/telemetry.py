@@ -165,6 +165,8 @@ class TelemetryBuilder:
         lossless: bool = False,
         queue_size: int | None = None,
         batch_size: int | None = None,
+        exporters: int = 1,
+        timeout: float = 30.0,
     ) -> "TelemetryBuilder":
         """Tune the OTLP export queues for logs and spans.
 
@@ -177,7 +179,19 @@ class TelemetryBuilder:
             lossless=lossless,
             queue_size=queue_size or (65536 if lossless else 2048),
             batch_size=batch_size or (8192 if lossless else 512),
+            exporters=max(1, exporters),
+            timeout=timeout,
         )
+        return self
+
+    def with_console(self, console: bool = True) -> "TelemetryBuilder":
+        """Print each log line to stderr, or not; on by default.
+
+        Off, records still go to OTLP and MCAP: for services whose logs are
+        read in Loki rather than a terminal, where printing every line costs
+        more than exporting it.
+        """
+        self._console = console
         return self
 
     def with_otlp_http(self, use_http: bool = True) -> "TelemetryBuilder":
@@ -277,6 +291,8 @@ class TelemetryBuilder:
         # Configure MCAP if specified
         if getattr(self, "_export", None):
             telemetry_opts.telemetry.otlp.export = self._export
+        if getattr(self, "_console", None) is not None:
+            telemetry_opts.telemetry.logging.console = self._console
 
         if self._mcap_path:
             telemetry_opts.foxglove.enabled = True

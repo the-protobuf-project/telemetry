@@ -115,21 +115,18 @@ impl TelemetryProvider {
             let shards = exporters
                 .into_iter()
                 .map(|exporter| {
-                    opentelemetry_sdk::logs::BatchLogProcessor::builder(CountingLogExporter::new(
-                        exporter,
-                        Arc::clone(&logs),
-                    ))
+                    let counters = Arc::new(Counters::part_of(&logs));
+                    let batch = opentelemetry_sdk::logs::BatchLogProcessor::builder(
+                        CountingLogExporter::new(exporter, Arc::clone(&counters)),
+                    )
                     .with_batch_config(config())
-                    .build()
+                    .build();
+                    AccountedLogProcessor::new(batch, counters, &telemetry_opts.export)
                 })
                 .collect();
             Some(
                 SdkLoggerProvider::builder()
-                    .with_log_processor(AccountedLogProcessor::new(
-                        Shards::new(shards),
-                        Arc::clone(&logs),
-                        &telemetry_opts.export,
-                    ))
+                    .with_log_processor(Shards::new(shards))
                     .with_resource(resource)
                     .build(),
             )
@@ -247,19 +244,17 @@ impl TelemetryProvider {
             let shards = exporters
                 .into_iter()
                 .map(|exporter| {
-                    opentelemetry_sdk::trace::BatchSpanProcessor::builder(
-                        CountingSpanExporter::new(exporter, Arc::clone(&spans)),
+                    let counters = Arc::new(Counters::part_of(&spans));
+                    let batch = opentelemetry_sdk::trace::BatchSpanProcessor::builder(
+                        CountingSpanExporter::new(exporter, Arc::clone(&counters)),
                     )
                     .with_batch_config(config())
-                    .build()
+                    .build();
+                    AccountedSpanProcessor::new(batch, counters, &telemetry_opts.export)
                 })
                 .collect();
             let provider = SdkTracerProvider::builder()
-                .with_span_processor(AccountedSpanProcessor::new(
-                    Shards::new(shards),
-                    Arc::clone(&spans),
-                    &telemetry_opts.export,
-                ))
+                .with_span_processor(Shards::new(shards))
                 .with_resource(resource)
                 .build();
             opentelemetry::global::set_tracer_provider(provider.clone());

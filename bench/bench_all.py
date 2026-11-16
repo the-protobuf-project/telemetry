@@ -27,9 +27,21 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
 OTLP = "127.0.0.1:43170"  # away from 4317, so a running local stack is untouched
-OTLP_HTTP = "127.0.0.1:43180"  # the same collector over OTLP/HTTP, for the C++ SDKs
+OTLP_HTTP = "127.0.0.1:43180"  # the same collector over OTLP/HTTP, for C++ and Python
 COUNTS = "127.0.0.1:43200"
 OFFICIAL = "official OpenTelemetry SDK alone (default batch processor)"
+
+# The official SDKs tuned through the standard variables every one of them
+# reads: a queue that holds the whole burst, so they drop nothing either, and
+# the same batch size this SDK uses in lossless mode.
+TUNED = {
+    "OTEL_BLRP_MAX_QUEUE_SIZE": "1048576",
+    "OTEL_BLRP_MAX_EXPORT_BATCH_SIZE": "8192",
+    "OTEL_BSP_MAX_QUEUE_SIZE": "1048576",
+    "OTEL_BSP_MAX_EXPORT_BATCH_SIZE": "8192",
+}
+# Exporters this SDK runs per signal in the head-to-head.
+EXPORTERS = {"Go": 4, "Rust": 8, "Python": 4, "C++": 8}
 
 
 def sh(cmd, cwd, **kw):
@@ -99,10 +111,11 @@ def variants(langs, loadgen, workers):
         ]
     if "python" in langs:
         cmd = lambda sig, n: ["uv", "run", "-q", "--project", str(ROOT / "telemetry-py"),
-                              "python", str(ROOT / "telemetry-py" / "examples" / "loadgen.py"), sig, str(n), OTLP]
+                              "python", str(ROOT / "telemetry-py" / "examples" / "loadgen.py"), sig, str(n), OTLP_HTTP]
+        # Free-threaded Python (3.14t) exports over HTTP: grpcio has no build for it.
         out += [
-            ("Python", "default (drop when full)", "Python drop", cmd, {}),
-            ("Python", "Lossless", "Python lossless", cmd, {"LOADGEN_LOSSLESS": "1"}),
+            ("Python", "default (drop when full)", "Python drop", cmd, {"LOADGEN_HTTP": "1"}),
+            ("Python", "Lossless", "Python lossless", cmd, {"LOADGEN_HTTP": "1", "LOADGEN_LOSSLESS": "1"}),
         ]
     if "cpp" in langs:
         cpp = ROOT / "telemetry-cpp" / "bazel-bin" / "examples"
@@ -115,13 +128,14 @@ def variants(langs, loadgen, workers):
         "go": ("Go", lambda sig, n: [str(scratch / "otel-baseline-go"), "-signal", sig, "-n", str(n), "-endpoint", OTLP]),
         "rust": ("Rust", lambda sig, n: [str(ROOT / "telemetry-rs" / "target" / "release" / "otel_baseline"), sig, str(n), OTLP]),
         "python": ("Python", lambda sig, n: ["uv", "run", "-q", "--project", str(ROOT / "telemetry-py"), "python",
-                                             str(ROOT / "telemetry-py" / "examples" / "otel_baseline.py"), sig, str(n), OTLP]),
+                                             str(ROOT / "telemetry-py" / "examples" / "otel_baseline.py"), sig, str(n),
+                                             OTLP_HTTP]),
         "cpp": ("C++", lambda sig, n: [str(ROOT / "telemetry-cpp" / "bazel-bin" / "examples" / "otel_baseline"),
                                        sig, str(n), OTLP_HTTP]),
     }
     for key, (lang, cmd) in official.items():
         if key in langs:
-            out.append((lang, OFFICIAL, f"{lang} OTel SDK", cmd, {}))
+            out.append((lang, OFFICIAL, f"{lang} OTel SDK", cmd, {"OTEL_BASELINE_HTTP": "1"} if key == "python" else {}))
     return out
 
 
@@ -198,6 +212,7 @@ def main():
     ap.add_argument("--out", default=str(ROOT / "docs" / "BENCHMARKS.md"))
     ap.add_argument("--data", default=str(DATA), help="where the raw results are kept")
     ap.add_argument("--no-mcap", action="store_true", help="skip the MCAP recording runs")
+    ap.add_argument("--rounds", type=int, default=3, help="runs per head-to-head configuration; the median is kept")
     ap.add_argument("--render", action="store_true", help="rebuild the page from --data without running anything")
     args = ap.parse_args()
     data_path = Path(args.data)
@@ -236,6 +251,7 @@ def main():
                 r.update(lang=lang, mode=mode, label=label, delivered=got)
                 results.append(r)
                 print(f"{got}/{args.n} delivered, {args.n / r['emit_s']:,.0f}/s", file=sys.stderr)
+        versus = head_to_head(langs, loadgen, args.n, args.rounds, workers)
     finally:
         collector.terminate()
 
@@ -249,11 +265,12 @@ def main():
         "date": date.today().isoformat(),
         "platform": f"{platform.system()} {platform.machine()}",
         "cpus": workers,
-        "python": platform.python_version(),
+        "python": sdk_python(),
         "results": results,
         "mcap": mcap,
         "micro": [list(m) for m in micro],
         "exporter_sweep": previous.get("exporter_sweep"),
+        "head_to_head": versus,
     }
     data_path.write_text(json.dumps(data, indent=2) + "\n")
     write(data, args.out)
@@ -261,6 +278,75 @@ def main():
 
 
 # The page
+
+
+def sdk_python():
+    """The Python the Python SDK runs on, "3.14.10t" when free-threaded."""
+    try:
+        out = subprocess.run(
+            ["uv", "run", "-q", "--project", str(ROOT / "telemetry-py"), "python", "-c",
+             ("import sys; g = getattr(sys, '_is_gil_enabled', lambda: True)(); "
+              "print(sys.version.split()[0] + ('' if g else 't'))")],
+            capture_output=True, text=True, check=True)
+        return out.stdout.strip()
+    except (OSError, subprocess.CalledProcessError):
+        return platform.python_version()
+
+
+def head_to_head(langs, loadgen, n, rounds, workers):
+    """Each SDK against its tuned official SDK, lossless both, on one thread and on
+    one per CPU: the median of `rounds` runs of goodput, records delivered per
+    second of emitting and flushing."""
+    scratch = loadgen.parent
+    py = ["uv", "run", "-q", "--project", str(ROOT / "telemetry-py"), "python"]
+    rs = ROOT / "telemetry-rs" / "target" / "release"
+    cpp = ROOT / "telemetry-cpp" / "bazel-bin" / "examples"
+    go_ours = lambda sig, w: ([str(loadgen), "-json", "-signals", sig, "-n", str(n), "-endpoint", OTLP, "-workers", str(w),
+                               "-lossless", "-batch", "8192", "-queue", "65536", "-exporters", str(EXPORTERS["Go"])], {})
+    go_off = lambda sig, w: ([str(scratch / "otel-baseline-go"), "-signal", sig, "-n", str(n), "-workers", str(w),
+                              "-endpoint", OTLP], TUNED)
+    ours_env = lambda lang, w: {"LOADGEN_LOSSLESS": "1", "LOADGEN_WORKERS": str(w), "LOADGEN_EXPORTERS": str(EXPORTERS[lang])}
+    off_env = lambda w: dict(TUNED, OTEL_BASELINE_WORKERS=str(w))
+    sdks = {
+        "go": ("Go", go_off, go_ours),
+        "rust": ("Rust", lambda sig, w: ([str(rs / "otel_baseline"), sig, str(n), OTLP], off_env(w)),
+                 lambda sig, w: ([str(rs / "loadgen"), sig, str(n), OTLP], ours_env("Rust", w))),
+        "python": ("Python", lambda sig, w: ([*py, str(ROOT / "telemetry-py" / "examples" / "otel_baseline.py"), sig, str(n),
+                                              OTLP_HTTP], dict(off_env(w), OTEL_BASELINE_HTTP="1")),
+                   lambda sig, w: ([*py, str(ROOT / "telemetry-py" / "examples" / "loadgen.py"), sig, str(n), OTLP_HTTP],
+                                   dict(ours_env("Python", w), LOADGEN_HTTP="1"))),
+        "cpp": ("C++", lambda sig, w: ([str(cpp / "otel_baseline"), sig, str(n), OTLP_HTTP], off_env(w)),
+                lambda sig, w: ([str(cpp / "loadgen"), sig, str(n), OTLP_HTTP], ours_env("C++", w))),
+    }
+    out = []
+    for key, (lang, official, ours) in sdks.items():
+        if key not in langs:
+            continue
+        for w in (1, workers):
+            for sig in ("logs", "spans", "metrics"):
+                for sdk, cmd in (("official", official), ("ours", ours)):
+                    argv, env = cmd(sig, w)
+                    runs = []
+                    print(f"{lang:6} {sig:5} x{w:<2} {sdk:8} ...", end=" ", flush=True, file=sys.stderr)
+                    for _ in range(rounds):
+                        http("POST", "/reset")
+                        try:
+                            r = run_one(argv, 1800, env)
+                        except (subprocess.TimeoutExpired, RuntimeError) as e:
+                            print(f"failed: {e}", file=sys.stderr)
+                            break
+                        got = delivered(sig)
+                        runs.append({"delivered": got, "goodput": got / (r["emit_s"] + r["close_s"])})
+                    if not runs:
+                        continue
+                    runs.sort(key=lambda x: x["goodput"])
+                    mid = runs[len(runs) // 2]
+                    out.append({"lang": lang, "signal": sig, "workers": w, "sdk": sdk,
+                                "exporters": EXPORTERS[lang] if sdk == "ours" else 1,
+                                "delivered": mid["delivered"], "goodput": mid["goodput"],
+                                "runs": [round(x["goodput"]) for x in runs]})
+                    print(f"{mid['delivered']}/{n} delivered, {mid['goodput']:,.0f}/s", file=sys.stderr)
+    return out
 
 
 def ok(rows):
@@ -291,6 +377,7 @@ def charts(data):
     by = lambda sig: [r for r in rows if r["signal"] == sig]
 
     out += from_official(data)
+    out += tuned(data)
     out += ["## At a glance", ""]
 
     # Delivery and throughput, per signal.
@@ -376,6 +463,51 @@ def charts(data):
         out += ["### Go: cost of one call", ""]
         out += xychart("Go SDK nanoseconds per call", [m[0].removeprefix("Benchmark") for m in micro],
                        [float(m[1]) for m in micro], "ns / op")
+    return out
+
+
+def tuned(data):
+    """Each SDK against its official SDK tuned to drop nothing."""
+    rows = data.get("head_to_head") or []
+    if not rows:
+        return []
+    n = data["n"]
+    by = {(r["lang"], r["signal"], r["workers"], r["sdk"]): r for r in rows}
+    pairs = []
+    for (lang, sig, w, sdk), r in by.items():
+        if sdk == "ours" and (lang, sig, w, "official") in by:
+            pairs.append((lang, sig, w, by[(lang, sig, w, "official")], r))
+    order = {"Go": 0, "Rust": 1, "Python": 2, "C++": 3}
+    pairs.sort(key=lambda p: (p[2], order.get(p[0], 9), p[1]))
+    most = max(p[2] for p in pairs)
+    out = ["## Head to head: the official SDKs tuned", "",
+           "Defaults are not the official SDKs' best. Here each one is tuned through the standard",
+           "`OTEL_BLRP_*` and `OTEL_BSP_*` variables to a queue that holds the whole burst and batches",
+           "of 8192, so it drops nothing, and this SDK runs lossless with several exporters per signal",
+           (f"(Go {EXPORTERS['Go']}, Rust {EXPORTERS['Rust']}, Python {EXPORTERS['Python']}, "
+            f"C++ {EXPORTERS['C++']}). Both get the same "
+            f"{n:,} records from the same number of threads."),
+           "**Goodput** is records that reached the collector per second, emitting and flushing included;",
+           "each figure is the median of several runs.", ""]
+    for w in sorted({p[2] for p in pairs}):
+        ps = [p for p in pairs if p[2] == w]
+        out += xychart(f"Goodput vs the tuned official SDK, {w} thread{'s' if w > 1 else ''} (x)",
+                       [f"{p[0]} {p[1]}" for p in ps], [p[4]["goodput"] / p[3]["goodput"] for p in ps], "x official")
+    out += ["| Language | Signal | Threads | Official, tuned | This SDK | Delivered (both) | vs official |",
+            "| -------- | ------ | ------: | --------------: | -------: | ---------------: | ----------: |"]
+    for lang, sig, w, off, ours in pairs:
+        both = f"{off['delivered']:,} / {ours['delivered']:,}"
+        out.append(f"| {lang} | {sig} | {w} | {off['goodput']:,.0f}/s | {ours['goodput']:,.0f}/s | {both} | "
+                   f"**{ours['goodput'] / off['goodput']:.2f}x** |")
+    out += [""]
+    short = [p for p in pairs if p[2] == most]
+    short = [f"{p[0]} {p[1]}" for p in short if p[4]["goodput"] < 2 * p[3]["goodput"]]
+    if short:
+        out += [f"Under 2x: {', '.join(short)}."]
+        if any(x.startswith("C++ spans") for x in short):
+            out += ["C++ spans are bounded inside opentelemetry-cpp's tracer: every span copies",
+                    "reference-counted pointers that all threads share, in the official SDK and this one alike."]
+        out += [""]
     return out
 
 
@@ -474,7 +606,7 @@ def write(data, out_path):
         "numbers (`docs/benchmarks.json`) with `just bench-render`.",
         "",
         f"Measured {data['date']} on {data['platform']}, {data['cpus']} CPUs, Python {data['python']}.",
-        "Console log output is discarded (Go) or sent to /dev/null (Rust, Python), so the terminal is",
+        "Console log output is off in every load generator (Go formats it to io.Discard), so the terminal is",
         "not what is measured. **drop** is the default: a full export queue drops what does not fit,",
         "counted and reported on close. **lossless** makes the writer wait for room instead.",
         "",

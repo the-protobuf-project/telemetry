@@ -32,7 +32,31 @@ pip install git+https://github.com/the-protobuf-project/telemetry.git#subdirecto
 cd telemetry-py && uv sync
 ```
 
-**Requirements:** Python 3.12+
+**Requirements:** Python 3.12 to 3.15, including the free-threaded builds (`3.14t`, `3.15t`),
+which development uses.
+
+OTLP goes over HTTP out of the box. For gRPC, install the `grpc` extra
+(`pip install 'telemetry-py[grpc]'`); grpcio has no free-threaded build, so on
+3.14t, or whenever the extra is missing, gRPC export falls back to HTTP on port
+4318 and warns once.
+
+### Free-threaded Python
+
+On 3.14t there is no GIL, so the exporters encode and send while your threads
+keep writing. Logs and spans are encoded straight to OTLP bytes rather than
+through protobuf message objects, which protobuf can only build in pure Python
+there. For more throughput, spread a signal over several exporters:
+
+```python
+t = (
+    Telemetry.new()
+    .with_service("ingest", "1.0.0")
+    .with_otlp_http()
+    .with_export(lossless=True, exporters=4)
+    .with_console(False)  # logs still go to OTLP and MCAP
+    .build()
+)
+```
 
 ## Quick Start
 

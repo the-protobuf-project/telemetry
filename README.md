@@ -364,7 +364,7 @@ C++,MCAP,1
 | Distributed logging (logs carry the trace id) | Yes: `InfoContext(ctx, …)`, `Logger.WithContext` | Yes: inside `span.attach()` | Yes: inside `start_span` | Yes: inside `span.attach()` / `TELEMETRY_SPAN` |
 | Profiles to Pyroscope | Yes: `WithProfiling` | Yes: `with_profiling` (`profiling` feature) | Yes: `with_profiling` (`[profiling]` extra) | Through an eBPF profiler (no Pyroscope C++ client exists; see below) |
 | MCAP recording | logs, metrics, spans | logs, metrics, spans | logs, metrics, spans | logs, metrics, spans |
-| Drops counted and reported, lossless mode | Yes: `WithExport`, `Stats()`, `Close` error | Yes: `with_export`, `stats()`, `close` error | Yes: `with_export`, `stats()`, warning on `close` | No (silent) |
+| Drops counted and reported, lossless mode | Yes: `WithExport`, `Stats()`, `Close` error | Yes: `with_export`, `stats()`, `close` error | Yes: `with_export`, `stats()`, warning on `close` | Yes: `with_export`, `stats()`, warning on `close` |
 
 `just crosslang` checks one trace across all four, passed from Go to Rust to
 Python to C++, and CI runs it on every change.

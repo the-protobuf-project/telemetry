@@ -19,6 +19,9 @@ use opentelemetry_sdk::logs::SdkLoggerProvider;
 use opentelemetry_sdk::metrics::{PeriodicReader, SdkMeterProvider};
 use opentelemetry_sdk::trace::SdkTracerProvider;
 
+type Emit = Box<dyn Fn(usize) + Sync>;
+type Close = Box<dyn FnOnce() -> Option<String>>;
+
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
     let args: Vec<String> = std::env::args().collect();
@@ -32,10 +35,7 @@ async fn main() -> anyhow::Result<()> {
         args.get(3).map(String::as_str).unwrap_or("127.0.0.1:4317")
     );
 
-    let (emit, close): (
-        Box<dyn Fn(usize) + Sync>,
-        Box<dyn FnOnce() -> Option<String>>,
-    ) = match signal {
+    let (emit, close): (Emit, Close) = match signal {
         "logs" => {
             let exporter = opentelemetry_otlp::LogExporter::builder()
                 .with_tonic()

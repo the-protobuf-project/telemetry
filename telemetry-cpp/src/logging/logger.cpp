@@ -96,6 +96,8 @@ Logger::Logger(Logger&& other) noexcept
     , level_(other.level_)
     , mcap_writer_(std::move(other.mcap_writer_))
     , sinks_(std::move(other.sinks_))
+    , has_sinks_(!sinks_.empty())
+    , console_(other.console_)
 #if !TELEMETRY_PLATFORM_FREERTOS
     , spdlog_logger_(std::move(other.spdlog_logger_))
 #endif
@@ -121,6 +123,8 @@ Logger& Logger::operator=(Logger&& other) noexcept {
         level_ = other.level_;
         mcap_writer_ = std::move(other.mcap_writer_);
         sinks_ = std::move(other.sinks_);
+        has_sinks_.store(!sinks_.empty(), std::memory_order_release);
+        console_ = other.console_;
 #if !TELEMETRY_PLATFORM_FREERTOS
         spdlog_logger_ = std::move(other.spdlog_logger_);
 #endif
@@ -160,6 +164,7 @@ void Logger::set_level(Level level) {
 void Logger::add_sink(LogSink sink) {
     platform::ScopedLock lock(mutex_);
     sinks_.push_back(std::move(sink));
+    has_sinks_.store(true, std::memory_order_release);
 }
 
 void Logger::trace(const char* message, const char* file, uint32_t line) {
@@ -215,12 +220,13 @@ void Logger::log(Level level, const char* message, const char* file, uint32_t li
         entry.span_id = current.span_id;
     }
 
-    log_to_console(entry);
+    if (console_) log_to_console(entry);
     log_to_mcap(entry);
 #if TELEMETRY_USE_OTEL
     log_to_otel(entry);
 #endif
 
+    if (!has_sinks_.load(std::memory_order_acquire)) return;
     platform::ScopedLock lock(mutex_);
     for (const auto& sink : sinks_) {
         sink(entry);

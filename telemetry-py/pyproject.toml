@@ -7,13 +7,15 @@ name = "telemetry-py"
 version = "1.0.1"
 description = "Unified observability framework with logging, metrics, and tracing"
 readme = "README.md"
-requires-python = ">=3.12,<3.15"
+requires-python = ">=3.12,<3.16"
 dependencies = [
     "logbook>=1.10.1",
     "mcap>=1.6.0",
     "protobuf>=5.0,<8.0",
     "opentelemetry-sdk>=1.45.1",
-    "opentelemetry-exporter-otlp-proto-grpc>=1.45.1",
+    # OTLP/HTTP runs everywhere, free-threaded Python (3.14t) included; gRPC
+    # needs grpcio, which has no free-threaded build: the grpc extra.
+    "opentelemetry-exporter-otlp-proto-http>=1.45.1",
     "pydantic>=2.14.1",
     "dynaconf>=3.3.5",
 ]
@@ -21,6 +23,11 @@ dependencies = [
 [project.optional-dependencies]
 # Continuous profiling to Pyroscope (Telemetry.new().with_profiling(...)).
 profiling = ["pyroscope-io>=1.4.0"]
+# OTLP over gRPC (the default protocol); not installable on free-threaded Python.
+grpc = ["opentelemetry-exporter-otlp-proto-grpc>=1.45.1"]
+
+[dependency-groups]
+dev = ["pytest>=9.0"]
 
 [tool.hatch.build.targets.wheel]
 packages = ["telemetry"]

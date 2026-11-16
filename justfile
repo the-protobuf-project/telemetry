@@ -32,7 +32,7 @@ test-rust:
 
 # Python: lint, check formatting, and import the package.
 test-py:
-    cd telemetry-py && uv run ruff check . && uv run ruff format --check . && uv run python -c "import telemetry"
+    cd telemetry-py && uv run ruff check . && uv run ruff format --check . && uv run pytest -q
 
 # C++: build everything and run the tests.
 test-cpp:

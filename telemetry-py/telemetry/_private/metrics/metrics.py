@@ -2,13 +2,13 @@ import time
 from typing import Any
 
 from opentelemetry import metrics
-from opentelemetry.exporter.otlp.proto.grpc.metric_exporter import OTLPMetricExporter
 from opentelemetry.sdk.metrics import MeterProvider
 from opentelemetry.sdk.metrics.export import PeriodicExportingMetricReader
 from opentelemetry.sdk.resources import Resource
 from pydantic import BaseModel
 
 from ...options import MetricsOptions, OTLPOptions, ServiceOptions
+from ..exporters import metric_exporter
 from ..foxglove import UnifiedMcapWriter
 
 
@@ -64,9 +64,15 @@ class TelemetryMetrics:
             }
         )
 
-        exporter = OTLPMetricExporter(
-            endpoint=f"{otlp_opts.host}:{otlp_opts.port}",
-            insecure=True,
+        headers = dict(otlp_opts.headers)
+        if otlp_opts.auth_token:
+            headers["authorization"] = f"Bearer {otlp_opts.auth_token}"
+        exporter = metric_exporter(
+            otlp_opts.endpoint,
+            otlp_opts.secure,
+            otlp_opts.use_http,
+            headers,
+            otlp_opts.export.timeout,
         )
 
         reader = PeriodicExportingMetricReader(

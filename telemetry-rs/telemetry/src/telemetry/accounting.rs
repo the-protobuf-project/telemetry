@@ -46,14 +46,31 @@ impl SignalStats {
 }
 
 /// Counters for one signal, shared by its processor and exporter wrappers.
+/// With several exporters each has its own, adding into the signal's.
 #[derive(Debug, Default)]
 pub struct Counters {
     emitted: AtomicU64,
     exported: AtomicU64,
     failed: AtomicU64,
+    total: Option<Arc<Counters>>,
 }
 
 impl Counters {
+    /// Counters for one exporter of a signal, adding into `total`.
+    pub fn part_of(total: &Arc<Counters>) -> Self {
+        Self {
+            total: Some(Arc::clone(total)),
+            ..Self::default()
+        }
+    }
+
+    fn emit(&self) {
+        self.emitted.fetch_add(1, Ordering::AcqRel);
+        if let Some(total) = &self.total {
+            total.emit();
+        }
+    }
+
     fn pending(&self) -> u64 {
         let done = self.exported.load(Ordering::Acquire) + self.failed.load(Ordering::Acquire);
         self.emitted.load(Ordering::Acquire).saturating_sub(done)
@@ -77,6 +94,9 @@ impl Counters {
             Ok(()) => self.exported.fetch_add(n, Ordering::AcqRel),
             Err(_) => self.failed.fetch_add(n, Ordering::AcqRel),
         };
+        if let Some(total) = &self.total {
+            total.record(n, result);
+        }
     }
 }
 
@@ -93,9 +113,6 @@ struct Gate {
 }
 
 impl Gate {
-    // Sized by one exporter's queue even when there are several: records are
-    // dealt round robin, but one exporter may drain slower than the rest, and
-    // its queue must never overflow while the others have room.
     fn new(opts: &ExportOptions) -> Self {
         let queue = opts.queue_size as u64;
         Self {
@@ -211,7 +228,7 @@ impl<P: SpanProcessor> SpanProcessor for AccountedSpanProcessor<P> {
 
     fn on_end(&self, span: SpanData) {
         self.gate.wait(&self.counters);
-        self.counters.emitted.fetch_add(1, Ordering::AcqRel);
+        self.counters.emit();
         self.inner.on_end(span);
     }
 
@@ -251,7 +268,7 @@ impl<P> AccountedLogProcessor<P> {
 impl<P: LogProcessor> LogProcessor for AccountedLogProcessor<P> {
     fn emit(&self, data: &mut SdkLogRecord, instrumentation: &InstrumentationScope) {
         self.gate.wait(&self.counters);
-        self.counters.emitted.fetch_add(1, Ordering::AcqRel);
+        self.counters.emit();
         self.inner.emit(data, instrumentation);
     }
 
@@ -275,7 +292,8 @@ impl<P: LogProcessor> LogProcessor for AccountedLogProcessor<P> {
 
 /// Spreads records over several processors, each with its own exporter,
 /// round robin: one exporter sends one batch at a time, so n of them send n
-/// batches at once.
+/// batches at once. Each shard is accounted and gated on its own, so one
+/// exporter draining slower than the rest cannot overflow its queue.
 #[derive(Debug)]
 pub struct Shards<P> {
     shards: Vec<P>,
@@ -295,8 +313,16 @@ impl<P> Shards<P> {
         &self.shards[self.next.fetch_add(1, Ordering::Relaxed) % self.shards.len()]
     }
 
+    // Runs f on every shard, even after one fails, and returns the first error.
     fn each(&self, f: impl Fn(&P) -> OTelSdkResult) -> OTelSdkResult {
-        self.shards.iter().map(f).fold(Ok(()), |acc, r| acc.and(r))
+        let mut result = Ok(());
+        for p in &self.shards {
+            let r = f(p);
+            if result.is_ok() {
+                result = r;
+            }
+        }
+        result
     }
 }
 

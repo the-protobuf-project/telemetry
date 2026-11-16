@@ -66,7 +66,12 @@ otel::OtelExporter* otel_exporter() { return otel_exporter_.get(); }
 #endif
 
     void flush();
+    /// Exports what is queued and shuts down; reports on stderr any log
+    /// records or spans that never reached the collector.
     void close();
+
+    /// What happened to every log record and span sent for export.
+    Stats stats() const;
 
 private:
     std::unique_ptr<logging::Logger> logger_;
@@ -87,6 +92,11 @@ public:
     TelemetryBuilder& environment(Environment env);
     TelemetryBuilder& with_otlp(const std::string& host, uint16_t port);
     TelemetryBuilder& with_mcap(const std::string& path);
+    /// Tunes the OTLP export queues for logs and spans.
+    TelemetryBuilder& with_export(const ExportOptions& options);
+    /// Prints each log line to stdout, or not; on by default. Off, records
+    /// still go to OTLP and MCAP.
+    TelemetryBuilder& with_console(bool console);
 
     Telemetry build();
 
@@ -98,6 +108,8 @@ private:
     std::optional<std::string> otlp_host_;
     std::optional<uint16_t> otlp_port_;
     std::optional<std::string> mcap_path_;
+    ExportOptions export_options_;
+    bool console_ = true;
 };
 
 }  // namespace telemetry

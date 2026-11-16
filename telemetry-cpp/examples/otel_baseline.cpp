@@ -1,8 +1,10 @@
 // Writes the load examples/loadgen.cpp writes — n log records, spans or
 // counter increments — through the upstream OpenTelemetry C++ SDK alone, with
-// its default batch processors and OTLP/HTTP exporters, and prints one JSON
-// line with how long it took. bench/bench_all.py runs it beside loadgen to
-// compare this SDK with plain OpenTelemetry.
+// its batch processors and OTLP/HTTP exporters, and prints one JSON line with
+// how long it took. bench/bench_all.py runs it beside loadgen to compare this
+// SDK with plain OpenTelemetry. The batch processors read the standard
+// OTEL_BSP_* and OTEL_BLRP_* variables, which is how the bench tunes them;
+// OTEL_BASELINE_WORKERS sets the threads writing.
 //
 //   bazel run -c opt //examples:otel_baseline -- <signal> <n> <host:port>
 #include <opentelemetry/exporters/otlp/otlp_http_exporter.h>
@@ -15,11 +17,14 @@
 #include <opentelemetry/sdk/trace/batch_span_processor.h>
 #include <opentelemetry/sdk/trace/tracer_provider.h>
 
+#include <algorithm>
 #include <chrono>
 #include <cstdio>
 #include <cstdlib>
 #include <memory>
 #include <string>
+#include <thread>
+#include <vector>
 
 namespace otlp = opentelemetry::exporter::otlp;
 namespace logs_sdk = opentelemetry::sdk::logs;
@@ -31,12 +36,23 @@ int main(int argc, char** argv) {
     const long n = argc > 2 ? std::atol(argv[2]) : 1000000;
     const std::string base = std::string("http://") + (argc > 3 ? argv[3] : "127.0.0.1:4318");
 
+    const char* workers_env = std::getenv("OTEL_BASELINE_WORKERS");
+    const long workers = workers_env ? std::max(std::atol(workers_env), 1L) : 1;
+
     using clock = std::chrono::steady_clock;
     double emit_s = 0;
     double close_s = 0;
     auto timed = [&](auto&& emit, auto&& shutdown) {
         auto start = clock::now();
-        for (long i = 0; i < n; ++i) emit(i);
+        std::vector<std::thread> threads;
+        const long per = n / workers;
+        for (long w = 0; w < workers; ++w) {
+            const long count = w == workers - 1 ? n - per * (workers - 1) : per;
+            threads.emplace_back([count, &emit] {
+                for (long i = 0; i < count; ++i) emit(i);
+            });
+        }
+        for (auto& t : threads) t.join();
         emit_s = std::chrono::duration<double>(clock::now() - start).count();
         start = clock::now();
         shutdown();
@@ -79,7 +95,7 @@ int main(int argc, char** argv) {
         return 2;
     }
 
-    std::printf("{\"lang\":\"cpp\",\"signal\":\"%s\",\"n\":%ld,\"workers\":1,\"emit_s\":%.9f,\"close_s\":%.9f}\n",
-                signal.c_str(), n, emit_s, close_s);
+    std::printf("{\"lang\":\"cpp\",\"signal\":\"%s\",\"n\":%ld,\"workers\":%ld,\"emit_s\":%.9f,\"close_s\":%.9f}\n",
+                signal.c_str(), n, workers, emit_s, close_s);
     return 0;
 }

@@ -77,9 +77,10 @@ async fn main() -> anyhow::Result<()> {
             });
         }
         "metrics" => {
-            for _ in 0..n {
-                telemetry.metrics.counter("ops", 1.0)?;
-            }
+            let metrics = &telemetry.metrics;
+            fan_out(n, workers, |_| {
+                let _ = metrics.counter("ops", 1.0);
+            });
         }
         // Distributed logging: records logged while a span is attached carry
         // its trace id. Prints the trace id for the caller to look for.

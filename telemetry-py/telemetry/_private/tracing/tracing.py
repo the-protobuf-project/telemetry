@@ -22,14 +22,19 @@ from typing import Any
 
 from opentelemetry import baggage, propagate, trace
 from opentelemetry.context import Context, attach
-from opentelemetry.exporter.otlp.proto.grpc.trace_exporter import OTLPSpanExporter
 from opentelemetry.sdk.resources import Resource
 from opentelemetry.sdk.trace import TracerProvider
 from opentelemetry.sdk.trace.export import BatchSpanProcessor
 from opentelemetry.trace import SpanKind
 
 from ...options import OTLPOptions, ServiceOptions, TracingOptions
-from ..accounting import AccountedSpanProcessor, CountingSpanExporter
+from ..accounting import (
+    SPANS,
+    AccountedSpanProcessor,
+    CountingSpanExporter,
+    ShardedSpanProcessor,
+)
+from ..exporters import span_exporter
 from ..foxglove import UnifiedMcapWriter
 from .context import get_current_span_id, get_current_trace_id
 from .decorator import create_trace_decorator
@@ -103,21 +108,32 @@ class TelemetryTracing:
 
         provider = TracerProvider(resource=resource)
 
-        exporter = OTLPSpanExporter(
-            endpoint=f"{otlp_opts.host}:{otlp_opts.port}",
-            insecure=True,
-        )
-
         # Counted, and lossless when asked: the SDK's batch processor alone
         # drops what overflows its queue with no more than a single warning.
+        # Each exporter has its own queue, counters and gate.
         export = otlp_opts.export
-        batch = BatchSpanProcessor(
-            CountingSpanExporter(exporter),
-            max_queue_size=export.queue_size,
-            max_export_batch_size=min(export.batch_size, export.queue_size),
-        )
+        shards = []
+        for _ in range(max(1, export.exporters)):
+            counters = SPANS.part()
+            exporter = span_exporter(
+                otlp_opts.endpoint,
+                otlp_opts.secure,
+                otlp_opts.use_http,
+                _headers(otlp_opts),
+                export.timeout,
+            )
+            batch = BatchSpanProcessor(
+                CountingSpanExporter(exporter, counters),
+                max_queue_size=export.queue_size,
+                max_export_batch_size=min(export.batch_size, export.queue_size),
+            )
+            shards.append(
+                AccountedSpanProcessor(
+                    batch, export.lossless, export.queue_size, counters
+                )
+            )
         provider.add_span_processor(
-            AccountedSpanProcessor(batch, export.lossless, export.queue_size)
+            shards[0] if len(shards) == 1 else ShardedSpanProcessor(shards)
         )
         trace.set_tracer_provider(provider)
         self._provider = provider
@@ -240,3 +256,11 @@ class TelemetryTracing:
         provider = getattr(self, "_provider", None)
         if provider is not None:
             provider.force_flush()
+
+
+def _headers(otlp_opts: OTLPOptions) -> dict[str, str]:
+    """The OTLP request headers: the bearer token and any extras."""
+    headers = dict(otlp_opts.headers)
+    if otlp_opts.auth_token:
+        headers["authorization"] = f"Bearer {otlp_opts.auth_token}"
+    return headers

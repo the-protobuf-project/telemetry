@@ -1,22 +1,24 @@
 """
 Writes the load examples/loadgen.py writes — n log records, spans or counter
 increments — through the upstream OpenTelemetry Python SDK alone, with its
-default batch processors and OTLP/gRPC exporters, and prints one JSON line
-with how long it took. bench/bench_all.py runs it beside loadgen.py to compare
-this SDK with plain OpenTelemetry.
+batch processors and OTLP exporters, and prints one JSON line with how long it
+took. bench/bench_all.py runs it beside loadgen.py to compare this SDK with
+plain OpenTelemetry. The batch processors read the standard OTEL_BSP_* and
+OTEL_BLRP_* variables, which is how the bench tunes them;
+OTEL_BASELINE_WORKERS sets the threads writing and OTEL_BASELINE_HTTP=1
+exports over OTLP/HTTP (the endpoint is then the HTTP port).
 
 Run with:
     uv run python examples/otel_baseline.py <signal> <n> <host:port>
 """
 
 import json
+import os
 import sys
+import threading
 import time
 
 from opentelemetry._logs import LogRecord, SeverityNumber
-from opentelemetry.exporter.otlp.proto.grpc._log_exporter import OTLPLogExporter
-from opentelemetry.exporter.otlp.proto.grpc.metric_exporter import OTLPMetricExporter
-from opentelemetry.exporter.otlp.proto.grpc.trace_exporter import OTLPSpanExporter
 from opentelemetry.sdk._logs import LoggerProvider
 from opentelemetry.sdk._logs.export import BatchLogRecordProcessor
 from opentelemetry.sdk.metrics import MeterProvider
@@ -29,11 +31,34 @@ def main() -> None:
     signal = sys.argv[1] if len(sys.argv) > 1 else "logs"
     n = int(sys.argv[2]) if len(sys.argv) > 2 else 1_000_000
     endpoint = sys.argv[3] if len(sys.argv) > 3 else "127.0.0.1:4317"
+    workers = max(1, int(os.environ.get("OTEL_BASELINE_WORKERS", "1")))
+    if os.environ.get("OTEL_BASELINE_HTTP") == "1":
+        from opentelemetry.exporter.otlp.proto.http._log_exporter import OTLPLogExporter
+        from opentelemetry.exporter.otlp.proto.http.metric_exporter import (
+            OTLPMetricExporter,
+        )
+        from opentelemetry.exporter.otlp.proto.http.trace_exporter import (
+            OTLPSpanExporter,
+        )
+
+        def exporter(cls, path):
+            return cls(endpoint=f"http://{endpoint}{path}")
+    else:
+        from opentelemetry.exporter.otlp.proto.grpc._log_exporter import OTLPLogExporter
+        from opentelemetry.exporter.otlp.proto.grpc.metric_exporter import (
+            OTLPMetricExporter,
+        )
+        from opentelemetry.exporter.otlp.proto.grpc.trace_exporter import (
+            OTLPSpanExporter,
+        )
+
+        def exporter(cls, path):
+            return cls(endpoint=endpoint, insecure=True)
 
     if signal == "logs":
         provider = LoggerProvider()
         provider.add_log_record_processor(
-            BatchLogRecordProcessor(OTLPLogExporter(endpoint=endpoint, insecure=True))
+            BatchLogRecordProcessor(exporter(OTLPLogExporter, "/v1/logs"))
         )
         logger = provider.get_logger("otel-baseline")
 
@@ -53,7 +78,7 @@ def main() -> None:
     elif signal == "spans":
         provider = TracerProvider()
         provider.add_span_processor(
-            BatchSpanProcessor(OTLPSpanExporter(endpoint=endpoint, insecure=True))
+            BatchSpanProcessor(exporter(OTLPSpanExporter, "/v1/traces"))
         )
         tracer = provider.get_tracer("otel-baseline")
 
@@ -65,7 +90,7 @@ def main() -> None:
         provider = MeterProvider(
             metric_readers=[
                 PeriodicExportingMetricReader(
-                    OTLPMetricExporter(endpoint=endpoint, insecure=True)
+                    exporter(OTLPMetricExporter, "/v1/metrics")
                 )
             ]
         )
@@ -78,8 +103,17 @@ def main() -> None:
         raise SystemExit(f"unknown signal {signal}")
 
     start = time.perf_counter()
-    for i in range(n):
-        emit(i)
+    per = n // workers
+    threads = []
+    for w in range(workers):
+        count = n - per * (workers - 1) if w == workers - 1 else per
+        threads.append(
+            threading.Thread(target=lambda c=count: [emit(i) for i in range(c)])
+        )
+    for th in threads:
+        th.start()
+    for th in threads:
+        th.join()
     emitted = time.perf_counter() - start
 
     start = time.perf_counter()
@@ -92,7 +126,7 @@ def main() -> None:
                 "lang": "python",
                 "signal": signal,
                 "n": n,
-                "workers": 1,
+                "workers": workers,
                 "emit_s": emitted,
                 "close_s": closed,
             }

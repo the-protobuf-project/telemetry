@@ -48,7 +48,7 @@ func decode(w http.ResponseWriter, r *http.Request, msg proto.Message) bool {
 			http.Error(w, err.Error(), http.StatusBadRequest)
 			return false
 		}
-		defer gz.Close()
+		defer func() { _ = gz.Close() }()
 		body = gz
 	}
 	data, err := io.ReadAll(body)

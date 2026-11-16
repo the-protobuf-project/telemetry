@@ -352,6 +352,10 @@ jobs:
       # The fork the pull request comes from; set the BCR_FORK variable to use another.
       registry_fork: ${{ vars.BCR_FORK || 'the-protobuf-project/bazel-central-registry' }}
       attest: false
+      # Google's CLA check on BCR pull requests covers the committer as well as
+      # the author, and the default committer (the Actions bot) cannot sign it.
+      committer_name: oh-tarnished
+      committer_email: 104291599+oh-tarnished@users.noreply.github.com
     permissions:
       contents: write
       id-token: write

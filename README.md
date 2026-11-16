@@ -689,6 +689,20 @@ module waits for a BCR maintainer to review its pull request; until it is
 merged, `archive_override` takes the release archive (the release notes show
 how).
 
+Every C++ release is attested, the way the BCR asks for it. bazel-contrib's
+[release_ruleset](https://github.com/bazel-contrib/.github/blob/master/.github/workflows/release_ruleset.yaml)
+runs the C++ tests, builds the source archive with
+[`release_prep.sh`](.github/workflows/release_prep.sh) and signs its SLSA
+build provenance (`telemetry-cpp-<version>.tar.gz.intoto.jsonl`). publish-to-bcr
+then attests the entry's `MODULE.bazel` and `source.json` and adds an
+`attestations.json`, which BCR presubmit verifies and the registry shows on
+the version's Attestations tab. The GitHub release stays a draft until those
+attestations are uploaded to it. Anyone can check the archive:
+
+```bash
+gh attestation verify telemetry-cpp-1.3.0.tar.gz --repo the-protobuf-project/telemetry
+```
+
 ## Use cases
 
 - **Microservices** — track requests across service boundaries.

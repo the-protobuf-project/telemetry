@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- C++ releases are built by bazel-contrib's `release_ruleset` and carry SLSA
+  build provenance; the Bazel Central Registry entry ships with
+  `attestations.json` for its source archive, `MODULE.bazel` and
+  `source.json`. The GitHub release is published once the attestations are
+  attached.
+
 ## [1.3.2] - 2026-11-16
 
 ### Changed

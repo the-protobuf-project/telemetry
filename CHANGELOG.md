@@ -7,13 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.3.3] - 2026-11-16
+
 ### Fixed
 
 - C++: opentelemetry-cpp 1.30.0 (was 1.29.0), whose metrics headers build
-  with GCC 15; 1.29.0 misses `<cstdint>`. The 1.3.3 release failed on it and
-  stopped before the GitHub release; only its Go tag and image went out.
-
-## [1.3.3] - 2026-11-16
+  with GCC 15; 1.29.0 misses `<cstdint>`. The release runner (ubuntu-latest) has
+  GCC 15.
+- The Docker build record is no longer uploaded with the release; bazel-contrib's
+  release_ruleset downloads every artifact in the run and failed on it.
 
 ### Changed
 

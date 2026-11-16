@@ -702,10 +702,12 @@ build provenance (`telemetry-cpp-<version>.tar.gz.intoto.jsonl`). publish-to-bcr
 then attests the entry's `MODULE.bazel` and `source.json` and adds an
 `attestations.json`, which BCR presubmit verifies and the registry shows on
 the version's Attestations tab. The GitHub release stays a draft until those
-attestations are uploaded to it. Anyone can check the archive:
+attestations are uploaded to it. Anyone can check the archive; the signer is
+bazel-contrib's workflow, so name its repository:
 
 ```bash
-gh attestation verify telemetry-cpp-1.3.0.tar.gz --repo the-protobuf-project/telemetry
+gh attestation verify telemetry-cpp-1.3.0.tar.gz --repo the-protobuf-project/telemetry \
+  --signer-repo bazel-contrib/.github
 ```
 
 ## Use cases

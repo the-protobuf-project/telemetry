@@ -48,7 +48,7 @@ cat <<EOF
 The C++ archive carries SLSA build provenance (\`$ARCHIVE.intoto.jsonl\`):
 
 \`\`\`sh
-gh attestation verify $ARCHIVE --repo $REPO
+gh attestation verify $ARCHIVE --repo $REPO --signer-repo bazel-contrib/.github
 \`\`\`
 
 ### C++ with Bazel

@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.3.2] - 2026-11-16
+
 ### Changed
 
 - C++: the Bazel module is `tpp_telemetry.cpp` (was `tpp_telemetry_cpp` in
@@ -269,7 +271,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## Release Links
 
-[Unreleased]: https://github.com/the-protobuf-project/telemetry/compare/v1.3.1...HEAD
+[Unreleased]: https://github.com/the-protobuf-project/telemetry/compare/v1.3.2...HEAD
+[1.3.2]: https://github.com/the-protobuf-project/telemetry/releases/tag/v1.3.2
 [1.3.1]: https://github.com/the-protobuf-project/telemetry/releases/tag/v1.3.1
 [1.3.0]: https://github.com/the-protobuf-project/telemetry/releases/tag/v1.3.0
 [1.0.0]: https://github.com/the-protobuf-project/telemetry/releases/tag/v1.0.0

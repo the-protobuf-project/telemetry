@@ -1,0 +1,3 @@
+# A separate module that takes tpp_telemetry.cpp from the BCR; build it from
+# its own directory.
+examples/bazel

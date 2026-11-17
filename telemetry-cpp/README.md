@@ -57,8 +57,11 @@ an OpenTelemetry collector, to an MCAP file for Foxglove Studio, or both.
 From the Bazel Central Registry, in your `MODULE.bazel`:
 
 ```starlark
-bazel_dep(name = "tpp_telemetry.cpp", version = "1.3.0")
+bazel_dep(name = "tpp_telemetry.cpp", version = "1.3.3")
 ```
+
+[`examples/bazel`](examples/bazel) is a complete module that does this; CI
+builds and tests it against the registry.
 
 Before a version reaches the registry, take it from the GitHub release (each
 release's notes give the `integrity` value):

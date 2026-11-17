@@ -1,14 +1,12 @@
-module(
-    name = "telemetry-example",
-    version = "1.0.0",
-)
+"""
+A consumer of tpp_telemetry.cpp as released to the Bazel Central Registry.
+
+No override: this builds what users get from `bazel_dep`, so it is the smoke
+test for a published version. Bump the version after each release reaches the
+registry.
+"""
+
+module(name = "telemetry-example")
 
 bazel_dep(name = "rules_cc", version = "0.2.26")
-
-# Local dependency on tpp_telemetry.cpp
-local_path_override(
-    module_name = "tpp_telemetry.cpp",
-    path = "../telemetry-cpp",
-)
-
-bazel_dep(name = "tpp_telemetry.cpp", version = "1.0.0")
+bazel_dep(name = "tpp_telemetry.cpp", version = "1.3.3")

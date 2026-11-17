@@ -38,6 +38,10 @@ test-py:
 test-cpp:
     cd telemetry-cpp && bazel build //... && bazel test //tests/...
 
+# C++: the smoke test against the tpp_telemetry.cpp the BCR serves.
+test-cpp-bcr:
+    cd telemetry-cpp/examples/bazel && bazel test //...
+
 # Lint every SDK the way CI does.
 lint:
     cd telemetry-go && golangci-lint run ./...

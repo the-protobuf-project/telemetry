@@ -261,6 +261,27 @@ jobs:
         working-directory: ./telemetry-cpp
         run: bazel test //tests/...
 
+  bcr-cpp:
+    name: C++ SDK from the BCR
+    # Builds examples/bazel against the tpp_telemetry.cpp the registry
+    # serves, not this checkout: what a user's bazel_dep gets.
+    runs-on: blacksmith-4vcpu-ubuntu-2404
+
+    steps:
+      - name: Check out code
+        uses: actions/checkout@v6
+
+      - name: Set up Bazel
+        uses: bazel-contrib/setup-bazel@0.15.0
+        with:
+          bazelisk-cache: true
+          disk-cache: ${{ github.workflow }}-bcr
+          repository-cache: true
+
+      - name: Smoke test
+        working-directory: ./telemetry-cpp/examples/bazel
+        run: bazel test //...
+
   docker-compose:
     name: Test Docker Compose Stack
     runs-on: blacksmith-4vcpu-ubuntu-2404

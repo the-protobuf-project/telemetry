@@ -1,7 +1,15 @@
-load("@rules_cc//cc:defs.bzl", "cc_binary")
+load("@rules_cc//cc:defs.bzl", "cc_binary", "cc_test")
 
 cc_binary(
     name = "chat-service",
     srcs = ["main.cpp"],
-    deps = ["@tpp_telemetry.cpp//src:telemetry"],
+    deps = ["@tpp_telemetry.cpp//:telemetry"],
+)
+
+# The same program as a test: it fails if the SDK writes no MCAP output.
+cc_test(
+    name = "smoke_test",
+    size = "small",
+    srcs = ["main.cpp"],
+    deps = ["@tpp_telemetry.cpp//:telemetry"],
 )

@@ -13,20 +13,12 @@ updates:
           - "*"
 
   - package-ecosystem: gomod
-
-    assignees:
-
-      - "ParthuReddy31"
     directory: /telemetry-core/deploy/production/local-webhook
     schedule:
       interval: weekly
     open-pull-requests-limit: 5
 
   - package-ecosystem: cargo
-
-    assignees:
-
-      - "ParthuReddy31"
     directory: /telemetry-rs
     schedule:
       interval: weekly
@@ -37,10 +29,6 @@ updates:
           - "*"
 
   - package-ecosystem: pip
-
-    assignees:
-
-      - "ParthuReddy31"
     directory: /telemetry-py
     schedule:
       interval: weekly
@@ -51,10 +39,6 @@ updates:
           - "*"
 
   - package-ecosystem: github-actions
-
-    assignees:
-
-      - "ParthuReddy31"
     directory: /
     schedule:
       interval: weekly
@@ -64,21 +48,13 @@ updates:
         patterns:
           - "*"
 
-  - package-ecosystem: docker
-
-    assignees:
-
-      - "ParthuReddy31"
+  - package-ecosystem: docker-compose
     directory: /.devcontainer
     schedule:
       interval: monthly
     open-pull-requests-limit: 5
 
-  - package-ecosystem: docker
-
-    assignees:
-
-      - "ParthuReddy31"
+  - package-ecosystem: docker-compose
     directory: /telemetry-core/deploy/production
     schedule:
       interval: monthly

@@ -20,8 +20,7 @@ std::pair<std::string, uint16_t> get_otel_endpoint() {
         std::string endpoint(env);
         auto pos = endpoint.find(':');
         if (pos != std::string::npos) {
-            return {endpoint.substr(0, pos),
-                    static_cast<uint16_t>(std::stoi(endpoint.substr(pos + 1)))};
+            return {endpoint.substr(0, pos), static_cast<uint16_t>(std::stoi(endpoint.substr(pos + 1)))};
         }
         return {endpoint, 4317};
     }
@@ -35,13 +34,13 @@ struct LlmMetrics : public telemetry::metrics::RecordMetrics {
 
     LlmMetrics() = default;
     /**
-         * @brief Creates LLM metrics with request, latency, and cache hit-rate values.
-         *
-         * @param count Number of requests.
-         * @param latency Response latency in milliseconds.
-         * @param hit_rate Cache hit rate.
-         */
-        LlmMetrics(uint64_t count, double latency, double hit_rate)
+     * @brief Creates LLM metrics with request, latency, and cache hit-rate values.
+     *
+     * @param count Number of requests.
+     * @param latency Response latency in milliseconds.
+     * @param hit_rate Cache hit rate.
+     */
+    LlmMetrics(uint64_t count, double latency, double hit_rate)
         : request_count(count), latency_ms(latency), cache_hit_rate(hit_rate) {}
 
     /**
@@ -50,14 +49,12 @@ struct LlmMetrics : public telemetry::metrics::RecordMetrics {
      * @return Vector containing request count, response latency, and cache hit rate metrics.
      */
     std::vector<telemetry::metrics::MetricField> metric_fields() const override {
-        return {
-            {"llm.requests.total", telemetry::metrics::MetricType::Counter,
-             "Total number of LLM requests", static_cast<double>(request_count)},
-            {"llm.response.latency_ms", telemetry::metrics::MetricType::Histogram,
-             "LLM response latency in milliseconds", latency_ms},
-            {"llm.cache.hit_rate", telemetry::metrics::MetricType::Gauge,
-             "LLM cache hit rate percentage", cache_hit_rate}
-        };
+        return {{"llm.requests.total", telemetry::metrics::MetricType::Counter, "Total number of LLM requests",
+                 static_cast<double>(request_count)},
+                {"llm.response.latency_ms", telemetry::metrics::MetricType::Histogram,
+                 "LLM response latency in milliseconds", latency_ms},
+                {"llm.cache.hit_rate", telemetry::metrics::MetricType::Gauge, "LLM cache hit rate percentage",
+                 cache_hit_rate}};
     }
 };
 
@@ -70,11 +67,11 @@ int main() {
     auto [otel_host, otel_port] = get_otel_endpoint();
 
     auto telemetry = telemetry::Telemetry::builder("metrics-example", "1.0.0")
-        .description("Metrics example service")
-        .environment(telemetry::Environment::Development)
-        .with_mcap("examples/metrics.mcap")
-        .with_otlp(otel_host, otel_port)
-        .build();
+                         .description("Metrics example service")
+                         .environment(telemetry::Environment::Development)
+                         .with_mcap("examples/metrics.mcap")
+                         .with_otlp(otel_host, otel_port)
+                         .build();
 
     TELEMETRY_LOG_INFO("Metrics Example Started");
     TELEMETRY_LOG_INFO("Sending metrics to OTEL collector at localhost:4317");

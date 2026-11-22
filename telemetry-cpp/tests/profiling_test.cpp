@@ -114,10 +114,10 @@ TEST_CASE("the profiler sends the stacks it samples to Pyroscope's ingest API") 
     bool sampled = false;
     for (const auto& r : requests) {
         // name=profiling-test.development.cpu{environment=development,service=profiling-test,team=core,version=1.2.3}
-        named = named || (r.rfind("POST /ingest?name=profiling-test.development.cpu%7B", 0) == 0 &&
-                          r.find("team%3Dcore") != std::string::npos &&
-                          r.find("version%3D1.2.3") != std::string::npos &&
-                          r.find("format=folded") != std::string::npos);
+        named =
+            named || (r.rfind("POST /ingest?name=profiling-test.development.cpu%7B", 0) == 0 &&
+                      r.find("team%3Dcore") != std::string::npos && r.find("version%3D1.2.3") != std::string::npos &&
+                      r.find("format=folded") != std::string::npos);
         sampled = sampled || r.find("burn_cpu_for_profile_test") != std::string::npos;
     }
     CHECK(named);

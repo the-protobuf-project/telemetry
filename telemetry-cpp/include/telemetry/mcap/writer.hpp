@@ -35,15 +35,12 @@ public:
 
     uint16_t create_channel(const std::string& topic, const std::string& schema_name);
 
-    void write_message(uint16_t channel_id, const uint8_t* data, size_t size,
-                       uint64_t log_time, uint64_t publish_time);
+    void write_message(uint16_t channel_id, const uint8_t* data, size_t size, uint64_t log_time, uint64_t publish_time);
 
     void write_log(const logging::LogEntry& entry);
-    void write_metric(const std::string& name, const std::string& type, double value,
-                      uint64_t timestamp_ns);
-    void write_span(const std::string& name, const std::string& trace_id,
-                    const std::string& span_id, uint64_t start_ns, uint64_t end_ns,
-                    const std::string& status);
+    void write_metric(const std::string& name, const std::string& type, double value, uint64_t timestamp_ns);
+    void write_span(const std::string& name, const std::string& trace_id, const std::string& span_id, uint64_t start_ns,
+                    uint64_t end_ns, const std::string& status);
 
     void flush();
     void close();

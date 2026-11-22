@@ -19,10 +19,8 @@ public:
      * @param environment Deployment environment associated with the entry.
      * @return Formatted log line containing the local timestamp, metadata, message, and optional JSON data.
      */
-    static std::string format(const LogEntry& entry,
-                              const std::string& service_name,
-                              const std::string& service_version,
-                              const std::string& environment) {
+    static std::string format(const LogEntry& entry, const std::string& service_name,
+                              const std::string& service_version, const std::string& environment) {
         std::ostringstream oss;
 
         auto time_s = entry.timestamp_ns / 1000000000ULL;
@@ -62,13 +60,13 @@ public:
         return "";
 #else
         switch (level) {
-            case Level::Trace: return "\033[90m";   // Gray
-            case Level::Debug: return "\033[36m";   // Cyan
-            case Level::Info:  return "\033[32m";   // Green
-            case Level::Warn:  return "\033[33m";   // Yellow
-            case Level::Error: return "\033[31m";   // Red
-            case Level::Fatal: return "\033[35m";   // Magenta
-            default: return "";
+            case Level::Trace: return "\033[90m";  // Gray
+            case Level::Debug: return "\033[36m";  // Cyan
+            case Level::Info:  return "\033[32m";  // Green
+            case Level::Warn:  return "\033[33m";  // Yellow
+            case Level::Error: return "\033[31m";  // Red
+            case Level::Fatal: return "\033[35m";  // Magenta
+            default:           return "";
         }
 #endif
     }

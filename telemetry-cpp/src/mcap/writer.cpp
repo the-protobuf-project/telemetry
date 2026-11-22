@@ -25,12 +25,7 @@ std::string timestamp_to_iso8601(uint64_t timestamp_ns) {
     return oss.str();
 }
 
-}  /**
- * @brief Initializes an MCAP writer for the specified output path and service.
- *
- * @param service_opts Service metadata used for recorded telemetry.
- * @param path Binary output file path.
- */
+}  // namespace
 
 McapWriter::McapWriter(const ServiceOptions& service_opts, const std::string& path)
     : path_(path)
@@ -38,7 +33,6 @@ McapWriter::McapWriter(const ServiceOptions& service_opts, const std::string& pa
     , service_version_(service_opts.version)
     , environment_(environment_to_string(service_opts.environment))
     , mutex_(platform::create_mutex()) {
-
 #if !TELEMETRY_PLATFORM_FREERTOS
     file_.open(path, std::ios::binary);
     if (!file_.is_open()) {
@@ -95,8 +89,7 @@ uint16_t McapWriter::get_or_create_schema(const std::string& schema_name) {
     schema.encoding = schema_it->second.encoding;
     schema.data.assign(
         reinterpret_cast<const std::byte*>(schema_it->second.data.data()),
-        reinterpret_cast<const std::byte*>(schema_it->second.data.data() + schema_it->second.data.size())
-    );
+        reinterpret_cast<const std::byte*>(schema_it->second.data.data() + schema_it->second.data.size()));
 
     writer_.addSchema(schema);
     schema_ids_[schema_name] = schema.id;
@@ -149,8 +142,8 @@ uint16_t McapWriter::create_channel(const std::string& topic, const std::string&
  * @param log_time Message log timestamp in nanoseconds.
  * @param publish_time Message publication timestamp in nanoseconds.
  */
-void McapWriter::write_message(uint16_t channel_id, const uint8_t* data, size_t size,
-                                uint64_t log_time, uint64_t publish_time) {
+void McapWriter::write_message(uint16_t channel_id, const uint8_t* data, size_t size, uint64_t log_time,
+                               uint64_t publish_time) {
 #if !TELEMETRY_PLATFORM_FREERTOS
     if (!is_open_ || closed_) return;
 
@@ -191,10 +184,8 @@ void McapWriter::write_log(const logging::LogEntry& entry) {
     json << "}";
 
     std::string data = json.str();
-    write_message(log_channel_id_,
-                  reinterpret_cast<const uint8_t*>(data.data()),
-                  data.size(),
-                  entry.timestamp_ns, entry.timestamp_ns);
+    write_message(log_channel_id_, reinterpret_cast<const uint8_t*>(data.data()), data.size(), entry.timestamp_ns,
+                  entry.timestamp_ns);
 #endif
 }
 
@@ -206,8 +197,7 @@ void McapWriter::write_log(const logging::LogEntry& entry) {
  * @param value Numeric metric value.
  * @param timestamp_ns Metric timestamp in nanoseconds since the Unix epoch.
  */
-void McapWriter::write_metric(const std::string& name, const std::string& type,
-                               double value, uint64_t timestamp_ns) {
+void McapWriter::write_metric(const std::string& name, const std::string& type, double value, uint64_t timestamp_ns) {
 #if !TELEMETRY_PLATFORM_FREERTOS
     if (!is_open_ || closed_) return;
 
@@ -220,10 +210,8 @@ void McapWriter::write_metric(const std::string& name, const std::string& type,
     json << "}";
 
     std::string data = json.str();
-    write_message(metric_channel_id_,
-                  reinterpret_cast<const uint8_t*>(data.data()),
-                  data.size(),
-                  timestamp_ns, timestamp_ns);
+    write_message(metric_channel_id_, reinterpret_cast<const uint8_t*>(data.data()), data.size(), timestamp_ns,
+                  timestamp_ns);
 #endif
 }
 
@@ -237,9 +225,8 @@ void McapWriter::write_metric(const std::string& name, const std::string& type,
  * @param end_ns Span end time as nanoseconds since the Unix epoch.
  * @param status Span completion status.
  */
-void McapWriter::write_span(const std::string& name, const std::string& trace_id,
-                             const std::string& span_id, uint64_t start_ns,
-                             uint64_t end_ns, const std::string& status) {
+void McapWriter::write_span(const std::string& name, const std::string& trace_id, const std::string& span_id,
+                            uint64_t start_ns, uint64_t end_ns, const std::string& status) {
 #if !TELEMETRY_PLATFORM_FREERTOS
     if (!is_open_ || closed_) return;
 
@@ -254,10 +241,7 @@ void McapWriter::write_span(const std::string& name, const std::string& trace_id
     json << "}";
 
     std::string data = json.str();
-    write_message(span_channel_id_,
-                  reinterpret_cast<const uint8_t*>(data.data()),
-                  data.size(),
-                  start_ns, end_ns);
+    write_message(span_channel_id_, reinterpret_cast<const uint8_t*>(data.data()), data.size(), start_ns, end_ns);
 #endif
 }
 

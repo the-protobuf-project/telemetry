@@ -10,10 +10,10 @@
  */
 int main() {
     auto telemetry = telemetry::Telemetry::builder("example-service", "1.0.0")
-        .description("Example service demonstrating telemetry-cpp")
-        .environment(telemetry::Environment::Development)
-        .with_mcap("output.mcap")
-        .build();
+                         .description("Example service demonstrating telemetry-cpp")
+                         .environment(telemetry::Environment::Development)
+                         .with_mcap("output.mcap")
+                         .build();
 
     TELEMETRY_LOG_INFO("Application started");
     TELEMETRY_LOG_DEBUG("Debug message with context");

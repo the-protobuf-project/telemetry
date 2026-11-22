@@ -1,0 +1,17 @@
+# The C++ SDK's style, checked in CI with clang-format 23.1.5 (just fmt applies it).
+# Chosen to match the code as it was written: 4-space indent, 120 columns,
+# leading-comma initializer lists, one-line case labels.
+BasedOnStyle: Google
+IndentWidth: 4
+AccessModifierOffset: -4
+DerivePointerAlignment: false
+PointerAlignment: Left
+ColumnLimit: 120
+SortIncludes: Never
+AllowShortFunctionsOnASingleLine: Inline
+AllowShortIfStatementsOnASingleLine: WithoutElse
+AllowShortLoopsOnASingleLine: true
+BreakConstructorInitializers: BeforeComma
+AllowShortCaseLabelsOnASingleLine: true
+AlignConsecutiveShortCaseStatements:
+  Enabled: true

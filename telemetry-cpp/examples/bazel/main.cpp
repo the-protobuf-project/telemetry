@@ -15,12 +15,22 @@ struct ChatMessage {
     int64_t timestamp;
 
     std::string to_json() const {
-        return "{\"message_id\":\"" + message_id + "\","
-               "\"room_id\":\"" + room_id + "\","
-               "\"user_id\":\"" + user_id + "\","
-               "\"language\":\"" + language + "\","
-               "\"content\":\"" + content + "\","
-               "\"timestamp\":" + std::to_string(timestamp) + "}";
+        return "{\"message_id\":\"" + message_id +
+               "\","
+               "\"room_id\":\"" +
+               room_id +
+               "\","
+               "\"user_id\":\"" +
+               user_id +
+               "\","
+               "\"language\":\"" +
+               language +
+               "\","
+               "\"content\":\"" +
+               content +
+               "\","
+               "\"timestamp\":" +
+               std::to_string(timestamp) + "}";
     }
 };
 
@@ -43,23 +53,21 @@ int main() {
     const auto path = mcap_path();
 
     auto telemetry = telemetry::Telemetry::builder("chat-service", "1.0.0")
-        .description("Simple chat service with logging")
-        .environment(telemetry::Environment::Development)
-        .with_mcap(path.string())
-        .build();
+                         .description("Simple chat service with logging")
+                         .environment(telemetry::Environment::Development)
+                         .with_mcap(path.string())
+                         .build();
 
     TELEMETRY_LOG_INFO("Chat service started");
 
-    auto timestamp = std::chrono::duration_cast<std::chrono::seconds>(
-        std::chrono::system_clock::now().time_since_epoch()).count();
+    auto timestamp =
+        std::chrono::duration_cast<std::chrono::seconds>(std::chrono::system_clock::now().time_since_epoch()).count();
 
     ChatMessage messages[] = {
-        {"msg-001", "room-ai-chat", "user-alice", "en",
-         "Hello! Can you help me with C++ programming?", timestamp},
-        {"msg-002", "room-ai-chat", "user-carlos", "es",
-         "¿Puedes explicarme cómo funcionan los templates en C++?", timestamp},
-        {"msg-003", "room-ai-chat", "user-yuki", "ja",
-         "C++のスマートポインタについて教えてください", timestamp},
+        {"msg-001", "room-ai-chat", "user-alice", "en", "Hello! Can you help me with C++ programming?", timestamp},
+        {"msg-002", "room-ai-chat", "user-carlos", "es", "¿Puedes explicarme cómo funcionan los templates en C++?",
+         timestamp},
+        {"msg-003", "room-ai-chat", "user-yuki", "ja", "C++のスマートポインタについて教えてください", timestamp},
     };
 
     for (const auto& msg : messages) {

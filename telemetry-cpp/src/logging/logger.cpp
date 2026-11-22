@@ -24,19 +24,17 @@ std::unique_ptr<Logger> GlobalLogger::instance_ = nullptr;
  * @param service_version Version of the service producing log messages.
  * @param environment Deployment environment associated with the service.
  */
-Logger::Logger(const std::string& service_name,
-               const std::string& service_version,
-               const std::string& environment)
+Logger::Logger(const std::string& service_name, const std::string& service_version, const std::string& environment)
     : service_name_(service_name)
     , service_version_(service_version)
     , environment_(environment)
     , mutex_(platform::create_mutex()) {
-
 #if !TELEMETRY_PLATFORM_FREERTOS
     static int logger_counter = 0;
     std::string logger_name = service_name + "_" + std::to_string(++logger_counter);
     spdlog_logger_ = spdlog::stdout_color_mt(logger_name);
-    spdlog_logger_->set_pattern("[%Y-%m-%d %H:%M:%S.%e] [%^%l%$] [" + service_name + "@" + service_version + "] [" + environment + "] %v");
+    spdlog_logger_->set_pattern("[%Y-%m-%d %H:%M:%S.%e] [%^%l%$] [" + service_name + "@" + service_version + "] [" +
+                                environment + "] %v");
 #endif
 }
 
@@ -49,14 +47,13 @@ Logger::Logger(const std::string& service_name,
  * @param mcap_writer Optional writer for MCAP log output.
  * @param otel_exporter Optional exporter for OpenTelemetry log output.
  */
-Logger::Logger(const std::string& service_name,
-               const std::string& service_version,
-               const std::string& environment,
+Logger::Logger(const std::string& service_name, const std::string& service_version, const std::string& environment,
                std::shared_ptr<mcap::McapWriter> mcap_writer
 #if TELEMETRY_USE_OTEL
-               , otel::OtelExporter* otel_exporter
+               ,
+               otel::OtelExporter* otel_exporter
 #endif
-)
+               )
     : service_name_(service_name)
     , service_version_(service_version)
     , environment_(environment)
@@ -70,7 +67,8 @@ Logger::Logger(const std::string& service_name,
     static int logger_counter_mcap = 0;
     std::string logger_name = service_name + "_mcap_" + std::to_string(++logger_counter_mcap);
     spdlog_logger_ = spdlog::stdout_color_mt(logger_name);
-    spdlog_logger_->set_pattern("[%Y-%m-%d %H:%M:%S.%e] [%^%l%$] [" + service_name + "@" + service_version + "] [" + environment + "] %v");
+    spdlog_logger_->set_pattern("[%Y-%m-%d %H:%M:%S.%e] [%^%l%$] [" + service_name + "@" + service_version + "] [" +
+                                environment + "] %v");
 #endif
 
 #if TELEMETRY_USE_OTEL
@@ -202,8 +200,7 @@ void Logger::fatal(const char* message, const char* file, uint32_t line) {
  * @param line Source line associated with the message.
  * @param data_json Optional JSON data associated with the message.
  */
-void Logger::log(Level level, const char* message, const char* file, uint32_t line,
-                 const std::string& data_json) {
+void Logger::log(Level level, const char* message, const char* file, uint32_t line, const std::string& data_json) {
     if (static_cast<int>(level) < static_cast<int>(level_)) {
         return;
     }
@@ -249,7 +246,7 @@ void Logger::log_to_console(const LogEntry& entry) {
         case Level::Warn:  spdlog_logger_->warn("{}", entry.message); break;
         case Level::Error: spdlog_logger_->error("{}", entry.message); break;
         case Level::Fatal: spdlog_logger_->critical("{}", entry.message); break;
-        default: break;
+        default:           break;
     }
 
     if (!entry.data_json.empty()) {
@@ -290,7 +287,7 @@ void Logger::log_to_otel(const LogEntry& entry) {
         case Level::Warn:  severity = logs_api::Severity::kWarn; break;
         case Level::Error: severity = logs_api::Severity::kError; break;
         case Level::Fatal: severity = logs_api::Severity::kFatal; break;
-        default: severity = logs_api::Severity::kInfo; break;
+        default:           severity = logs_api::Severity::kInfo; break;
     }
 
     if (entry.trace_id.size() == 32 && entry.span_id.size() == 16) {
@@ -298,20 +295,16 @@ void Logger::log_to_otel(const LogEntry& entry) {
         // under, so Grafana links it to its trace.
         uint8_t tid[16];
         uint8_t sid[8];
-        for (size_t i = 0; i < 16; ++i) tid[i] = static_cast<uint8_t>(std::stoul(entry.trace_id.substr(2 * i, 2), nullptr, 16));
-        for (size_t i = 0; i < 8; ++i) sid[i] = static_cast<uint8_t>(std::stoul(entry.span_id.substr(2 * i, 2), nullptr, 16));
-        otel_logger_->EmitLogRecord(
-            severity,
-            entry.message,
-            opentelemetry::trace::TraceId(tid),
-            opentelemetry::trace::SpanId(sid),
-            opentelemetry::trace::TraceFlags(opentelemetry::trace::TraceFlags::kIsSampled));
+        for (size_t i = 0; i < 16; ++i)
+            tid[i] = static_cast<uint8_t>(std::stoul(entry.trace_id.substr(2 * i, 2), nullptr, 16));
+        for (size_t i = 0; i < 8; ++i)
+            sid[i] = static_cast<uint8_t>(std::stoul(entry.span_id.substr(2 * i, 2), nullptr, 16));
+        otel_logger_->EmitLogRecord(severity, entry.message, opentelemetry::trace::TraceId(tid),
+                                    opentelemetry::trace::SpanId(sid),
+                                    opentelemetry::trace::TraceFlags(opentelemetry::trace::TraceFlags::kIsSampled));
         return;
     }
-    otel_logger_->EmitLogRecord(
-        severity,
-        entry.message
-    );
+    otel_logger_->EmitLogRecord(severity, entry.message);
 }
 #endif
 

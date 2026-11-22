@@ -22,22 +22,18 @@ class McapWriter;
 namespace otel {
 class OtelExporter;
 }
-}
+}  // namespace telemetry
 
 namespace telemetry::metrics {
 
-enum class MetricType {
-    Counter,
-    Histogram,
-    Gauge
-};
+enum class MetricType { Counter, Histogram, Gauge };
 
 inline const char* metric_type_to_string(MetricType type) {
     switch (type) {
-        case MetricType::Counter: return "counter";
+        case MetricType::Counter:   return "counter";
         case MetricType::Histogram: return "histogram";
-        case MetricType::Gauge: return "gauge";
-        default: return "unknown";
+        case MetricType::Gauge:     return "gauge";
+        default:                    return "unknown";
     }
 }
 
@@ -95,8 +91,8 @@ private:
 
 class Histogram {
 public:
-    Histogram(const std::string& name, const std::string& description = "",
-              const std::vector<double>& buckets = {}, Sink sink = {});
+    Histogram(const std::string& name, const std::string& description = "", const std::vector<double>& buckets = {},
+              Sink sink = {});
 
     void record(double value);
     uint64_t count() const { return count_; }
@@ -139,10 +135,10 @@ private:
 class Metrics {
 public:
     Metrics(const ServiceOptions& service_opts);
-    Metrics(const ServiceOptions& service_opts,
-            std::shared_ptr<mcap::McapWriter> mcap_writer
+    Metrics(const ServiceOptions& service_opts, std::shared_ptr<mcap::McapWriter> mcap_writer
 #if TELEMETRY_USE_OTEL
-            , otel::OtelExporter* otel_exporter = nullptr
+            ,
+            otel::OtelExporter* otel_exporter = nullptr
 #endif
     );
     ~Metrics();
@@ -158,10 +154,9 @@ public:
     void histogram(std::string_view name, double value);
     void gauge(std::string_view name, double value);
 
-    template<typename T>
+    template <typename T>
     void record(const T& model) {
-        static_assert(std::is_base_of<RecordMetrics, T>::value,
-                      "T must derive from RecordMetrics");
+        static_assert(std::is_base_of<RecordMetrics, T>::value, "T must derive from RecordMetrics");
         for (const auto& field : model.metric_fields()) {
             record_dynamic(field.name, field.type, field.value);
         }

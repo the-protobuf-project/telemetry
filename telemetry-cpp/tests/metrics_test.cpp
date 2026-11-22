@@ -206,7 +206,8 @@ double last_value(const std::vector<std::string>& bodies, const std::string& nam
 TEST_CASE("OpenTelemetry receives every increment and the last gauge value, at shutdown included") {
     MetricsReceiver receiver;
     setenv("OTEL_EXPORTER_OTLP_METRICS_PROTOCOL", "http/json", 1);
-    auto telemetry = telemetry::Telemetry::builder("metrics-test", "1.0.0").with_otlp("127.0.0.1", receiver.port()).build();
+    auto telemetry =
+        telemetry::Telemetry::builder("metrics-test", "1.0.0").with_otlp("127.0.0.1", receiver.port()).build();
     auto& metrics = telemetry.metrics();
     std::vector<std::thread> threads;
     for (int t = 0; t < 8; ++t) {

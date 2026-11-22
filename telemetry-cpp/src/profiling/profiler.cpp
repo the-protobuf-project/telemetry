@@ -75,7 +75,9 @@ std::string url_encode(const std::string& s) {
     return out;
 }
 
-size_t discard(char*, size_t size, size_t n, void*) { return size * n; }
+size_t discard(char*, size_t size, size_t n, void*) {
+    return size * n;
+}
 
 struct sigaction g_previous;
 
@@ -106,7 +108,7 @@ Profiler::Profiler(const ServiceOptions& service, ProfilingOptions options) : op
     void* warm[1];
     backtrace(warm, 1);  // loads what backtrace needs now, not inside the handler
 
-    struct sigaction action {};
+    struct sigaction action{};
     action.sa_sigaction = on_sample;
     action.sa_flags = SA_SIGINFO | SA_RESTART;
     sigemptyset(&action.sa_mask);
@@ -122,7 +124,9 @@ Profiler::Profiler(const ServiceOptions& service, ProfilingOptions options) : op
 #endif
 }
 
-Profiler::~Profiler() { stop(); }
+Profiler::~Profiler() {
+    stop();
+}
 
 void Profiler::stop() {
 #if TELEMETRY_PROFILER_ENABLED

@@ -26,9 +26,7 @@ struct Span::OtelState {};
 namespace {
 
 bool is_lower_hex(const std::string& s) {
-    return std::all_of(s.begin(), s.end(), [](char c) {
-        return (c >= '0' && c <= '9') || (c >= 'a' && c <= 'f');
-    });
+    return std::all_of(s.begin(), s.end(), [](char c) { return (c >= '0' && c <= '9') || (c >= 'a' && c <= 'f'); });
 }
 
 bool all_zero(const std::string& s) {
@@ -53,11 +51,11 @@ void hex_to_bytes(const std::string& hex, uint8_t (&out)[N]) {
 
 trace_api::SpanKind to_otel(SpanKind kind) {
     switch (kind) {
-        case SpanKind::Server: return trace_api::SpanKind::kServer;
-        case SpanKind::Client: return trace_api::SpanKind::kClient;
+        case SpanKind::Server:   return trace_api::SpanKind::kServer;
+        case SpanKind::Client:   return trace_api::SpanKind::kClient;
         case SpanKind::Producer: return trace_api::SpanKind::kProducer;
         case SpanKind::Consumer: return trace_api::SpanKind::kConsumer;
-        default: return trace_api::SpanKind::kInternal;
+        default:                 return trace_api::SpanKind::kInternal;
     }
 }
 #endif
@@ -69,14 +67,13 @@ trace_api::SpanKind to_otel(SpanKind kind) {
  *
  * @param mcap_writer Optional MCAP writer used to record the span.
  */
-Span::Span(const std::string& name, const std::string& trace_id,
-           const std::string& span_id, std::shared_ptr<mcap::McapWriter> mcap_writer)
+Span::Span(const std::string& name, const std::string& trace_id, const std::string& span_id,
+           std::shared_ptr<mcap::McapWriter> mcap_writer)
     : name_(name)
     , trace_id_(trace_id)
     , span_id_(span_id)
     , start_time_ns_(platform::get_timestamp_ns())
-    , mcap_writer_(std::move(mcap_writer)) {
-}
+    , mcap_writer_(std::move(mcap_writer)) {}
 
 Span::~Span() {
     if (!ended_) {
@@ -210,9 +207,8 @@ void Span::end() {
 #endif
 
     if (mcap_writer_) {
-        mcap_writer_->write_span(name_, trace_id_, span_id_,
-                                  start_time_ns_, end_time_ns_,
-                                  span_status_to_string(status_));
+        mcap_writer_->write_span(name_, trace_id_, span_id_, start_time_ns_, end_time_ns_,
+                                 span_status_to_string(status_));
     }
 }
 
@@ -232,12 +228,12 @@ Tracer::Tracer(const ServiceOptions& service_opts)
  * @param mcap_writer Optional MCAP writer for recording spans.
  * @param otel_exporter Optional OpenTelemetry exporter.
  */
-Tracer::Tracer(const ServiceOptions& service_opts,
-               std::shared_ptr<mcap::McapWriter> mcap_writer
+Tracer::Tracer(const ServiceOptions& service_opts, std::shared_ptr<mcap::McapWriter> mcap_writer
 #if TELEMETRY_USE_OTEL
-               , otel::OtelExporter* otel_exporter
+               ,
+               otel::OtelExporter* otel_exporter
 #endif
-)
+               )
     : service_name_(service_opts.name)
     , service_version_(service_opts.version)
     , environment_(environment_to_string(service_opts.environment))
@@ -260,13 +256,13 @@ Tracer::Tracer(const ServiceOptions& service_opts,
  * @param otel_exporter Optional OpenTelemetry exporter.
 #endif
  */
-Tracer::Tracer(const ServiceOptions& service_opts,
-               std::shared_ptr<mcap::McapWriter> mcap_writer,
+Tracer::Tracer(const ServiceOptions& service_opts, std::shared_ptr<mcap::McapWriter> mcap_writer,
                const std::string& otlp_endpoint
 #if TELEMETRY_USE_OTEL
-               , otel::OtelExporter* otel_exporter
+               ,
+               otel::OtelExporter* otel_exporter
 #endif
-)
+               )
     : service_name_(service_opts.name)
     , service_version_(service_opts.version)
     , environment_(environment_to_string(service_opts.environment))
@@ -352,9 +348,9 @@ Span Tracer::start_span(const std::string& name, const RemoteContext& parent, Sp
     return make_span(name, parent.trace_id, parent.span_id, true, parent.sampled, parent.baggage, kind);
 }
 
-Span Tracer::make_span(const std::string& name, const std::string& trace_id,
-                       const std::string& parent_span_id, bool remote_parent, bool sampled,
-                       const std::map<std::string, std::string>& baggage, SpanKind kind) {
+Span Tracer::make_span(const std::string& name, const std::string& trace_id, const std::string& parent_span_id,
+                       bool remote_parent, bool sampled, const std::map<std::string, std::string>& baggage,
+                       SpanKind kind) {
 #if TELEMETRY_USE_OTEL
     if (otel_exporter_ && otel_exporter_->is_enabled()) {
         trace_api::StartSpanOptions opts;
@@ -364,10 +360,9 @@ Span Tracer::make_span(const std::string& name, const std::string& trace_id,
             uint8_t sid[8];
             hex_to_bytes(trace_id, tid);
             hex_to_bytes(parent_span_id, sid);
-            opts.parent = trace_api::SpanContext(
-                trace_api::TraceId(tid), trace_api::SpanId(sid),
-                trace_api::TraceFlags(sampled ? trace_api::TraceFlags::kIsSampled : 0),
-                remote_parent);
+            opts.parent = trace_api::SpanContext(trace_api::TraceId(tid), trace_api::SpanId(sid),
+                                                 trace_api::TraceFlags(sampled ? trace_api::TraceFlags::kIsSampled : 0),
+                                                 remote_parent);
         }
         auto otel_span = otel_exporter_->get_tracer()->StartSpan(name, opts);
         char tid_hex[32];
@@ -412,7 +407,8 @@ RemoteContext Tracer::extract(const std::map<std::string, std::string>& headers)
             // version-traceid-spanid-flags, e.g. 00-4bf9...4736-00f0...02b7-01
             std::string tp = trim(value);
             if (tp.size() < 55 || tp[2] != '-' || tp[35] != '-' || tp[52] != '-') continue;
-            std::string version = tp.substr(0, 2), tid = tp.substr(3, 32), sid = tp.substr(36, 16), flags = tp.substr(53, 2);
+            std::string version = tp.substr(0, 2), tid = tp.substr(3, 32), sid = tp.substr(36, 16),
+                        flags = tp.substr(53, 2);
             if (version == "ff" || !is_lower_hex(version) || !is_lower_hex(tid) || !is_lower_hex(sid) ||
                 !is_lower_hex(flags) || all_zero(tid) || all_zero(sid)) {
                 continue;
@@ -460,9 +456,7 @@ std::string Tracer::generate_span_id() {
 }
 
 ScopedSpan::ScopedSpan(Tracer& tracer, const std::string& name)
-    : span_(tracer.start_span(name))
-    , current_({span_.trace_id(), span_.span_id(), span_.baggage()}) {
-}
+    : span_(tracer.start_span(name)), current_({span_.trace_id(), span_.span_id(), span_.baggage()}) {}
 
 /**
  * @brief Ends the scoped span.

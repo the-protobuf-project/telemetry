@@ -62,9 +62,8 @@ int main(int argc, char** argv) {
     if (signal == "logs") {
         otlp::OtlpHttpLogRecordExporterOptions opts;
         opts.url = base + "/v1/logs";
-        auto provider = std::make_shared<logs_sdk::LoggerProvider>(
-            std::make_unique<logs_sdk::BatchLogRecordProcessor>(
-                std::make_unique<otlp::OtlpHttpLogRecordExporter>(opts), logs_sdk::BatchLogRecordProcessorOptions{}));
+        auto provider = std::make_shared<logs_sdk::LoggerProvider>(std::make_unique<logs_sdk::BatchLogRecordProcessor>(
+            std::make_unique<otlp::OtlpHttpLogRecordExporter>(opts), logs_sdk::BatchLogRecordProcessorOptions{}));
         auto logger = provider->GetLogger("otel-baseline", "otel-baseline");
         timed(
             [&](long i) {

@@ -26,30 +26,22 @@ class McapWriter;
 namespace otel {
 class OtelExporter;
 }
-}
+}  // namespace telemetry
 
 namespace telemetry::logging {
 
-enum class Level {
-    Trace = 0,
-    Debug = 1,
-    Info = 2,
-    Warn = 3,
-    Error = 4,
-    Fatal = 5,
-    Off = 6
-};
+enum class Level { Trace = 0, Debug = 1, Info = 2, Warn = 3, Error = 4, Fatal = 5, Off = 6 };
 
 inline const char* level_to_string(Level level) {
     switch (level) {
         case Level::Trace: return "trace";
         case Level::Debug: return "debug";
-        case Level::Info: return "info";
-        case Level::Warn: return "warn";
+        case Level::Info:  return "info";
+        case Level::Warn:  return "warn";
         case Level::Error: return "error";
         case Level::Fatal: return "fatal";
-        case Level::Off: return "off";
-        default: return "unknown";
+        case Level::Off:   return "off";
+        default:           return "unknown";
     }
 }
 
@@ -68,16 +60,13 @@ using LogSink = std::function<void(const LogEntry&)>;
 
 class Logger {
 public:
-    Logger(const std::string& service_name,
-           const std::string& service_version,
-           const std::string& environment);
+    Logger(const std::string& service_name, const std::string& service_version, const std::string& environment);
 
-    Logger(const std::string& service_name,
-           const std::string& service_version,
-           const std::string& environment,
+    Logger(const std::string& service_name, const std::string& service_version, const std::string& environment,
            std::shared_ptr<mcap::McapWriter> mcap_writer
 #if TELEMETRY_USE_OTEL
-           , otel::OtelExporter* otel_exporter = nullptr
+           ,
+           otel::OtelExporter* otel_exporter = nullptr
 #endif
     );
 
@@ -103,17 +92,17 @@ public:
     void error(const char* message, const char* file = "", uint32_t line = 0);
     void fatal(const char* message, const char* file = "", uint32_t line = 0);
 
-    template<typename T>
+    template <typename T>
     void trace(const char* message, const T& data, const char* file = "", uint32_t line = 0);
-    template<typename T>
+    template <typename T>
     void debug(const char* message, const T& data, const char* file = "", uint32_t line = 0);
-    template<typename T>
+    template <typename T>
     void info(const char* message, const T& data, const char* file = "", uint32_t line = 0);
-    template<typename T>
+    template <typename T>
     void warn(const char* message, const T& data, const char* file = "", uint32_t line = 0);
-    template<typename T>
+    template <typename T>
     void error(const char* message, const T& data, const char* file = "", uint32_t line = 0);
-    template<typename T>
+    template <typename T>
     void fatal(const char* message, const T& data, const char* file = "", uint32_t line = 0);
 
     const std::string& service_name() const { return service_name_; }
@@ -121,8 +110,7 @@ public:
     const std::string& environment() const { return environment_; }
 
 private:
-    void log(Level level, const char* message, const char* file, uint32_t line,
-             const std::string& data_json = "");
+    void log(Level level, const char* message, const char* file, uint32_t line, const std::string& data_json = "");
     void log_to_console(const LogEntry& entry);
     void log_to_mcap(const LogEntry& entry);
 #if TELEMETRY_USE_OTEL
@@ -136,7 +124,7 @@ private:
 
     std::shared_ptr<mcap::McapWriter> mcap_writer_;
     std::vector<LogSink> sinks_;
-    std::atomic<bool> has_sinks_{false}; // so a log call takes the lock only when a sink is added
+    std::atomic<bool> has_sinks_{false};  // so a log call takes the lock only when a sink is added
     bool console_ = true;
 
 #if !TELEMETRY_PLATFORM_FREERTOS
@@ -161,32 +149,32 @@ private:
     static std::unique_ptr<Logger> instance_;
 };
 
-template<typename T>
+template <typename T>
 void Logger::trace(const char* message, const T& data, const char* file, uint32_t line) {
     log(Level::Trace, message, file, line, data.to_json());
 }
 
-template<typename T>
+template <typename T>
 void Logger::debug(const char* message, const T& data, const char* file, uint32_t line) {
     log(Level::Debug, message, file, line, data.to_json());
 }
 
-template<typename T>
+template <typename T>
 void Logger::info(const char* message, const T& data, const char* file, uint32_t line) {
     log(Level::Info, message, file, line, data.to_json());
 }
 
-template<typename T>
+template <typename T>
 void Logger::warn(const char* message, const T& data, const char* file, uint32_t line) {
     log(Level::Warn, message, file, line, data.to_json());
 }
 
-template<typename T>
+template <typename T>
 void Logger::error(const char* message, const T& data, const char* file, uint32_t line) {
     log(Level::Error, message, file, line, data.to_json());
 }
 
-template<typename T>
+template <typename T>
 /**
  * @brief Logs a fatal message with structured data.
  *

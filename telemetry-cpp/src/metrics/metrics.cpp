@@ -66,7 +66,9 @@ size_t this_thread_slot() {
 
 std::atomic<uint64_t> next_registry_id{1};
 
-uint64_t new_registry_id() { return next_registry_id.fetch_add(1, std::memory_order_relaxed); }
+uint64_t new_registry_id() {
+    return next_registry_id.fetch_add(1, std::memory_order_relaxed);
+}
 
 #if !TELEMETRY_PLATFORM_FREERTOS
 // Equal bytes, compared eight at a time inline: names are short, and a call
@@ -140,8 +142,7 @@ Counter::Counter(const std::string& name, const std::string& description, Sink s
     , description_(description)
     , cells_(new Cell[cell_count()])
     , mask_(cell_count() - 1)
-    , sink_(std::move(sink)) {
-}
+    , sink_(std::move(sink)) {}
 
 namespace {
 // atomic<double>::fetch_add is C++20; this is it for C++17.
@@ -176,15 +177,15 @@ double Counter::value() const {
     return static_cast<double>(whole) + rest;
 }
 
-Histogram::Histogram(const std::string& name, const std::string& description,
-                     const std::vector<double>& buckets, Sink sink)
+Histogram::Histogram(const std::string& name, const std::string& description, const std::vector<double>& buckets,
+                     Sink sink)
     : name_(name)
     , description_(description)
-    , buckets_(buckets.empty() ? std::vector<double>{0.005, 0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 1.0, 2.5, 5.0, 10.0} : buckets)
+    , buckets_(buckets.empty() ? std::vector<double>{0.005, 0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 1.0, 2.5, 5.0, 10.0}
+                               : buckets)
     , bucket_counts_(buckets_.size() + 1, 0)
     , mutex_(platform::create_mutex())
-    , sink_(std::move(sink)) {
-}
+    , sink_(std::move(sink)) {}
 
 void Histogram::record(double value) {
     if (sink_) sink_(value);
@@ -202,10 +203,7 @@ void Histogram::record(double value) {
 }
 
 Gauge::Gauge(const std::string& name, const std::string& description, Sink sink)
-    : name_(name)
-    , description_(description)
-    , sink_(std::move(sink)) {
-}
+    : name_(name), description_(description), sink_(std::move(sink)) {}
 
 void Gauge::set(double value) {
     const double old = value_.exchange(value, std::memory_order_relaxed);
@@ -223,10 +221,7 @@ void Gauge::decrement(double value) {
 }
 
 Metrics::Metrics(const ServiceOptions& service_opts)
-    : id_(new_registry_id())
-    , service_name_(service_opts.name)
-    , mutex_(platform::create_mutex()) {
-}
+    : id_(new_registry_id()), service_name_(service_opts.name), mutex_(platform::create_mutex()) {}
 
 /**
  * @brief Initializes metrics for a service.
@@ -235,12 +230,12 @@ Metrics::Metrics(const ServiceOptions& service_opts)
  * @param mcap_writer Optional MCAP writer for metric export.
  * @param otel_exporter Optional OpenTelemetry exporter.
  */
-Metrics::Metrics(const ServiceOptions& service_opts,
-                 std::shared_ptr<mcap::McapWriter> mcap_writer
+Metrics::Metrics(const ServiceOptions& service_opts, std::shared_ptr<mcap::McapWriter> mcap_writer
 #if TELEMETRY_USE_OTEL
-                 , otel::OtelExporter* otel_exporter
+                 ,
+                 otel::OtelExporter* otel_exporter
 #endif
-)
+                 )
     : id_(new_registry_id())
     , service_name_(service_opts.name)
     , mcap_writer_(std::move(mcap_writer))
@@ -316,8 +311,9 @@ void Metrics::counter(std::string_view name, double value) {
  * @param value Value to record.
  */
 void Metrics::histogram(std::string_view name, double value) {
-    cached<Histogram>(id_, MetricType::Histogram, name, [&]() -> Histogram& { return get_histogram(name); })
-        .record(value);
+    cached<Histogram>(id_, MetricType::Histogram, name, [&]() -> Histogram& {
+        return get_histogram(name);
+    }).record(value);
     if (mcap_writer_) write_to_mcap(name, MetricType::Histogram, value);
 }
 
@@ -336,8 +332,8 @@ namespace {
 // Finds name in instruments, or makes it with make; found under a shared
 // lock, made under an exclusive one.
 template <class T, class Lock, class Make>
-T& find_or_make(std::map<std::string, std::unique_ptr<T>, std::less<>>& instruments, std::string_view name,
-                Lock& lock, Make make) {
+T& find_or_make(std::map<std::string, std::unique_ptr<T>, std::less<>>& instruments, std::string_view name, Lock& lock,
+                Make make) {
 #if !TELEMETRY_PLATFORM_FREERTOS
     {
         std::shared_lock<std::shared_mutex> read(lock);
@@ -373,7 +369,7 @@ Counter& Metrics::get_counter(std::string_view name, const std::string& descript
 }
 
 Histogram& Metrics::get_histogram(std::string_view name, const std::string& description,
-                                   const std::vector<double>& buckets) {
+                                  const std::vector<double>& buckets) {
     return find_or_make(histograms_, name, TELEMETRY_INSTRUMENTS_LOCK, [&](const std::string& key) {
         return std::make_unique<Histogram>(key, description, buckets, otel_sink(key, MetricType::Histogram));
     });
@@ -391,15 +387,9 @@ Gauge& Metrics::get_gauge(std::string_view name, const std::string& description)
 
 void Metrics::record_dynamic(const std::string& name, MetricType type, double value) {
     switch (type) {
-        case MetricType::Counter:
-            counter(name, value);
-            break;
-        case MetricType::Histogram:
-            histogram(name, value);
-            break;
-        case MetricType::Gauge:
-            gauge(name, value);
-            break;
+        case MetricType::Counter:   counter(name, value); break;
+        case MetricType::Histogram: histogram(name, value); break;
+        case MetricType::Gauge:     gauge(name, value); break;
     }
 }
 
@@ -412,8 +402,7 @@ void Metrics::record_dynamic(const std::string& name, MetricType type, double va
  */
 void Metrics::write_to_mcap(std::string_view name, MetricType type, double value) {
     if (!mcap_writer_) return;
-    mcap_writer_->write_metric(std::string(name), metric_type_to_string(type), value,
-                                platform::get_timestamp_ns());
+    mcap_writer_->write_metric(std::string(name), metric_type_to_string(type), value, platform::get_timestamp_ns());
 }
 
 /**

@@ -21,20 +21,18 @@ Telemetry::Telemetry(const ServiceOptions& service_opts, const TelemetryOptions&
 
 #if TELEMETRY_USE_OTEL
     if (telemetry_opts.telemetry.otlp.enabled) {
-        std::string endpoint = "http://" + telemetry_opts.telemetry.otlp.host + ":" +
-                               std::to_string(telemetry_opts.telemetry.otlp.port);
-        otel_exporter_ = std::make_unique<otel::OtelExporter>(service_opts, endpoint,
-                                                              telemetry_opts.telemetry.otlp.export_options);
+        std::string endpoint =
+            "http://" + telemetry_opts.telemetry.otlp.host + ":" + std::to_string(telemetry_opts.telemetry.otlp.port);
+        otel_exporter_ =
+            std::make_unique<otel::OtelExporter>(service_opts, endpoint, telemetry_opts.telemetry.otlp.export_options);
     }
 #endif
 
-    logger_ = std::make_unique<logging::Logger>(
-        service_opts.name,
-        service_opts.version,
-        environment_to_string(service_opts.environment),
-        mcap_writer_
+    logger_ = std::make_unique<logging::Logger>(service_opts.name, service_opts.version,
+                                                environment_to_string(service_opts.environment), mcap_writer_
 #if TELEMETRY_USE_OTEL
-        , otel_exporter_.get()
+                                                ,
+                                                otel_exporter_.get()
 #endif
     );
 
@@ -42,33 +40,34 @@ Telemetry::Telemetry(const ServiceOptions& service_opts, const TelemetryOptions&
 
     metrics_ = std::make_unique<metrics::Metrics>(service_opts, mcap_writer_
 #if TELEMETRY_USE_OTEL
-        , otel_exporter_.get()
+                                                  ,
+                                                  otel_exporter_.get()
 #endif
     );
 
     if (telemetry_opts.telemetry.otlp.enabled) {
-        std::string endpoint = "http://" + telemetry_opts.telemetry.otlp.host + ":" +
-                               std::to_string(telemetry_opts.telemetry.otlp.port);
+        std::string endpoint =
+            "http://" + telemetry_opts.telemetry.otlp.host + ":" + std::to_string(telemetry_opts.telemetry.otlp.port);
         tracer_ = std::make_unique<tracing::Tracer>(service_opts, mcap_writer_, endpoint
 #if TELEMETRY_USE_OTEL
-            , otel_exporter_.get()
+                                                    ,
+                                                    otel_exporter_.get()
 #endif
         );
     } else {
         tracer_ = std::make_unique<tracing::Tracer>(service_opts, mcap_writer_
 #if TELEMETRY_USE_OTEL
-            , otel_exporter_.get()
+                                                    ,
+                                                    otel_exporter_.get()
 #endif
         );
     }
 
-    auto global_logger = std::make_unique<logging::Logger>(
-        service_opts.name,
-        service_opts.version,
-        environment_to_string(service_opts.environment),
-        mcap_writer_
+    auto global_logger = std::make_unique<logging::Logger>(service_opts.name, service_opts.version,
+                                                           environment_to_string(service_opts.environment), mcap_writer_
 #if TELEMETRY_USE_OTEL
-        , otel_exporter_.get()
+                                                           ,
+                                                           otel_exporter_.get()
 #endif
     );
     global_logger->set_console(telemetry_opts.console);
@@ -175,8 +174,8 @@ void Telemetry::close() {
             }
             if (sig.failed > 0) {
                 std::fprintf(stderr, "telemetry: %llu of %llu %s failed to export\n",
-                             static_cast<unsigned long long>(sig.failed),
-                             static_cast<unsigned long long>(sig.emitted), name);
+                             static_cast<unsigned long long>(sig.failed), static_cast<unsigned long long>(sig.emitted),
+                             name);
             }
         }
     }
@@ -203,9 +202,7 @@ Stats Telemetry::stats() const {
  * @param version Service version.
  */
 TelemetryBuilder::TelemetryBuilder(const std::string& name, const std::string& version)
-    : name_(name)
-    , version_(version) {
-}
+    : name_(name), version_(version) {}
 
 /**
  * @brief Sets the service description.

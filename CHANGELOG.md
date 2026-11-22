@@ -379,7 +379,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## Release Links
 
-[Unreleased]: https://github.com/the-protobuf-project/telemetry/compare/v1.3.3...HEAD
+[Unreleased]: https://github.com/the-protobuf-project/telemetry/compare/v1.4.0...HEAD
 [1.4.0]: https://github.com/the-protobuf-project/telemetry/releases/tag/v1.4.0
 [1.3.3]: https://github.com/the-protobuf-project/telemetry/releases/tag/v1.3.3
 [1.3.2]: https://github.com/the-protobuf-project/telemetry/releases/tag/v1.3.2

@@ -397,15 +397,16 @@ TypeScript,MCAP,1
 | Traces over OTLP | Yes | Yes | Yes | Yes (OTLP export added; was MCAP-only) | Yes (gRPC or HTTP in Node, HTTP in the browser) |
 | Metrics over OTLP | Yes | Yes | Yes | Yes | Yes |
 | Logs over OTLP | Yes | Yes | Yes | Yes | Yes |
-| Trace context across services (W3C `traceparent`) | Yes: `Inject` / `Extract` | Yes: `inject` / `extract` | Yes: `inject` / `extract` | Yes: `inject` / `extract` | Yes: `inject` / `extract` |
+| Trace context across services (W3C `traceparent`) | Yes: `http.DefaultClient` automatic; `HTTPHandler`, `HTTPTransport`, `GRPC*Options`; `Inject` / `Extract` | Yes: `ServerLayer` / `ClientLayer` (axum, hyper, tonic); `inject` / `extract` | Yes: HTTP and gRPC clients automatic; `asgi_middleware` / `wsgi_middleware`; `inject` / `extract` | Yes: `ServerScope` / `ClientScope`; `inject` / `extract` | Yes: HTTP, `fetch` and gRPC automatic; `inject` / `extract` |
 | Baggage | Yes: `SetBaggage` / `Baggage` | Yes: `set_baggage` / `baggage` | Yes: `set_baggage` / `get_baggage` | Yes: carried from `extract` to `inject` | Yes: `setBaggage` / `baggage` |
 | Distributed logging (logs carry the trace id) | Yes: `InfoContext(ctx, …)`, `Logger.WithContext` | Yes: inside `span.attach()` | Yes: inside `start_span` | Yes: inside `span.attach()` / `TELEMETRY_SPAN` | Yes: inside `withSpan`, `logger.withContext` |
 | Profiles to Pyroscope | Yes: `WithProfiling` | Yes: `with_profiling` (`profiling` feature) | Yes: `with_profiling` (`[profiling]` extra) | Through an eBPF profiler (no Pyroscope C++ client exists; see below) | Node: `withProfiling` (`@pyroscope/nodejs`) |
 | MCAP recording | logs, metrics, spans | logs, metrics, spans | logs, metrics, spans | logs, metrics, spans | Node: logs, metrics, spans |
 | Drops counted and reported, lossless mode | Yes: `WithExport`, `Stats()`, `Close` error | Yes: `with_export`, `stats()`, `close` error | Yes: `with_export`, `stats()`, warning on `close` | Yes: `with_export`, `stats()`, warning on `close` | Yes: `withExport`, `stats()`, warning on `close`; lossless grows the queue, `ready()` waits for room |
 
-`just crosslang` checks one trace across all five, passed from Go to Rust to
-Python to C++ to TypeScript, and CI runs it on every change.
+`just crosslang` runs five services, one per SDK, calling one another over
+HTTP from Go to Rust to Python to C++ to TypeScript, checks they share one
+trace, and CI runs it on every change.
 
 C++ profiles come from outside the process: Pyroscope has no C++ client
 library, so the supported route is an eBPF profiler — Grafana Alloy's
@@ -437,72 +438,104 @@ injects** its span's context into the outgoing request's headers; the
 one trace id, and Tempo shows the request as one trace across both services,
 whatever language each is written in.
 
+Over HTTP and gRPC, the SDKs do both sides themselves, so a service needs no
+tracing code at its calls. Where a language can patch its libraries at run
+time, it is automatic; where it cannot, each server and client takes one
+line:
+
+| | Automatic once built | One line each |
+| --- | --- | --- |
+| TypeScript | Node: `http`, `https`, `fetch`, gRPC clients and servers; browser: `fetch`, XHR | |
+| Python | `requests`, `httpx`, `urllib`, `urllib3`, `aiohttp`, gRPC clients and servers | web apps: `tel.asgi_middleware(app)`, `tel.wsgi_middleware(app)` |
+| Go | `http.DefaultClient` | `tel.HTTPHandler`, `tel.HTTPTransport`, `tel.GRPCServerOptions`, `tel.GRPCDialOptions` |
+| Rust | | `ServerLayer` and `ClientLayer` for axum, hyper and tonic; `propagation::headers()` for reqwest |
+| C++ | | `ServerScope` and `ClientScope` over any library's headers (gRPC, cpp-httplib) |
+
 Say service A (`orders`, Go) calls service B (`inventory`, Rust) over HTTP:
 
 ```go
-// Service A — Go: start a client span and put its context on the request.
-ctx, span := tel.Tracing.StartSpan(ctx, "inventory.reserve",
-    telemetry.WithSpanKind(telemetry.SpanKindClient))
+// Service A — Go: http.DefaultClient carries the span in ctx on.
+ctx, span := tel.Tracing.StartSpan(ctx, "checkout")
 defer span.End()
-
-headers := map[string]string{}
-tel.Tracing.Inject(ctx, headers) // writes traceparent (+ tracestate, baggage)
-
 req, _ := http.NewRequestWithContext(ctx, "POST", inventoryURL, body)
-for k, v := range headers {
-    req.Header.Set(k, v)
-}
+res, err := http.DefaultClient.Do(req)
 ```
 
 ```rust
-// Service B — Rust: continue the caller's trace from the request headers.
-use telemetry::tracing::SpanKind;
-
-let headers: HashMap<String, String> = request_headers_lowercased(&req);
-let tracing = telemetry.tracing.as_ref().unwrap();
-
-let parent = tracing.extract(&headers); // the Go span, as a remote parent
-let mut span = tracing.start_span_with("inventory.reserve", SpanKind::Server, Some(&parent));
-span.set_attribute("order.id", order_id);
-
-// Calling a third service? Hand the trace on the same way.
-let mut out = HashMap::new();
-tracing.inject(&span, &mut out);
+// Service B — Rust: each request runs in a span continuing the caller's trace.
+let app = Router::new()
+    .route("/reserve", post(reserve))
+    .layer(telemetry::propagation::ServerLayer::new());
 ```
 
-The reverse direction is the same calls on the other side:
-`tracing.inject` in Rust and `tel.Tracing.Extract(ctx, headers)` followed by
-`StartSpan(ctx, ..., WithSpanKind(SpanKindServer))` in Go. Over gRPC the
-headers are the request metadata; over a message broker they are the message
-headers (`SpanKindProducer` / `SpanKindConsumer`).
+Inside the handler, the server span is the current context: spans started
+there, logs written there and requests made there all join the trace. Each
+SDK's README has the details.
+
+Transports that are not HTTP or gRPC, such as a message broker, carry the
+trace by hand: `inject` the span's context into the message headers, and
+`extract` it on the other side (`SpanKindProducer` / `SpanKindConsumer`).
+Every SDK has both, under those names.
 
 Things that break the chain:
 
-- **The callee does not extract.** It starts a new trace, and Tempo shows two
-  unrelated traces. Always start the server span from the extracted context.
+- **A server or client is not wrapped.** In Go, Rust and C++ a server the
+  SDK does not wrap starts a new trace, and Tempo shows two unrelated traces;
+  so does a hand-made `extract` that is not used as the parent.
 - **Header names change case.** HTTP header names are case-insensitive, and
   the propagator expects lowercase `traceparent`. Lowercase keys when copying
   headers into a map.
 - **A proxy strips unknown headers.** Allow `traceparent`, `tracestate` and
   `baggage` through gateways and load balancers.
 
-Try it locally. One trace through five services, each written with a
-different SDK:
+Try it locally. Five services, each written with a different SDK, call one
+another over HTTP, and none has tracing code at its calls
+(`tests/crosslang.py`):
 
 ```bash
 just crosslang
-# go     (orders-go)       trace cd3b5eda…  span ef132842…
-# rust   (inventory-rs)    trace cd3b5eda…  span 70f84c9e…  parent ef132842…
-# python (billing-py)      trace cd3b5eda…  span 0585d24b…  parent 70f84c9e…
-# c++    (shipping-cpp)    trace cd3b5eda…  span 4c7cf38d…  parent 0585d24b…
-# ts     (notify-ts)       trace cd3b5eda…  span 9a1e6b20…  parent 4c7cf38d…
-# OK: one trace across every service
+# go     (orders-go)       trace 6769f6ac…  span 02ea3c36…
+# inventory-rs             trace 6769f6ac…  span 72d2c3bd…  parent 82e683dc…
+# billing-py               trace 6769f6ac…  span 593554b5…  parent 72d2c3bd…
+# shipping-cpp             trace 6769f6ac…  span 911ed13e…  parent 07e631e4…
+# notify-ts                trace 6769f6ac…  span 2744c553…  parent 4b16d0e3…
+# OK: one trace across 5 services, over HTTP
 ```
 
-CI runs the same check on every change, so a regression in either SDK's
-propagation fails the build. With the stack running
-(`telemetry-core`, `docker compose up -d`), set
-`TELEMETRY_DEMO_OTLP=localhost:4317` to see the single trace in Grafana Tempo.
+Each `parent` is the span that made the request: Go's and Python's client
+spans, Rust's server span (reqwest sends it on directly), and C++'s
+`ClientScope`.
+
+CI runs the same check on every change, so a regression in any SDK's
+propagation fails the build.
+
+Each run is a whole checkout: Go loads the cart and prices it, Rust looks up
+and reserves each item, Python checks for fraud and charges, C++ quotes and
+prints the shipping label, and TypeScript renders and sends the confirmation.
+Each step is a span with its own log lines and metrics, so one checkout is
+one trace of twenty spans across the five services. To see it, start the
+stack and send the run to it:
+
+```bash
+docker run -d -p 6009:6009 ghcr.io/the-protobuf-project/telemetry:latest
+TELEMETRY_DEMO_OTLP=localhost:6009 just crosslang
+```
+
+Then open the **Distributed Journey** dashboard
+(<http://localhost:6009/grafana/d/telemetry-journey>):
+
+- **Totals:** checkouts, stock reservations, payments, labels and
+  notifications.
+- **Recent checkouts:** pick one, and the dashboard shows that trace.
+- **The trace:** the whole waterfall for the checkout you picked.
+- **Logs:** every service's logs for that trace, each linking back to its
+  span.
+- **Service map.**
+- **Metrics:** step and request latency per service, and the order, payment
+  and shipping amounts.
+
+The Compose stack (`telemetry-core`, `docker compose up -d`) has the same
+dashboard; there, point `TELEMETRY_DEMO_OTLP` at `localhost:4317`.
 
 ## Writing at high volume
 

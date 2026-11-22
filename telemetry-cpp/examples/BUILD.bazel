@@ -55,6 +55,7 @@ cc_binary(
     srcs = ["crosslang.cpp"],
     deps = [
         "//src:telemetry",
+        "@cpp-httplib//:httplib",
         "@nlohmann_json//:json",
     ],
 )

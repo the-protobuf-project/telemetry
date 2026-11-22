@@ -263,5 +263,6 @@ npm run lint           # Biome
 npm run build && npm run check:browser
 ```
 
-`just crosslang` from the repository root passes one trace through Go, Rust,
-Python, C++ and this SDK (`examples/crosslang.ts`).
+`just crosslang` from the repository root runs five services, one per SDK,
+calling one another over HTTP, and checks they share one trace; this SDK's is
+`examples/crosslang.ts`, a plain `node:http` server.

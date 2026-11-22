@@ -1,59 +1,118 @@
 """
-A hop of the cross-language tracing demo (`just crosslang`): continues,
-in Python, the trace an upstream service started, from the W3C headers it
-sent, and hands it on.
+The billing service of the cross-language tracing demo (`just crosslang`):
+it checks an order for fraud, charges it, and hands it to shipping. A WSGI app
+behind `tel.wsgi_middleware` continues the trace the caller sent, and the
+call to shipping goes out with plain urllib, which Telemetry has instrumented
+to carry it on. Neither side has an inject or extract of its own.
 
-The headers arrive on stdin as a JSON object; in a real service they are the
-incoming HTTP headers, gRPC metadata or message headers. Set
-TELEMETRY_DEMO_OTLP=localhost:4317 to export the span to a collector.
+Each step is a span of its own under the request's, logs under it (so the
+logs carry its trace and span id) and measures what it did, so the journey
+shows in Grafana as one trace with its logs and metrics.
+
+It listens on a free port and prints {"listening": <port>}; GET /hop answers
+with this hop's view of the trace, followed by the hops after it
+(CROSSLANG_NEXT, a URL, when there is one). Set
+TELEMETRY_DEMO_OTLP=localhost:4317 to export the spans to a collector.
 
 Run with:
-    echo '{"traceparent": "00-…-…-01"}' | uv run python examples/crosslang.py
+    CROSSLANG_NEXT=http://127.0.0.1:8081 uv run python examples/crosslang.py
 """
 
 import json
 import os
+import signal
 import sys
+import threading
+import time
+import urllib.parse
+import urllib.request
+from socketserver import ThreadingMixIn
+from wsgiref.simple_server import WSGIRequestHandler, WSGIServer, make_server
 
-from opentelemetry.trace import SpanKind
+from opentelemetry import trace
 
 from telemetry import Telemetry
 
 
+class Server(ThreadingMixIn, WSGIServer):
+    daemon_threads = True
+
+
+class Quiet(WSGIRequestHandler):
+    def log_message(self, *args) -> None:
+        pass
+
+
 def main() -> None:
-    headers = json.load(sys.stdin)
     host, _, port = os.environ.get("TELEMETRY_DEMO_OTLP", "127.0.0.1:4317").rpartition(
         ":"
     )
-
-    t = (
+    tel = (
         Telemetry.new()
         .with_service("billing-py", "1.0.0")
         .with_otlp(host, int(port))
         .with_tracing()
+        .with_console(False)
         .build()
     )
+    next_url = os.environ.get("CROSSLANG_NEXT")
 
-    # The one call that joins the caller's trace.
-    parent = t.tracing.extract(headers)
-    with t.tracing.start_span(
-        "billing.charge", parent=parent, kind=SpanKind.SERVER
-    ) as span:
-        span.span.set_attribute("order.id", "o-42")
-        downstream = t.tracing.inject()  # and the next hop continues it in turn
-        print(
-            json.dumps(
-                {
-                    "received_traceparent": headers.get("traceparent"),
-                    "trace_id": span.trace_id,
-                    "span_id": span.span_id,
-                    "downstream_traceparent": downstream.get("traceparent"),
-                    "baggage": t.tracing.get_baggage(parent),
-                },
-                separators=(",", ":"),
-            )
+    def hop(environ, start_response):
+        # The middleware's server span, which continues the caller's trace.
+        span = trace.get_current_span().get_span_context()
+        query = environ.get("QUERY_STRING", "")
+        order = dict(urllib.parse.parse_qsl(query))
+        order_id, total = order.get("order", ""), float(order.get("total", 0))
+
+        with tel.tracing.start_span("billing.fraud_check", {"order.id": order_id}):
+            time.sleep(0.012)
+            score = 0.07
+            tel.metrics.histogram("fraud_score", score)
+            tel.logger.info(f"fraud check passed for {order_id}", {"score": score})
+
+        with tel.tracing.start_span(
+            "billing.charge", {"order.id": order_id, "payment.amount": total}
+        ):
+            time.sleep(0.018)
+            tel.metrics.counter("payments_total")
+            tel.metrics.histogram("payment_amount", total)
+            tel.logger.info(f"charged {total:.2f} for {order_id}")
+
+        hops = [
+            {
+                "service": "billing-py",
+                "received_traceparent": environ.get("HTTP_TRACEPARENT"),
+                "trace_id": format(span.trace_id, "032x"),
+                "span_id": format(span.span_id, "016x"),
+            }
+        ]
+        if next_url:
+            # urllib is instrumented: the request carries this server span on.
+            with urllib.request.urlopen(f"{next_url}/hop?{query}") as res:
+                hops += json.load(res)
+        body = json.dumps(hops).encode()
+        start_response(
+            "200 OK",
+            [("Content-Type", "application/json"), ("Content-Length", str(len(body)))],
         )
-    t.close()
+        return [body]
+
+    server = make_server(
+        "127.0.0.1", 0, tel.wsgi_middleware(hop), Server, handler_class=Quiet
+    )
+
+    # Stopped with SIGTERM or Ctrl-C: stop serving, then close Telemetry,
+    # which exports the spans still queued. shutdown() waits for
+    # serve_forever, so it runs on a thread of its own.
+    def stop(*_) -> None:
+        threading.Thread(target=server.shutdown).start()
+
+    signal.signal(signal.SIGTERM, stop)
+    signal.signal(signal.SIGINT, stop)
+    print(json.dumps({"listening": server.server_address[1]}), flush=True)
+    server.serve_forever()
+    tel.close()
+    sys.exit(0)
 
 
 if __name__ == "__main__":

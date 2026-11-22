@@ -390,6 +390,14 @@ func (b *Builder) WithTracing() *Builder {
 	return b
 }
 
+// WithAutoInstrumentation sets whether Build makes http.DefaultClient carry
+// the trace on every request; on by default ([tracing] auto_instrument).
+// HTTPHandler, HTTPTransport and the gRPC options work either way.
+func (b *Builder) WithAutoInstrumentation(on bool) *Builder {
+	b.telemetryOpts.Tracing.AutoInstrument = on
+	return b
+}
+
 // WithSpanRecorder enables tracing and sends every span to r as well,
 // synchronously, so a test reads what was traced from r.Spans() without an
 // exporter or a collector.
@@ -491,6 +499,9 @@ func (b *Builder) Build() (*Telemetry, error) {
 		Profiler:        profiling.NewProfiler(b.serviceOpts, b.telemetryOpts.Profiling, unifiedMcap),
 	}
 	tel.SetReportOutput(p.Logger.Console())
+	if b.telemetryOpts.Tracing.AutoInstrument {
+		p.instrumentDefaultClient()
+	}
 
 	return p, nil
 }
@@ -625,6 +636,8 @@ func NewLegacy(ctx context.Context, serviceOpts options.ServiceOptions, opts opt
 // Close returns an error when any log record or span was dropped or failed
 // to export during the program's run, saying how many and why.
 func (p *Telemetry) Close() error {
+	p.uninstrumentDefaultClient()
+
 	// Stop profiler first to flush remaining data
 	if p.Profiler != nil {
 		if err := p.Profiler.Stop(); err != nil {

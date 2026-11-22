@@ -53,32 +53,64 @@ function replacer(_key: string, value: unknown): unknown {
 
 // This package's own files: frames in them are the SDK, not the caller.
 const ownDir = fileURLToPath(new URL("..", import.meta.url));
-const cache = new Map<string, string>();
+// What each frame's file name is shown as, or "" for the SDK's own frames.
+const shown = new Map<string, string>();
 
 /**
  * The first stack frame outside this package: the line that called the
  * logger. Its path is shown relative to the working directory when inside it.
+ *
+ * V8's structured stack trace, a few frames deep: formatting the whole stack
+ * as text and parsing it back was 96% of a log call.
  */
 export function caller(): Caller | undefined {
-  const stack = new Error().stack?.split("\n");
-  if (!stack) return undefined;
-  for (const frame of stack.slice(1)) {
-    const match = /\(?((?:file:\/\/)?[^\s()]+?):(\d+):\d+\)?$/.exec(frame);
-    if (!match?.[1]) continue;
-    let file = match[1];
-    if (file.startsWith("file://")) file = fileURLToPath(file);
-    if (file.startsWith(ownDir) || file.startsWith("node:")) continue;
-    return { file: display(file), line: Number(match[2]) };
+  const limit = Error.stackTraceLimit;
+  const prepare = Error.prepareStackTrace;
+  Error.stackTraceLimit = 8;
+  Error.prepareStackTrace = (_error, sites) => sites;
+  const holder: { stack?: NodeJS.CallSite[] | string } = {};
+  try {
+    Error.captureStackTrace(holder, caller);
+  } finally {
+    Error.prepareStackTrace = prepare;
+    Error.stackTraceLimit = limit;
+  }
+  const stack = holder.stack;
+  // A tool that installs its own stack formatting (source maps under a test
+  // runner) can hand back text instead of call sites; read the text then.
+  if (!Array.isArray(stack) || typeof stack[0]?.getFileName !== "function") {
+    return typeof stack === "string" ? fromText(stack) : undefined;
+  }
+  for (const site of stack) {
+    const name = site.getFileName();
+    if (!name) continue;
+    const file = display(name);
+    if (file) return { file, line: site.getLineNumber() ?? 0 };
   }
   return undefined;
 }
 
-function display(file: string): string {
-  let shown = cache.get(file);
-  if (shown === undefined) {
-    const rel = relative(process.cwd(), file);
-    shown = rel.startsWith(`..${sep}`) || rel === ".." ? file : rel;
-    cache.set(file, shown);
+function fromText(stack: string): Caller | undefined {
+  for (const frame of stack.split("\n")) {
+    const match = /\(?((?:file:\/\/)?[^\s()]+?):(\d+):\d+\)?$/.exec(frame);
+    if (!match?.[1]) continue;
+    const file = display(match[1]);
+    if (file) return { file, line: Number(match[2]) };
   }
-  return shown;
+  return undefined;
+}
+
+function display(name: string): string {
+  let file = shown.get(name);
+  if (file === undefined) {
+    const path = name.startsWith("file://") ? fileURLToPath(name) : name;
+    if (path.startsWith(ownDir) || path.startsWith("node:")) {
+      file = "";
+    } else {
+      const rel = relative(process.cwd(), path);
+      file = rel.startsWith(`..${sep}`) || rel === ".." ? path : rel;
+    }
+    shown.set(name, file);
+  }
+  return file;
 }

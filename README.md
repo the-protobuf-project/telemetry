@@ -523,8 +523,12 @@ on one thread, with its default settings:
 | Rust | 110,180 (11%) | 149,536 (15%) |
 | Python | 335,581 (34%) | 499,200 (50%) |
 | C++ | 216,760 (22%) | 841,406 (84%) |
+| TypeScript | 2,560 (0.3%) | 2,560 (0.3%) |
 
-The calls returned quickly, and between 16% and 89% of the records never
+JavaScript runs the burst and the exporter on one thread, so the exporter
+gets no turn until the loop ends, and only what fits the queue arrives.
+
+The calls returned quickly, and between 16% and 99.7% of the records never
 arrived. Nothing in the program said so.
 
 ### What this SDK changes
@@ -567,13 +571,17 @@ Per call, this SDK does more work than the official one: console output, MCAP
 recording, caller lookup and drop accounting. On one thread, in default mode,
 it runs at this fraction of the official SDK's call rate:
 
-| Signal | Go | Rust | Python | C++ |
-| ------ | -: | ---: | -----: | --: |
-| Logs | 0.33x | 0.07x | 0.24x | 0.16x |
-| Spans | 0.88x | 0.56x | 0.87x | 1.0x |
-| Metrics | 0.43x | 0.25x | 0.70x | 0.04x |
+| Signal | Go | Rust | Python | C++ | TypeScript |
+| ------ | -: | ---: | -----: | --: | ---------: |
+| Logs | 0.33x | 0.07x | 0.24x | 0.16x | 0.04x |
+| Spans | 0.88x | 0.56x | 0.87x | 1.0x | 0.88x |
+| Metrics | 0.43x | 0.25x | 0.70x | 0.04x | 0.89x |
 
-The TypeScript SDK is not in these benchmarks yet.
+In TypeScript most of a log call is finding the caller's file and line from a
+stack trace; `report_caller = false` under `[logging.log]` skips it. Both
+lossless on one thread, against the official SDK tuned to drop nothing, it
+delivers spans at 1.03x and metrics at 0.87x the official rate, and logs at
+0.19x; see [BENCHMARKS.md](docs/benchmark.md).
 
 Spans cost about the same as upstream. The gaps in logs and metrics are where
 the next improvements go. Rust's log macro formats every message even when

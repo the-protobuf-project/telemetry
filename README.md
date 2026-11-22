@@ -506,10 +506,36 @@ Each `parent` is the span that made the request: Go's and Python's client
 spans, Rust's server span (reqwest sends it on directly), and C++'s
 `ClientScope`.
 
-CI runs the same check on every change, so a regression in either SDK's
-propagation fails the build. With the stack running
-(`telemetry-core`, `docker compose up -d`), set
-`TELEMETRY_DEMO_OTLP=localhost:4317` to see the single trace in Grafana Tempo.
+CI runs the same check on every change, so a regression in any SDK's
+propagation fails the build.
+
+Each run is a whole checkout: Go loads the cart and prices it, Rust looks up
+and reserves each item, Python checks for fraud and charges, C++ quotes and
+prints the shipping label, and TypeScript renders and sends the confirmation.
+Each step is a span with its own log lines and metrics, so one checkout is
+one trace of twenty spans across the five services. To see it, start the
+stack and send the run to it:
+
+```bash
+docker run -d -p 6009:6009 ghcr.io/the-protobuf-project/telemetry:latest
+TELEMETRY_DEMO_OTLP=localhost:6009 just crosslang
+```
+
+Then open the **Distributed Journey** dashboard
+(<http://localhost:6009/grafana/d/telemetry-journey>):
+
+- **Totals:** checkouts, stock reservations, payments, labels and
+  notifications.
+- **Recent checkouts:** pick one, and the dashboard shows that trace.
+- **The trace:** the whole waterfall for the checkout you picked.
+- **Logs:** every service's logs for that trace, each linking back to its
+  span.
+- **Service map.**
+- **Metrics:** step and request latency per service, and the order, payment
+  and shipping amounts.
+
+The Compose stack (`telemetry-core`, `docker compose up -d`) has the same
+dashboard; there, point `TELEMETRY_DEMO_OTLP` at `localhost:4317`.
 
 ## Writing at high volume
 

@@ -55,6 +55,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   cpp-httplib's `Headers`). Header-only; the SDK takes no HTTP or gRPC
   dependency.
 
+- Grafana: a **Distributed Journey** dashboard in both stacks (the image's
+  and `telemetry-core`'s). It shows one request across services: totals per
+  step, recent checkouts (picking one shows its trace), the trace's waterfall,
+  every service's logs for it, a service map, and step and request latency.
+  The stack image shipped no dashboards before.
+
 ### Changed
 
 - `just crosslang` runs five services, one per SDK, that call one another
@@ -62,7 +68,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   None has tracing code at its calls: each SDK's own propagation carries the
   trace, and the run fails unless every service's span is in one trace, each
   received a `traceparent` from it, and each made a span of its own. The C++
-  example uses cpp-httplib, a dev dependency.
+  example uses cpp-httplib, a dev dependency. Each run is a whole checkout,
+  with each step a span that logs and counts what it did: twenty spans in one
+  trace. The services close cleanly on SIGTERM, so a run sent to a collector
+  (`TELEMETRY_DEMO_OTLP`) arrives whole; the C++ one now exports at all.
 - TypeScript: with `[tracing] enabled = false`, a service still passes a
   caller's sampled trace on to the services it calls, rather than starting
   an unsampled one, so a hop without tracing no longer breaks the trace. It

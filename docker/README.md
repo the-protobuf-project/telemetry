@@ -72,7 +72,11 @@ At runtime, the stack uses:
 
 ### Service endpoints via single external port
 
-- Grafana UI: `http://<host>:6009/grafana/`
+- Grafana UI: `http://<host>:6009/grafana/`. The **Distributed Journey**
+  dashboard (`/grafana/d/telemetry-journey`) shows one request across
+  services: its trace, every service's logs for it, a service map, and the
+  metrics around it; `just crosslang` with
+  `TELEMETRY_DEMO_OTLP=<host>:6009` fills it.
 - Loki API: `http://<host>:6009/logs/...`
 - Prometheus: `http://<host>:6009/metrics/...`
 - Tempo HTTP API: `http://<host>:6009/traces/...`

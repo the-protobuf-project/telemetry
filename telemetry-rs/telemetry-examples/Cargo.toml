@@ -8,7 +8,7 @@ description = "Runnable demos for Telemetry — OTLP to localhost:6009 (gRPC)"
 [dependencies]
 telemetry = { package = "telemetry-rs", path = "../telemetry" }
 anyhow.workspace = true
-tokio.workspace = true
+tokio = { workspace = true, features = ["signal"] }
 serde.workspace = true
 chrono.workspace = true
 serde_json.workspace = true
@@ -17,8 +17,8 @@ opentelemetry_sdk.workspace = true
 # Upstream exporters alone, for the otel_baseline comparison.
 opentelemetry-otlp.workspace = true
 # The crosslang service: an HTTP server and client (both already in the tree).
-axum = { version = "0.8", default-features = false, features = ["tokio", "http1", "json"] }
-reqwest = { version = "0.13", default-features = false, features = ["json"] }
+axum = { version = "0.8", default-features = false, features = ["tokio", "http1", "json", "query"] }
+reqwest = { version = "0.13", default-features = false, features = ["json", "query"] }
 
 [[bin]]
 name = "logging"

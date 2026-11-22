@@ -1,12 +1,14 @@
 // W3C trace-context propagation: a trace a Go, Rust or Python service sent in
 // its headers continues here, and goes on to the next service.
 #include "telemetry/context.hpp"
+#include "telemetry/tracing/propagation.hpp"
 #include "telemetry/tracing/tracer.hpp"
 
 #include <catch2/catch_test_macros.hpp>
 
 #include <map>
 #include <string>
+#include <string_view>
 
 using telemetry::ServiceOptions;
 using telemetry::tracing::SpanKind;
@@ -97,4 +99,36 @@ TEST_CASE("baggage set on a span reaches the spans under it and the next service
         CHECK(tracer.extract(headers).baggage.at("tenant") == "acme");
     }
     CHECK(tracer.start_span("after").baggage().empty());
+}
+
+TEST_CASE("a server scope continues the caller's trace and a client scope hands it on") {
+    Tracer tracer(service());
+    // As gRPC's client_metadata() iterates: a multimap of string views.
+    const std::string name = "traceparent";
+    std::multimap<std::string_view, std::string_view> metadata{{name, kTraceparent}};
+
+    std::map<std::string, std::string> outgoing;
+    std::string server_span;
+    {
+        telemetry::tracing::ServerScope server(tracer, "orders.Orders/Place", metadata);
+        server_span = server.span().span_id();
+        CHECK(server.span().trace_id() == "4bf92f3577b34da6a3ce929d0e0e4736");
+        CHECK(server.span().parent_span_id() == "00f067aa0ba902b7");
+        CHECK(telemetry::current_trace_context().span_id == server_span);  // logs inside join it
+
+        telemetry::tracing::ClientScope client(
+            tracer, "billing.Billing/Charge",
+            [&](const std::string& k, const std::string& v) { outgoing.emplace(k, v); });
+        CHECK(client.span().parent_span_id() == server_span);
+        CHECK(outgoing.at("traceparent") ==
+              "00-4bf92f3577b34da6a3ce929d0e0e4736-" + client.span().span_id() + "-01");
+    }
+    CHECK_FALSE(telemetry::current_trace_context().valid());
+}
+
+TEST_CASE("a server scope without a caller's trace starts one") {
+    Tracer tracer(service());
+    telemetry::tracing::ServerScope server(tracer, "GET", std::map<std::string, std::string>{});
+    CHECK(server.span().trace_id().size() == 32);
+    CHECK(server.span().parent_span_id().empty());
 }

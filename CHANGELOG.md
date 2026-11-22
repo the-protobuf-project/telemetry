@@ -48,6 +48,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   and hyper clients, with spans named and attributed per the semantic
   conventions. `propagation::headers()` gives the current trace's headers for
   other clients such as reqwest.
+- C++: `telemetry/tracing/propagation.hpp`, with `ServerScope` and
+  `ClientScope`: one scope per request continues a caller's trace from any
+  library's headers (gRPC `client_metadata()`, cpp-httplib, a map), or
+  carries the current one on through a setter (`grpc::ClientContext::AddMetadata`,
+  cpp-httplib's `Headers`). Header-only; the SDK takes no HTTP or gRPC
+  dependency.
 
 ### Changed
 

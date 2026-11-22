@@ -317,8 +317,47 @@ auto parent = tracer.extract(request_headers);
 auto span = tracer.start_span("billing.charge", parent);
 ```
 
+#### HTTP and gRPC requests
+
+C++ has no single HTTP or gRPC library to hook, and this SDK depends on
+none, so each request takes one scope from `telemetry/tracing/propagation.hpp`
+over the library's own headers:
+
+```cpp
+#include "telemetry/tracing/propagation.hpp"
+
+using telemetry::tracing::ClientScope;
+using telemetry::tracing::ServerScope;
+
+// A gRPC handler: a SERVER span continuing the caller's trace, current until
+// the scope ends, so spans and logs inside join it.
+grpc::Status Place(grpc::ServerContext* context, const PlaceRequest* req, PlaceReply* reply) {
+    ServerScope scope(tracer, "orders.Orders/Place", context->client_metadata());
+    // ...
+}
+
+// A gRPC call: a CLIENT span under the current one, carrying the trace.
+grpc::ClientContext ctx;
+ClientScope call(tracer, "billing.Billing/Charge",
+                 [&](const std::string& k, const std::string& v) { ctx.AddMetadata(k, v); });
+stub->Charge(&ctx, charge, &receipt);
+
+// cpp-httplib, both sides.
+server.Get("/orders", [&](const httplib::Request& req, httplib::Response& res) {
+    ServerScope scope(tracer, "GET /orders", req.headers);
+});
+httplib::Headers headers;
+ClientScope get(tracer, "GET", [&](const std::string& k, const std::string& v) { headers.emplace(k, v); });
+client.Get("/stock", headers);
+```
+
+The headers can be anything iterated as (name, value) pairs whose parts have
+`data()` and `size()`: `std::map`, `std::multimap`, cpp-httplib's `Headers`
+and gRPC's `client_metadata()` among them. Mark a failed request on
+`scope.span()`; the span ends with the scope.
+
 `just crosslang`, from the repository root, sends one trace through Go, Rust,
-Python and C++ and checks it arrives whole.
+Python, C++ and TypeScript and checks it arrives whole.
 
 ## Baggage
 

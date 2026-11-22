@@ -556,7 +556,7 @@ basic_auth_password = ""
 [tracing]
 enabled = true
 sample_ratio = 1.0            # 0.0 to 1.0 (Rust only)
-auto_instrument = true        # carry the trace on HTTP and gRPC requests (TypeScript, Go, Python; Rust uses telemetry::propagation layers)
+auto_instrument = true        # carry the trace on HTTP and gRPC requests (TypeScript, Go, Python; Rust and C++ take one layer or scope per server and client)
 propagate_to = []             # other origins the browser sends trace headers to (TypeScript)
 ```
 

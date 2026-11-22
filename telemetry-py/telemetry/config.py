@@ -109,6 +109,7 @@ _VALIDATORS = [
     Validator("profiling.server_address", default="http://localhost:4040"),
     # Tracing validators
     Validator("tracing.enabled", default=True),
+    Validator("tracing.auto_instrument", default=True),
 ]
 
 _translate_single_underscore_env_vars("TELEMETRY", _VALIDATORS)

@@ -17,6 +17,7 @@ import time
 from collections.abc import Sequence
 from dataclasses import dataclass
 
+from opentelemetry.instrumentation.utils import suppress_instrumentation
 from opentelemetry.sdk._logs import LogRecordProcessor
 from opentelemetry.sdk._logs.export import LogRecordExporter, LogRecordExportResult
 from opentelemetry.sdk.trace import SpanProcessor
@@ -118,7 +119,9 @@ class CountingSpanExporter(SpanExporter):
         self._counters = counters
 
     def export(self, spans: Sequence) -> SpanExportResult:
-        result = self._inner.export(spans)
+        # The export's own HTTP or gRPC request is not traced.
+        with suppress_instrumentation():
+            result = self._inner.export(spans)
         self._counters.add_result(len(spans), result == SpanExportResult.SUCCESS)
         return result
 
@@ -137,7 +140,8 @@ class CountingLogExporter(LogRecordExporter):
         self._counters = counters
 
     def export(self, batch: Sequence) -> LogRecordExportResult:
-        result = self._inner.export(batch)
+        with suppress_instrumentation():
+            result = self._inner.export(batch)
         self._counters.add_result(len(batch), result == LogRecordExportResult.SUCCESS)
         return result
 

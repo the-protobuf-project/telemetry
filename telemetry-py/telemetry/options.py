@@ -192,9 +192,14 @@ class TracingOptions:
 
     Attributes:
         enabled: Whether distributed tracing is enabled.
+        auto_instrument: Whether the HTTP and gRPC clients and servers carry
+            the trace on every request (requests, httpx, urllib, urllib3,
+            aiohttp, gRPC); web apps take ``Telemetry.asgi_middleware`` or
+            ``wsgi_middleware``.
     """
 
     enabled: bool = True
+    auto_instrument: bool = True
 
 
 @dataclass
@@ -395,6 +400,7 @@ def from_config(
     # Tracing configuration
     tracing_opts = TracingOptions(
         enabled=cfg.get("tracing.enabled", True),
+        auto_instrument=cfg.get("tracing.auto_instrument", True),
     )
 
     # Foxglove/MCAP configuration

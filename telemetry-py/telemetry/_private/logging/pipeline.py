@@ -20,6 +20,7 @@ from collections import deque
 
 from opentelemetry import context as otel_context
 from opentelemetry import trace
+from opentelemetry.instrumentation.utils import suppress_instrumentation
 from opentelemetry.sdk._logs import LogRecordProcessor
 from opentelemetry.sdk.util.instrumentation import InstrumentationScope
 
@@ -176,9 +177,11 @@ class LogPipeline(LogRecordProcessor):
                 batch = self._ready.popleft()
             ok = False
             try:
-                ok = client(
-                    otlp_wire.encode_log_tuples(self._resource, self._scope, batch)
-                )
+                # The export's own HTTP request is not traced.
+                with suppress_instrumentation():
+                    ok = client(
+                        otlp_wire.encode_log_tuples(self._resource, self._scope, batch)
+                    )
             except (
                 Exception
             ):  # an export that raised failed; the records are counted so

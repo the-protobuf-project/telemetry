@@ -556,7 +556,7 @@ basic_auth_password = ""
 [tracing]
 enabled = true
 sample_ratio = 1.0            # 0.0 to 1.0 (Rust only)
-auto_instrument = true        # carry the trace on HTTP and gRPC requests (TypeScript, Go)
+auto_instrument = true        # carry the trace on HTTP and gRPC requests (TypeScript, Go, Python)
 propagate_to = []             # other origins the browser sends trace headers to (TypeScript)
 ```
 
@@ -646,7 +646,7 @@ Key-value pairs added to all telemetry signals. Useful for:
 |--------|------|---------|-------------|
 | `enabled` | bool | `true` | Enable tracing |
 | `sample_ratio` | float | `1.0` | Sampling ratio (Rust only) |
-| `auto_instrument` | bool | `true` | Carry the trace across services on HTTP and gRPC requests. TypeScript: every HTTP, fetch and gRPC request made or answered. Go: `http.DefaultClient`; servers, other clients and gRPC use the `HTTPHandler`, `HTTPTransport` and `GRPC*Options` helpers |
+| `auto_instrument` | bool | `true` | Carry the trace across services on HTTP and gRPC requests. TypeScript: every HTTP, fetch and gRPC request made or answered. Go: `http.DefaultClient`; servers, other clients and gRPC use the `HTTPHandler`, `HTTPTransport` and `GRPC*Options` helpers. Python: `requests`, `httpx`, `urllib`, `urllib3`, `aiohttp` and gRPC; web apps use `asgi_middleware` / `wsgi_middleware` |
 | `propagate_to` | list of strings | `[]` | URL prefixes of other origins that browser `fetch` and XHR send trace headers to; same-origin requests always carry them (TypeScript) |
 
 ---

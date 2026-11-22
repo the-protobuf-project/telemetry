@@ -311,6 +311,51 @@ async fn process_request(request_id: String) -> Result<String> {
 }
 ```
 
+### Across services: HTTP and gRPC
+
+A trace crosses a request when the caller sends the W3C `traceparent`
+header and the callee continues it. Every SDK here does both, so a trace
+started in Go, Python, C++ or TypeScript continues through Rust services and
+back. Rust cannot patch a library at run time, so each server and client
+takes one layer. axum, hyper and tonic all go through tower, so the same two
+layers cover HTTP and gRPC:
+
+```rust,ignore
+use telemetry::propagation::{ClientLayer, ServerLayer};
+
+// Servers: each request runs in a SERVER span that continues the caller's trace.
+let app = router.layer(ServerLayer::new()); // axum
+tonic::transport::Server::builder()
+    .layer(ServerLayer::new())
+    .add_service(orders)
+    .serve(addr)
+    .await?;
+
+// Clients: each request is a CLIENT span and carries the trace.
+let channel = tower::ServiceBuilder::new()
+    .layer(ClientLayer::new())
+    .service(channel); // a tonic channel or a hyper client
+
+// Anything else, such as reqwest: send the current trace's headers.
+reqwest_client
+    .get(url)
+    .headers(telemetry::propagation::headers())
+    .send()
+    .await?;
+```
+
+- **Inside a handler, the server span is the current context.** Spans,
+  `#[instrument]` functions, log records and requests made there all join
+  the caller's trace.
+- **Spans are named as the semantic conventions say.** gRPC spans are named
+  `package.Service/Method`, with the `rpc.*` attributes and the gRPC status.
+  HTTP spans are named by method, with `http.*` and `url.*` attributes.
+- **A span ends when the response headers arrive.** A streamed body is not
+  part of it.
+- **A layer built before `Telemetry` still traces.** The layers look up the
+  global tracer on each request.
+- **With tracing off, the layers still pass a caller's trace on.**
+
 ## Examples
 
 ```bash

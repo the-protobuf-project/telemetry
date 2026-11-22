@@ -42,6 +42,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   continue it in web apps. `with_auto_instrumentation(False)` or
   `[tracing] auto_instrument = false` turns it off. The SDK's own exports are
   never traced.
+- Rust: trace propagation over HTTP and gRPC with tower layers.
+  `telemetry::propagation::ServerLayer` continues the caller's trace in axum,
+  hyper and tonic servers, and `ClientLayer` carries it on from tonic channels
+  and hyper clients, with spans named and attributed per the semantic
+  conventions. `propagation::headers()` gives the current trace's headers for
+  other clients such as reqwest.
 
 ### Changed
 

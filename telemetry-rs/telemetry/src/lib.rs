@@ -35,6 +35,7 @@ pub mod logging;
 pub mod metrics;
 pub mod options;
 pub mod profiling;
+pub mod propagation;
 pub mod telemetry;
 pub mod tracing;
 pub mod traits;

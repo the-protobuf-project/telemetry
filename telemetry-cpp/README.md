@@ -356,8 +356,9 @@ The headers can be anything iterated as (name, value) pairs whose parts have
 and gRPC's `client_metadata()` among them. Mark a failed request on
 `scope.span()`; the span ends with the scope.
 
-`just crosslang`, from the repository root, sends one trace through Go, Rust,
-Python, C++ and TypeScript and checks it arrives whole.
+`just crosslang`, from the repository root, runs five services, one per SDK,
+calling one another over HTTP, and checks they share one trace; the C++ one
+is `examples/crosslang.cpp`, these scopes over cpp-httplib.
 
 ## Baggage
 

@@ -1,66 +1,72 @@
-//! Service B of the cross-language tracing demo: continues, in Rust, the trace
-//! a Go service started, from the W3C headers it was sent.
+//! The inventory service of the cross-language tracing demo (`just crosslang`):
+//! an axum server behind `ServerLayer`, which continues the trace the caller
+//! sent, calling the next service with reqwest and `propagation::headers()`.
+//! Neither side has an inject or extract of its own.
 //!
-//! ```text
-//! go run ./examples/crosslang | cargo run -q -p telemetry-examples --bin crosslang
-//! ```
-//!
-//! The headers arrive on stdin as a JSON object; in a real service they are
-//! the incoming HTTP headers, gRPC metadata or message headers. Set
+//! It listens on a free port and prints `{"listening": <port>}`; GET /hop
+//! answers with this hop's view of the trace, followed by the hops after it
+//! (`CROSSLANG_NEXT`, a URL, when there is one). Set
 //! `TELEMETRY_DEMO_OTLP=localhost:4317` to export the spans to a collector.
-use std::collections::HashMap;
-use std::io::Read;
 
-use opentelemetry::trace::TracerProvider as _;
+use axum::Router;
+use axum::http::HeaderMap;
+use axum::routing::get;
+use opentelemetry::Context;
+use opentelemetry::trace::{TraceContextExt, TracerProvider as _};
 use opentelemetry_sdk::trace::SdkTracerProvider;
-use telemetry::tracing::{SpanKind, TelemetryTracing};
+use serde_json::{Value, json};
+use telemetry::propagation::{ServerLayer, headers};
+
+async fn hop(incoming: HeaderMap) -> axum::Json<Value> {
+    let cx = Context::current();
+    let span = cx.span();
+    let mut hops = vec![json!({
+        "service": "inventory-rs",
+        "received_traceparent": incoming.get("traceparent").and_then(|v| v.to_str().ok()),
+        "trace_id": span.span_context().trace_id().to_string(),
+        "span_id": span.span_context().span_id().to_string(),
+    })];
+    if let Ok(next) = std::env::var("CROSSLANG_NEXT") {
+        // The current context is this request's server span: the next
+        // service continues it.
+        let downstream: Vec<Value> = reqwest::Client::new()
+            .get(format!("{next}/hop"))
+            .headers(headers())
+            .send()
+            .await
+            .and_then(|r| r.error_for_status())
+            .expect("the next service answered")
+            .json()
+            .await
+            .expect("the next service's hops");
+        hops.extend(downstream);
+    }
+    axum::Json(Value::Array(hops))
+}
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
-    let mut input = String::new();
-    std::io::stdin().read_to_string(&mut input)?;
-    let headers: HashMap<String, String> = serde_json::from_str(&input)?;
-
     let mut builder = telemetry::Telemetry::builder("inventory-rs", "1.0.0").with_tracing();
-    if let Some((host, port)) = std::env::var("TELEMETRY_DEMO_OTLP").ok().and_then(|ep| {
+    let otlp = std::env::var("TELEMETRY_DEMO_OTLP").ok().and_then(|ep| {
         ep.rsplit_once(':')
             .map(|(h, p)| (h.to_string(), p.parse().unwrap_or(4317)))
-    }) {
+    });
+    if let Some((host, port)) = otlp.clone() {
         builder = builder.with_otlp(host, port);
     }
-    let telemetry = builder.build()?;
+    let _telemetry = builder.build()?;
 
-    // Without a collector the SDK has no tracer; use a local one so the
-    // spans still get real ids to compare.
-    let local;
-    let tracing = match telemetry.tracing.as_ref().filter(|t| t.is_enabled()) {
-        Some(t) => t,
-        None => {
-            local = TelemetryTracing::new(Some(
-                SdkTracerProvider::builder().build().tracer("inventory-rs"),
-            ));
-            &local
-        }
+    // Exporting, the layer uses the global tracer Telemetry installs; without
+    // a collector, a local one, so the spans still get ids of their own.
+    let layer = if otlp.is_some() {
+        ServerLayer::new()
+    } else {
+        ServerLayer::with_tracer(SdkTracerProvider::builder().build().tracer("inventory-rs"))
     };
+    let app = Router::new().route("/hop", get(hop)).layer(layer);
 
-    // The one call that joins the caller's trace.
-    let parent = tracing.extract(&headers);
-    let mut span = tracing.start_span_with("inventory.reserve", SpanKind::Server, Some(&parent));
-    span.set_attribute("order.id", "o-42");
-
-    // And the next hop continues it in turn.
-    let mut downstream = HashMap::new();
-    tracing.inject(&span, &mut downstream);
-
-    println!(
-        "{}",
-        serde_json::json!({
-            "received_traceparent": headers.get("traceparent"),
-            "trace_id": span.trace_id(),
-            "span_id": span.span_id(),
-            "downstream_traceparent": downstream.get("traceparent"),
-        })
-    );
-    span.end();
+    let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await?;
+    println!("{}", json!({"listening": listener.local_addr()?.port()}));
+    axum::serve(listener, app).await?;
     Ok(())
 }

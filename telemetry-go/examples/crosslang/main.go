@@ -1,14 +1,12 @@
-// Service A of the cross-language tracing demo: a Go service starts a trace
-// and sends it to service B — written in Rust, Python or anything else that
-// speaks W3C Trace Context — in the headers of its request.
+// The orders service of the cross-language tracing demo (`just crosslang`):
+// it starts a trace and calls the next service with http.DefaultClient,
+// which Build instruments to carry the trace on. There is no inject of its
+// own: the request leaves with the W3C traceparent, and every service after
+// it, in Rust, Python, C++ and TypeScript, continues the same trace.
 //
-// Here the "request" is stdout, so the demo needs no network:
-//
-//	go run ./examples/crosslang | cargo run -q -p telemetry-examples --bin crosslang
-//
-// In a real service the same map goes on the HTTP request, gRPC metadata or
-// message headers. Set TELEMETRY_DEMO_OTLP=localhost:4317 on both sides to
-// export the spans and see one trace spanning both services in Grafana Tempo.
+// CROSSLANG_NEXT is the next service's URL; the program prints this
+// service's trace and every hop's view of it, as JSON. Set
+// TELEMETRY_DEMO_OTLP=localhost:4317 to export the spans to a collector.
 package main
 
 import (
@@ -17,13 +15,23 @@ import (
 	"fmt"
 	"log/slog"
 	"net"
+	"net/http"
 	"os"
 	"strconv"
+
+	"go.opentelemetry.io/otel/trace"
 
 	telemetry "github.com/the-protobuf-project/telemetry/telemetry-go"
 )
 
 func main() {
+	if err := run(); err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		os.Exit(1)
+	}
+}
+
+func run() error {
 	b := telemetry.New().
 		WithService("orders-go", "1.0.0").
 		WithLogHandler(slog.NewTextHandler(os.Stderr, nil))
@@ -36,21 +44,35 @@ func main() {
 	}
 	tel, err := b.Build()
 	if err != nil {
-		fmt.Fprintln(os.Stderr, err)
-		os.Exit(1)
+		return err
 	}
 	defer func() { _ = tel.Close() }()
 
 	ctx, span := tel.Tracing.StartSpan(context.Background(), "checkout",
-		telemetry.WithSpanKind(telemetry.SpanKindClient),
 		telemetry.WithSpanAttributes(map[string]any{"order.id": "o-42"}))
 	defer span.End()
 
-	// Everything service B needs to continue the trace: traceparent,
-	// tracestate and baggage.
-	headers := map[string]string{}
-	tel.Tracing.Inject(ctx, headers)
-
-	tel.Slog().InfoContext(ctx, "calling inventory service", "traceparent", headers["traceparent"])
-	_ = json.NewEncoder(os.Stdout).Encode(headers)
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, os.Getenv("CROSSLANG_NEXT")+"/hop", nil)
+	if err != nil {
+		return err
+	}
+	res, err := http.DefaultClient.Do(req) // carries the trace: no inject here
+	if err != nil {
+		return err
+	}
+	defer func() { _ = res.Body.Close() }()
+	if res.StatusCode != http.StatusOK {
+		return fmt.Errorf("the next service answered %s", res.Status)
+	}
+	var hops []map[string]any
+	if err := json.NewDecoder(res.Body).Decode(&hops); err != nil {
+		return err
+	}
+	sc := trace.SpanContextFromContext(ctx)
+	return json.NewEncoder(os.Stdout).Encode(map[string]any{
+		"service":  "orders-go",
+		"trace_id": sc.TraceID().String(),
+		"span_id":  sc.SpanID().String(),
+		"hops":     hops,
+	})
 }

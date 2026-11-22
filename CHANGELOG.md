@@ -57,6 +57,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- `just crosslang` runs five services, one per SDK, that call one another
+  over HTTP (`tests/crosslang.py`), instead of passing headers along a pipe.
+  None has tracing code at its calls: each SDK's own propagation carries the
+  trace, and the run fails unless every service's span is in one trace, each
+  received a `traceparent` from it, and each made a span of its own. The C++
+  example uses cpp-httplib, a dev dependency.
 - TypeScript: with `[tracing] enabled = false`, a service still passes a
   caller's sampled trace on to the services it calls, rather than starting
   an unsampled one, so a hop without tracing no longer breaks the trace. It

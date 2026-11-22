@@ -1,7 +1,7 @@
 # Every task in the repository, one place: `just` lists them.
 #
 #   just test                 test all five SDKs
-#   just crosslang            one trace through Go, Rust, Python, C++ and TypeScript
+#   just crosslang            one trace through Go, Rust, Python, C++ and TypeScript, over HTTP
 #   just bench                every SDK, 1M records per signal, OTLP and MCAP
 #   just set-version 1.3.0    stamp one version into every SDK
 #
@@ -65,60 +65,14 @@ fmt:
 
 # Tracing across languages
 
-# One trace through five services, one per SDK, handed on in W3C headers:
-# orders (Go) → inventory (Rust) → billing (Python) → shipping (C++) →
-# notify (TypeScript). Fails if any hop starts a new trace. The Python, C++
-# and TypeScript hops run when uv / bazel / npm are installed.
-[doc('One trace through Go, Rust, Python, C++ and TypeScript; fails if a hop starts a new trace')]
+# Five services, one per SDK, calling one another over HTTP: orders (Go) →
+# inventory (Rust) → billing (Python) → shipping (C++) → notify (TypeScript),
+# none with tracing code at its calls. Fails unless all five spans share one
+# trace. The Python, C++ and TypeScript services run when uv / bazel / npm
+# are installed. See tests/crosslang.py.
+[doc('Five services, one per SDK, over HTTP; fails unless they share one trace')]
 crosslang:
-    #!/usr/bin/env bash
-    set -euo pipefail
-    field() { sed -E "s/.*\"$2\":\"([^\"]*)\".*/\1/" <<<"$1"; }
-
-    go_out="$(cd telemetry-go && go run ./examples/crosslang 2>/dev/null)"
-    trace="$(sed -E 's/.*"traceparent":"00-([0-9a-f]{32})-.*/\1/' <<<"$go_out")"
-    go_span="$(sed -E 's/.*"traceparent":"00-[0-9a-f]{32}-([0-9a-f]{16})-.*/\1/' <<<"$go_out")"
-    printf '%-24s trace %s  span %s\n' "go     (orders-go)" "$trace" "$go_span"
-    next="$(sed -E 's/.*"traceparent":"([^"]*)".*/\1/' <<<"$go_out")"
-    broken=0
-
-    hop() { # name, result json
-      local name="$1" out="$2" got parent
-      got="$(field "$out" trace_id)"
-      parent="$(sed -E 's/^00-[0-9a-f]{32}-([0-9a-f]{16})-.*/\1/' <<<"$(field "$out" received_traceparent)")"
-      printf '%-24s trace %s  span %s  parent %s\n' "$name" "$got" "$(field "$out" span_id)" "$parent"
-      [[ "$got" == "$trace" ]] || broken=1
-      next="$(field "$out" downstream_traceparent)"
-    }
-
-    rust_out="$(cd telemetry-rs && printf '{"traceparent":"%s","baggage":"tenant=acme"}' "$next" \
-      | cargo run -q -p telemetry-examples --bin crosslang 2>/dev/null | grep '"received_traceparent"' | tail -1)"
-    hop "rust   (inventory-rs)" "$rust_out"
-
-    if command -v uv >/dev/null; then
-      py_out="$(cd telemetry-py && printf '{"traceparent":"%s"}' "$next" \
-        | uv run -q python examples/crosslang.py 2>/dev/null | grep '"received_traceparent"' | tail -1)"
-      hop "python (billing-py)" "$py_out"
-    fi
-
-    if command -v bazel >/dev/null; then
-      cpp_out="$(cd telemetry-cpp && bazel build --noshow_progress --ui_event_filters=-info //examples:crosslang >/dev/null 2>&1 \
-        && printf '{"traceparent":"%s"}' "$next" | bazel-bin/examples/crosslang 2>/dev/null | grep '"received_traceparent"' | tail -1)"
-      hop "c++    (shipping-cpp)" "$cpp_out"
-    fi
-
-    if command -v npm >/dev/null; then
-      ts_out="$(cd telemetry-ts && { [[ -d node_modules ]] || npm ci --silent >/dev/null 2>&1; } && npm run -s build >/dev/null 2>&1 \
-        && printf '{"traceparent":"%s"}' "$next" | node examples/crosslang.ts 2>/dev/null | grep '"received_traceparent"' | tail -1)"
-      hop "ts     (notify-ts)" "$ts_out"
-    fi
-
-    if [[ -n "$trace" && "$broken" == 0 ]]; then
-      echo "OK: one trace across every service"
-    else
-      echo "BROKEN: a hop started a new trace" >&2
-      exit 1
-    fi
+    python3 tests/crosslang.py
 
 # Load and benchmarks
 

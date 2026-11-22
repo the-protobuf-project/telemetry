@@ -16,6 +16,9 @@ opentelemetry.workspace = true
 opentelemetry_sdk.workspace = true
 # Upstream exporters alone, for the otel_baseline comparison.
 opentelemetry-otlp.workspace = true
+# The crosslang service: an HTTP server and client (both already in the tree).
+axum = { version = "0.8", default-features = false, features = ["tokio", "http1", "json"] }
+reqwest = { version = "0.13", default-features = false, features = ["json"] }
 
 [[bin]]
 name = "logging"

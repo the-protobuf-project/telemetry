@@ -1,4 +1,7 @@
-/** Node: config files, AsyncLocalStorage context, OTLP over gRPC or HTTP, MCAP and Pyroscope. */
+/**
+ * Node: config files, AsyncLocalStorage context, OTLP over gRPC or HTTP,
+ * HTTP, fetch and gRPC instrumentation, MCAP and Pyroscope.
+ */
 
 import { createRequire } from "node:module";
 import { Metadata } from "@grpc/grpc-js";
@@ -13,6 +16,7 @@ import type { OtlpOptions, ProfilingOptions, ServiceOptions } from "../core/opti
 import { type Exporters, otlpHeaders, otlpUrl, type Platform } from "../core/platform.ts";
 import { environment, loadConfig } from "./config.ts";
 import { caller, writeConsole } from "./console.ts";
+import { instrument } from "./instrument.ts";
 import { McapRecorder } from "./mcap.ts";
 
 function exporters(otlp: OtlpOptions, timeoutMillis: number): Exporters {
@@ -91,4 +95,5 @@ export const nodePlatform: Platform = {
   recorder: (path, service) => new McapRecorder(path, service, warn),
   startProfiling,
   warn,
+  instrument,
 };

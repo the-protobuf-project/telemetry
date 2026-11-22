@@ -18,11 +18,13 @@ import {
   W3CBaggagePropagator,
   W3CTraceContextPropagator,
 } from "@opentelemetry/core";
+import type { Instrumentation } from "@opentelemetry/instrumentation";
 import { type Resource, resourceFromAttributes } from "@opentelemetry/resources";
 import { LoggerProvider, type ReadWriteLogRecord } from "@opentelemetry/sdk-logs";
 import { MeterProvider, PeriodicExportingMetricReader } from "@opentelemetry/sdk-metrics";
 import {
   AlwaysOffSampler,
+  ParentBasedSampler,
   type ReadableSpan,
   type SpanProcessor,
   TracerProvider,
@@ -68,6 +70,7 @@ export class Telemetry {
   readonly #errors = new ExportErrors();
   readonly #recorder: Recorder | undefined;
   readonly #detach: (() => void) | undefined;
+  #uninstrument: (() => void) | undefined;
   #stopProfiling: (() => Promise<void>) | undefined;
   #closing: Promise<Stats> | undefined;
 
@@ -96,7 +99,8 @@ export class Telemetry {
     }
 
     // Tracing: spans are real whenever tracing is on, so ids propagate and
-    // MCAP records them even without a collector.
+    // MCAP records them even without a collector. Off, this service records
+    // nothing but still passes a caller's sampled trace on to the next hop.
     const spanProcessors: SpanProcessor[] = [];
     if (exporters && options.tracing.enabled) {
       const opts = signalExport(options.export, env, "spans");
@@ -109,11 +113,15 @@ export class Telemetry {
       this.#batchers.push(batcher as Batcher<unknown>);
       spanProcessors.push(new BatchedSpanProcessor(batcher));
     }
-    if (this.#recorder) spanProcessors.push(new RecordingSpanProcessor(this.#recorder));
+    if (this.#recorder && options.tracing.enabled) {
+      spanProcessors.push(new RecordingSpanProcessor(this.#recorder));
+    }
     this.#tracerProvider = new TracerProvider({
       resource,
       spanProcessors,
-      ...(!options.tracing.enabled && { sampler: new AlwaysOffSampler() }),
+      ...(!options.tracing.enabled && {
+        sampler: new ParentBasedSampler({ root: new AlwaysOffSampler() }),
+      }),
     });
     const propagator: TextMapPropagator = new CompositePropagator({
       propagators: [new W3CTraceContextPropagator(), new W3CBaggagePropagator()],
@@ -177,6 +185,16 @@ export class Telemetry {
       trace.setGlobalTracerProvider(this.#tracerProvider);
       if (this.#loggerProvider) logs.setGlobalLoggerProvider(this.#loggerProvider);
       if (this.#meterProvider) metrics.setGlobalMeterProvider(this.#meterProvider);
+      // Patching the HTTP and gRPC modules is process-wide too, so only the
+      // instance that owns the globals does it.
+      if (options.tracing.autoInstrument) {
+        this.#uninstrument = platform.instrument({
+          tracerProvider: this.#tracerProvider,
+          meterProvider: this.#meterProvider,
+          tracing: options.tracing,
+          otlp: exporting ? otlp : undefined,
+        });
+      }
     }
 
     if (options.profiling.enabled) {
@@ -229,6 +247,8 @@ export class Telemetry {
 
   async #close(): Promise<Stats> {
     this.#detach?.();
+    this.#uninstrument?.();
+    this.#uninstrument = undefined;
     await this.#stopProfiling?.();
     this.#stopProfiling = undefined;
     await Promise.allSettled([
@@ -383,6 +403,31 @@ export class TelemetryBuilder {
       o.tracing.enabled = true;
       o.otlp.enabled = true;
     });
+  }
+
+  /**
+   * Traces every HTTP, fetch and gRPC request this process makes or
+   * answers, carrying the trace across services; on by default.
+   */
+  withAutoInstrumentation(on = true): this {
+    return this.#edit((o) => (o.tracing.autoInstrument = on));
+  }
+
+  /**
+   * Adds OpenTelemetry instrumentations to the automatic ones, e.g. for a
+   * database client: `withInstrumentations(new PgInstrumentation())`.
+   */
+  withInstrumentations(...instrumentations: Instrumentation[]): this {
+    return this.#edit((o) => o.tracing.instrumentations.push(...instrumentations));
+  }
+
+  /**
+   * Browser: other origins (URL prefixes) that `fetch` and XHR send the
+   * trace headers to. Each must allow `traceparent`, `tracestate` and
+   * `baggage` in its CORS headers.
+   */
+  withPropagateTo(...urls: string[]): this {
+    return this.#edit((o) => o.tracing.propagateTo.push(...urls));
   }
 
   /** The options this builder would build with, without building. */

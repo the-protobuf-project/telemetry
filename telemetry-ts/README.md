@@ -65,6 +65,7 @@ or `/browser` to choose one explicitly.
 | Config | `telemetry.toml` / `.yaml` / `.json`, `.env`, `TELEMETRY_*` | code and `withConfigObject` |
 | OTLP | gRPC (default) or HTTP | HTTP; port 4317 becomes 4318 |
 | Active span follows `await` | yes (AsyncLocalStorage) | synchronous code only; use `logger.withContext(span.context)` |
+| Traced automatically | `http`, `https`, `fetch`, gRPC | `fetch`, XHR |
 | Console | stderr, colored on a terminal | `console.*` |
 | MCAP recording | yes | no |
 | Profiling | Pyroscope (`@pyroscope/nodejs`) | no |
@@ -111,8 +112,9 @@ The builder methods: `withConfig(path)`, `withConfigObject(tree)`,
 `withService`, `description`, `environment`, `withLabel(s)`, `withOtlp(host,
 port)`, `withOtlpEndpoint`, `withOtlpAuth`, `withOtlpHeaders`,
 `withOtlpSecure`, `withOtlpHttp`, `withExport`, `withConsole`, `withMcap`,
-`withProfiling`, `withLogLevel`, `withTracing`. `resolve()` returns the
-options without building.
+`withProfiling`, `withLogLevel`, `withTracing`, `withAutoInstrumentation`,
+`withInstrumentations`, `withPropagateTo`. `resolve()` returns the options
+without building.
 
 ## Logging
 
@@ -126,19 +128,64 @@ else `withLogLevel`, else `logging.level`, else the environment's default
 
 ## Tracing
 
+A trace follows requests on its own. Every HTTP, `fetch` and gRPC request the
+process makes carries the active trace (W3C `traceparent`, `tracestate` and
+`baggage`, which every SDK here reads), and every request it answers
+continues the caller's. So when a Go service calls this one, which calls a
+Python one, all three spans land in one trace, with no tracing code at the
+calls:
+
+```ts
+const tel = Telemetry.builder("inventory", "1.0.0").withOtlpEndpoint("localhost:4317").build();
+
+// This server's span continues the caller's trace; the fetch inside it is a
+// child span, and the next service continues the trace in turn.
+http.createServer(async (req, res) => {
+  await tel.tracing.withSpan("inventory.reserve", async () => {
+    await fetch("http://billing:8080/charge", { method: "POST" });
+  });
+  res.end("ok");
+}).listen(8080);
+```
+
+| Runtime | Traced automatically |
+| --- | --- |
+| Node | `http` and `https` clients and servers, `fetch` (undici), gRPC clients and servers (`@grpc/grpc-js`) |
+| Browser | `fetch` and `XMLHttpRequest` |
+
+- **ESM works.** The official HTTP and gRPC instrumentations patch only what
+  `require` loads, so an ESM program needs a loader flag for them. Here
+  `import http from "node:http"`, `import { request } from "node:http"` and
+  generated gRPC clients are all traced without one.
+- **Build Telemetry before registering gRPC services.** A handler registered
+  earlier is not wrapped. HTTP servers are traced whenever they were created.
+- **Tracing off still passes the trace on.** With `[tracing] enabled = false`
+  this service records nothing, but forwards a caller's sampled trace, so it
+  does not break the trace for the services after it.
+- **The SDK's own exports are not traced.**
+- **The browser sends trace headers to its own origin only**, unless
+  `withPropagateTo("https://api.example.com")` lists others. Each listed
+  origin must allow `traceparent`, `tracestate` and `baggage` in its CORS
+  headers.
+- **Other libraries** take any OpenTelemetry instrumentation:
+  `withInstrumentations(new PgInstrumentation())`.
+- `withAutoInstrumentation(false)` (or `auto_instrument = false`) turns it off.
+
+Transports that are not HTTP or gRPC, such as a message queue or a child
+process, carry the trace by hand:
+
 ```ts
 import { SpanKind } from "@the-protobuf-project/telemetry";
 
-// Server: continue the caller's trace from its headers.
-const parent = tel.tracing.extract(req.headers);
-await tel.tracing.withSpan("inventory.reserve", async () => {
-  // Client: hand the trace on.
-  await fetch(url, { headers: tel.tracing.inject() });
-}, { parent, kind: SpanKind.SERVER });
+// Consumer: continue the producer's trace from the message headers.
+const parent = tel.tracing.extract(message.headers);
+await tel.tracing.withSpan("orders.consume", async () => {
+  // Producer: hand the trace on.
+  queue.publish(next, { headers: tel.tracing.inject() });
+}, { parent, kind: SpanKind.CONSUMER });
 ```
 
-`inject` writes W3C `traceparent`, `tracestate` and `baggage`, which the
-other SDKs read, and `extract` reads them in any letter case.
+`inject` writes the W3C headers and `extract` reads them in any letter case.
 `setBaggage(key, value)` returns a context carrying it, and `baggage(ctx)`
 reads it. `startSpan` returns a span you end yourself. `withSpan` ends it when
 the function returns or its promise settles, and records a throw as the

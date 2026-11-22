@@ -556,6 +556,8 @@ basic_auth_password = ""
 [tracing]
 enabled = true
 sample_ratio = 1.0            # 0.0 to 1.0 (Rust only)
+auto_instrument = true        # trace every HTTP, fetch and gRPC request (TypeScript)
+propagate_to = []             # other origins the browser sends trace headers to (TypeScript)
 ```
 
 ### Configuration Options Reference
@@ -644,6 +646,8 @@ Key-value pairs added to all telemetry signals. Useful for:
 |--------|------|---------|-------------|
 | `enabled` | bool | `true` | Enable tracing |
 | `sample_ratio` | float | `1.0` | Sampling ratio (Rust only) |
+| `auto_instrument` | bool | `true` | Trace every HTTP, fetch and gRPC request made or answered, carrying the trace across services (TypeScript) |
+| `propagate_to` | list of strings | `[]` | URL prefixes of other origins that browser `fetch` and XHR send trace headers to; same-origin requests always carry them (TypeScript) |
 
 ---
 

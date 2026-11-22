@@ -247,16 +247,18 @@ set-version version:
       echo "usage: just set-version X.Y.Z[-prerelease]   (got '{{ version }}')" >&2
       exit 2
     fi
-    # Replace the first match of a line-anchored regex, failing if nothing
-    # matched so a renamed field cannot silently skip a language.
+    # Replace the first match of a line-anchored regex (which may span lines),
+    # failing if nothing matched so a renamed field cannot silently skip a language.
     set_line() {
       local file="$1" pattern="$2" replacement="$3"
-      grep -Eq "$pattern" "$file" || { echo "set-version: no line matching '$pattern' in $file" >&2; exit 1; }
+      perl -0ne "exit(/$pattern/m ? 0 : 1)" "$file" || { echo "set-version: no line matching '$pattern' in $file" >&2; exit 1; }
       perl -0pi -e "s/$pattern/$replacement/m" "$file"
     }
     set_line telemetry-rs/Cargo.toml '^version = "[^"]*"' "version = \"$version\""
     set_line telemetry-rs/Cargo.toml '^(telemetry-derive = \{[^}]*version = )"[^"]*"' "\${1}\"$version\""
     set_line telemetry-py/pyproject.toml '^version = "[^"]*"' "version = \"$version\""
+    # uv.lock's own entry, which uv does not rewrite until it next resolves.
+    set_line telemetry-py/uv.lock '^(name = "telemetry-py"\nversion = )"[^"]*"' "\${1}\"$version\""
     set_line telemetry-cpp/MODULE.bazel '^(    version = )"[^"]*"' "\${1}\"$version\""
     set_line telemetry-cpp/CMakeLists.txt '^(project\(telemetry-cpp VERSION )[0-9.]+' "\${1}${version%%-*}"
     # package.json, and package-lock.json's two copies (its root, then packages[""]).

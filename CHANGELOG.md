@@ -35,6 +35,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   each, with spans and request-duration metrics (otelhttp and otelgrpc).
   `WithAutoInstrumentation(false)` or `[tracing] auto_instrument = false`
   leaves `http.DefaultClient` alone.
+- Python: trace propagation over HTTP and gRPC. Once Telemetry is built,
+  `requests`, `httpx`, `urllib`, `urllib3`, `aiohttp` and gRPC channels and
+  servers (sync and asyncio) carry the trace on every request, each when
+  installed; `tel.asgi_middleware(app)` and `tel.wsgi_middleware(app)`
+  continue it in web apps. `with_auto_instrumentation(False)` or
+  `[tracing] auto_instrument = false` turns it off. The SDK's own exports are
+  never traced.
 
 ### Changed
 
@@ -43,6 +50,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   an unsampled one, so a hop without tracing no longer breaks the trace. It
   records and exports nothing itself.
 - TypeScript: the SDK's own export requests are never traced.
+- Python: `uv.lock` records the package's current version (1.3.3); it had
+  been left at 1.3.0.
 
 - The Go SDK needs Go 1.26.4, as its `go.mod` already said; the README said
   1.25.

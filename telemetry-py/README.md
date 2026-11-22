@@ -263,6 +263,43 @@ with Telemetry.new().build() as p:
         op.step("saving")
 ```
 
+#### Across services: HTTP and gRPC
+
+A trace follows requests on its own. Every request the process makes carries
+the active trace (W3C `traceparent`, `tracestate` and `baggage`, which every
+SDK here reads), so a Go, Rust, C++ or TypeScript service it calls continues
+the same trace:
+
+| Traced automatically once Telemetry is built | Wrap once |
+| --- | --- |
+| `requests`, `httpx`, `urllib`, `urllib3`, `aiohttp` clients; gRPC channels and servers, sync and asyncio | ASGI and WSGI apps (`tel.asgi_middleware(app)`, `tel.wsgi_middleware(app)`) |
+
+```python
+tel = Telemetry.new().with_service("billing", "1.0.0").build()
+
+api = FastAPI()
+
+
+@api.post("/charge")
+async def charge():
+    async with httpx.AsyncClient() as client:  # carries the trace on
+        await client.post("http://ledger:8080/entries")
+
+
+app = tel.asgi_middleware(api)  # serve this: each request continues the caller's trace
+```
+
+- Each library is instrumented only when it is installed. The patches go where
+  every request passes through, so they work however the program imported the
+  library.
+- Requests and calls are measured too (`http.client.request.duration`,
+  `http.server.request.duration`, `rpc.server.duration`).
+- With tracing off, a request still carries a caller's trace on, so this
+  service does not break the trace for the ones after it.
+- The SDK's own exports are not traced.
+- `with_auto_instrumentation(False)` (or `[tracing] auto_instrument = false`)
+  leaves the libraries alone; the middleware works either way.
+
 ## Examples
 
 ```bash

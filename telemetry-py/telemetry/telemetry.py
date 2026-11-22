@@ -2,6 +2,7 @@ import warnings
 
 from ._private.accounting import LOGS, SPANS, SignalStats, loss_report
 from ._private.foxglove import UnifiedMcapWriter
+from ._private.instrument import instrument, uninstrument
 from ._private.logging import TelemetryLogger
 from ._private.metrics import (
     TelemetryMetrics,
@@ -93,6 +94,7 @@ class TelemetryBuilder:
         self._otlp_use_http: bool | None = None
         self._mcap_path: str | None = None
         self._tracing_enabled: bool = False
+        self._auto_instrument: bool | None = None
         self._log_level: LogLevel | None = None
         self._service_from_code: bool = False
 
@@ -229,6 +231,12 @@ class TelemetryBuilder:
         self._tracing_enabled = True
         return self
 
+    def with_auto_instrumentation(self, on: bool = True) -> "TelemetryBuilder":
+        """Whether requests, httpx, urllib, urllib3, aiohttp and gRPC carry
+        the trace on every request; on by default ([tracing] auto_instrument)."""
+        self._auto_instrument = on
+        return self
+
     def build(self) -> "Telemetry":
         """
         Build a Telemetry instance from configuration and builder overrides.
@@ -293,6 +301,9 @@ class TelemetryBuilder:
             telemetry_opts.telemetry.otlp.export = self._export
         if getattr(self, "_console", None) is not None:
             telemetry_opts.telemetry.logging.console = self._console
+
+        if self._auto_instrument is not None:
+            telemetry_opts.telemetry.tracing.auto_instrument = self._auto_instrument
 
         if self._mcap_path:
             telemetry_opts.foxglove.enabled = True
@@ -380,6 +391,31 @@ class Telemetry:
             mcap_writer=self.mcap_writer,
         )
 
+        # Every HTTP and gRPC request carries the trace on (see _private.instrument).
+        if telemetry_opts.telemetry.tracing.auto_instrument:
+            instrument(self)
+
+    def asgi_middleware(self, app):
+        """Wraps an ASGI app (FastAPI, Starlette, Django's ASGI handler, ...)
+        so each request runs in a SERVER span that continues the caller's
+        trace, and is measured (http.server.request.duration).
+
+            app = tel.asgi_middleware(FastAPI())
+        """
+        from opentelemetry.instrumentation.asgi import OpenTelemetryMiddleware
+
+        return OpenTelemetryMiddleware(app)
+
+    def wsgi_middleware(self, app):
+        """Wraps a WSGI app (Flask, Django's WSGI handler, ...) as
+        ``asgi_middleware`` does an ASGI one.
+
+            app.wsgi_app = tel.wsgi_middleware(app.wsgi_app)  # Flask
+        """
+        from opentelemetry.instrumentation.wsgi import OpenTelemetryMiddleware
+
+        return OpenTelemetryMiddleware(app)
+
     def __enter__(self):
         """
         Enter the telemetry context and make this instance current for telemetry and metrics operations.
@@ -405,6 +441,7 @@ class Telemetry:
 
     def close(self):
         """Close all Telemetry components and flush pending data"""
+        uninstrument(self)
         # Close components in order
         if self._profiling:
             stop_profiling()

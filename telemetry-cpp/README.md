@@ -36,7 +36,8 @@ an OpenTelemetry collector, to an MCAP file for Foxglove Studio, or both.
   of each call; a record written inside a span carries its trace and span id.
 - **Metrics**: counters, histograms and gauges, safe to record from any thread.
 - **Distributed tracing** with W3C `traceparent` propagation, so one trace runs
-  through services written in Go, Rust, Python and C++.
+  through services written in Go, Rust, Python, C++ and TypeScript;
+  `ServerScope` and `ClientScope` carry it over any HTTP or gRPC library.
 - **Baggage**: W3C baggage set on a span reaches every service downstream.
 - **Continuous CPU profiling** to Pyroscope, in process.
 - **Lossless export**: every log record and span is counted; nothing is

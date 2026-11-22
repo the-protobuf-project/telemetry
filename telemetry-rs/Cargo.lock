@@ -2406,7 +2406,7 @@ dependencies = [
 
 [[package]]
 name = "telemetry-derive"
-version = "1.3.3"
+version = "1.4.0"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -2415,7 +2415,7 @@ dependencies = [
 
 [[package]]
 name = "telemetry-examples"
-version = "1.3.3"
+version = "1.4.0"
 dependencies = [
  "anyhow",
  "axum",
@@ -2432,7 +2432,7 @@ dependencies = [
 
 [[package]]
 name = "telemetry-rs"
-version = "1.3.3"
+version = "1.4.0"
 dependencies = [
  "anyhow",
  "axum",

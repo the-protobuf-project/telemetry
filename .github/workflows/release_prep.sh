@@ -43,6 +43,7 @@ cat <<EOF
 | Go       | \`go get github.com/$REPO/telemetry-go@v$VERSION\` |
 | Rust     | \`telemetry-rs = { git = "https://github.com/$REPO", tag = "$TAG" }\` |
 | Python   | \`pip install $url/telemetry_py-$VERSION-py3-none-any.whl\` |
+| TypeScript | \`npm install $url/the-protobuf-project-telemetry-$VERSION.tgz\` |
 | C++      | \`tpp_telemetry.cpp\` on the Bazel Central Registry, or \`$ARCHIVE\` for CMake |
 
 The C++ archive carries SLSA build provenance (\`$ARCHIVE.intoto.jsonl\`):

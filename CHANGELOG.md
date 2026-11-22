@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.4.0] - 2026-11-23
+
 ### Added
 
 - TypeScript SDK (`telemetry-ts`, package `@the-protobuf-project/telemetry`),
@@ -54,7 +56,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   carries the current one on through a setter (`grpc::ClientContext::AddMetadata`,
   cpp-httplib's `Headers`). Header-only; the SDK takes no HTTP or gRPC
   dependency.
-
 - Grafana: a **Distributed Journey** dashboard in both stacks (the image's
   and `telemetry-core`'s). It shows one request across services: totals per
   step, recent checkouts (picking one shows its trace), the trace's waterfall,
@@ -63,6 +64,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **Upgrading: propagation is on by default.** In Go (`http.DefaultClient`)
+  and Python, as in the new TypeScript SDK under Node, outgoing requests now
+  get `traceparent`, `tracestate` and `baggage` headers, whatever host they go
+  to, third parties included. Keep secrets and personal data out of baggage,
+  or set `[tracing] auto_instrument = false`.
+- Python: the OpenTelemetry HTTP and gRPC instrumentation packages are now
+  dependencies.
 - `just crosslang` runs five services, one per SDK, that call one another
   over HTTP (`tests/crosslang.py`), instead of passing headers along a pipe.
   None has tracing code at its calls: each SDK's own propagation carries the
@@ -77,9 +85,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   an unsampled one, so a hop without tracing no longer breaks the trace. It
   records and exports nothing itself.
 - TypeScript: the SDK's own export requests are never traced.
-- Python: `uv.lock` records the package's current version (1.3.3); it had
-  been left at 1.3.0.
-
+- Python: `just set-version` now stamps `uv.lock`, which had been left at
+  1.3.0.
 - The Go SDK needs Go 1.26.4, as its `go.mod` already said; the README said
   1.25.
 - `telemetry-go/bin/protoc-gen-telemetry`, a prebuilt macOS binary, is no
@@ -372,7 +379,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## Release Links
 
-[Unreleased]: https://github.com/the-protobuf-project/telemetry/compare/v1.3.3...HEAD
+[Unreleased]: https://github.com/the-protobuf-project/telemetry/compare/v1.4.0...HEAD
+[1.4.0]: https://github.com/the-protobuf-project/telemetry/releases/tag/v1.4.0
 [1.3.3]: https://github.com/the-protobuf-project/telemetry/releases/tag/v1.3.3
 [1.3.2]: https://github.com/the-protobuf-project/telemetry/releases/tag/v1.3.2
 [1.3.1]: https://github.com/the-protobuf-project/telemetry/releases/tag/v1.3.1

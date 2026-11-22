@@ -3,14 +3,14 @@ members = ["telemetry", "telemetry-derive", "telemetry-examples"]
 resolver = "2"
 
 [workspace.package]
-version = "1.3.3"
+version = "1.4.0"
 edition = "2024"
 license = "Apache-2.0"
 repository = "https://github.com/the-protobuf-project/telemetry"
 homepage = "https://github.com/the-protobuf-project/telemetry"
 
 [workspace.dependencies]
-telemetry-derive = { path = "telemetry-derive", version = "1.3.3" }
+telemetry-derive = { path = "telemetry-derive", version = "1.4.0" }
 anyhow = "1.0"
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"

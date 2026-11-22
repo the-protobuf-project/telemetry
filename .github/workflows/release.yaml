@@ -28,6 +28,7 @@ concurrency:
 #           with its directory; a bare v1.3.0 tag versions nothing Go can see)
 #   Rust    the .crate files attached to the GitHub release
 #   Python  the wheel and sdist attached to the GitHub release
+#   TypeScript  the npm tarball attached to the GitHub release
 #   C++     the source archive, built by bazel-contrib's release_ruleset
 #           (release_prep.sh) with SLSA provenance, attached to the GitHub
 #           release and published to the Bazel Central Registry as

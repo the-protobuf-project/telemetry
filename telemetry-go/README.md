@@ -501,6 +501,38 @@ func validateCart(ctx context.Context, p *telemetry.Telemetry) (context.Context,
 }
 ```
 
+#### Across services: HTTP and gRPC
+
+A trace crosses a request when the caller sends the W3C `traceparent`
+header and the callee continues it. Every SDK here does both, so a trace
+started in Go continues through Python, Rust, C++ or TypeScript services and
+back. Go cannot patch packages at run time, so the SDK does what it can reach
+and the rest is one call per server or client:
+
+```go
+// Clients: http.DefaultClient (http.Get, http.Post, and libraries using it)
+// carries the trace already; Build wraps it. Other clients wrap their transport.
+client := &http.Client{Transport: tel.HTTPTransport(nil), Timeout: 5 * time.Second}
+
+// Servers: each request continues the caller's trace in a SERVER span.
+http.ListenAndServe(":8080", tel.HTTPHandler("orders", mux))
+
+// gRPC
+srv := grpc.NewServer(tel.GRPCServerOptions()...)
+conn, err := grpc.NewClient(addr, append(tel.GRPCDialOptions(), creds)...)
+```
+
+Inside a handler, `r.Context()` holds the server span, so spans started from
+it, logs written with it, and requests made with it all join the caller's
+trace. Requests and calls are measured too (`http.server.request.duration`,
+`rpc.server.call.duration` and their client counterparts).
+
+`http.DefaultTransport` itself is left alone, since code that asserts it is an
+`*http.Transport` would break, so a client made with `&http.Client{}` needs
+`HTTPTransport`. `WithAutoInstrumentation(false)` (or `[tracing]
+auto_instrument = false`) leaves `http.DefaultClient` alone; the helpers work
+either way. With tracing off, the helpers still pass a caller's trace on.
+
 #### Distributed Tracing Flow
 
 ```mermaid
@@ -807,6 +839,7 @@ p, err := telemetry.New().
     WithTracing().
     WithProfiling("http://pyroscope:4040").
     WithMCAP("./recordings/session.mcap").
+    WithAutoInstrumentation(true). // http.DefaultClient carries the trace (default)
 
     Build()
 ```

@@ -28,6 +28,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   adds other OpenTelemetry instrumentations, and `withPropagateTo()` (or
   `[tracing] propagate_to`) lists the other origins a browser sends trace
   headers to.
+- Go: trace propagation over HTTP and gRPC. `Build` makes `http.DefaultClient`
+  (so `http.Get`, `http.Post` and libraries using it) carry the trace;
+  `tel.HTTPHandler`, `tel.HTTPTransport`, `tel.GRPCServerOptions` and
+  `tel.GRPCDialOptions` cover servers, other clients and gRPC in one call
+  each, with spans and request-duration metrics (otelhttp and otelgrpc).
+  `WithAutoInstrumentation(false)` or `[tracing] auto_instrument = false`
+  leaves `http.DefaultClient` alone.
 
 ### Changed
 

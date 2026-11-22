@@ -37,6 +37,7 @@ func Default() TelemetryOptions {
 				CallerOffset:    3,
 			},
 		},
+		Tracing: TracingOptions{AutoInstrument: true},
 		Foxglove: FoxgloveOptions{
 			Enabled:  getBoolFromEnvOrDefault("FOXGLOVE_MCAP_ENABLED", false),
 			McapPath: getFromEnvOrDefault("FOXGLOVE_MCAP_PATH", ""),

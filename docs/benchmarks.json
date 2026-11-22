@@ -333,114 +333,6 @@
       "delivered": 1000000
     },
     {
-      "lang": "TypeScript",
-      "signal": "logs",
-      "n": 1000000,
-      "workers": 1,
-      "emit_s": 8.683015375,
-      "close_s": 0.023186374999999315,
-      "dropped_reported": 997440,
-      "mode": "default (drop when full)",
-      "label": "TS drop",
-      "delivered": 2560
-    },
-    {
-      "lang": "TypeScript",
-      "signal": "spans",
-      "n": 1000000,
-      "workers": 1,
-      "emit_s": 0.62341125,
-      "close_s": 0.017122957999999924,
-      "dropped_reported": 997440,
-      "mode": "default (drop when full)",
-      "label": "TS drop",
-      "delivered": 2560
-    },
-    {
-      "lang": "TypeScript",
-      "signal": "metrics",
-      "n": 1000000,
-      "workers": 1,
-      "emit_s": 0.038736958,
-      "close_s": 0.012766208000000006,
-      "dropped_reported": 0,
-      "mode": "default (drop when full)",
-      "label": "TS drop",
-      "delivered": 1000000
-    },
-    {
-      "lang": "TypeScript",
-      "signal": "logs",
-      "n": 1000000,
-      "workers": 1,
-      "emit_s": 7.521778125000001,
-      "close_s": 0.11634320800000023,
-      "dropped_reported": 0,
-      "mode": "Lossless (awaits ready())",
-      "label": "TS lossless",
-      "delivered": 1000000
-    },
-    {
-      "lang": "TypeScript",
-      "signal": "spans",
-      "n": 1000000,
-      "workers": 1,
-      "emit_s": 1.7741080839999999,
-      "close_s": 0.06702237499999979,
-      "dropped_reported": 0,
-      "mode": "Lossless (awaits ready())",
-      "label": "TS lossless",
-      "delivered": 1000000
-    },
-    {
-      "lang": "TypeScript",
-      "signal": "metrics",
-      "n": 1000000,
-      "workers": 1,
-      "emit_s": 0.036892707999999996,
-      "close_s": 0.010453042000000011,
-      "dropped_reported": 0,
-      "mode": "Lossless (awaits ready())",
-      "label": "TS lossless",
-      "delivered": 1000000
-    },
-    {
-      "lang": "TypeScript",
-      "signal": "logs",
-      "n": 1000000,
-      "workers": 1,
-      "emit_s": 6.76670675,
-      "close_s": 0.06879845800000021,
-      "dropped_reported": 0,
-      "mode": "Lossless (awaits ready()), 4 exporters",
-      "label": "TS 4 exporters",
-      "delivered": 1000000
-    },
-    {
-      "lang": "TypeScript",
-      "signal": "spans",
-      "n": 1000000,
-      "workers": 1,
-      "emit_s": 1.7436476669999998,
-      "close_s": 0.05837879199999998,
-      "dropped_reported": 0,
-      "mode": "Lossless (awaits ready()), 4 exporters",
-      "label": "TS 4 exporters",
-      "delivered": 1000000
-    },
-    {
-      "lang": "TypeScript",
-      "signal": "metrics",
-      "n": 1000000,
-      "workers": 1,
-      "emit_s": 0.038556166,
-      "close_s": 0.011386209000000008,
-      "dropped_reported": 0,
-      "mode": "Lossless (awaits ready()), 4 exporters",
-      "label": "TS 4 exporters",
-      "delivered": 1000000
-    },
-    {
       "close_error": null,
       "close_s": 0.00478225,
       "emit_s": 0.590296083,
@@ -583,8 +475,116 @@
       "signal": "logs",
       "n": 1000000,
       "workers": 1,
-      "emit_s": 0.277293042,
-      "close_s": 0.01948345800000004,
+      "emit_s": 6.661566875,
+      "close_s": 0.01986462499999925,
+      "dropped_reported": 997440,
+      "mode": "default (drop when full)",
+      "label": "TS drop",
+      "delivered": 2560
+    },
+    {
+      "lang": "TypeScript",
+      "signal": "spans",
+      "n": 1000000,
+      "workers": 1,
+      "emit_s": 0.57448175,
+      "close_s": 0.01262845900000002,
+      "dropped_reported": 997440,
+      "mode": "default (drop when full)",
+      "label": "TS drop",
+      "delivered": 2560
+    },
+    {
+      "lang": "TypeScript",
+      "signal": "metrics",
+      "n": 1000000,
+      "workers": 1,
+      "emit_s": 0.03572012500000001,
+      "close_s": 0.010642250000000018,
+      "dropped_reported": 0,
+      "mode": "default (drop when full)",
+      "label": "TS drop",
+      "delivered": 1000000
+    },
+    {
+      "lang": "TypeScript",
+      "signal": "logs",
+      "n": 1000000,
+      "workers": 1,
+      "emit_s": 7.0882380419999995,
+      "close_s": 0.10627779100000044,
+      "dropped_reported": 0,
+      "mode": "Lossless (awaits ready())",
+      "label": "TS lossless",
+      "delivered": 1000000
+    },
+    {
+      "lang": "TypeScript",
+      "signal": "spans",
+      "n": 1000000,
+      "workers": 1,
+      "emit_s": 1.656589958,
+      "close_s": 0.06288616700000012,
+      "dropped_reported": 0,
+      "mode": "Lossless (awaits ready())",
+      "label": "TS lossless",
+      "delivered": 1000000
+    },
+    {
+      "lang": "TypeScript",
+      "signal": "metrics",
+      "n": 1000000,
+      "workers": 1,
+      "emit_s": 0.03656012500000001,
+      "close_s": 0.010306333000000023,
+      "dropped_reported": 0,
+      "mode": "Lossless (awaits ready())",
+      "label": "TS lossless",
+      "delivered": 1000000
+    },
+    {
+      "lang": "TypeScript",
+      "signal": "logs",
+      "n": 1000000,
+      "workers": 1,
+      "emit_s": 6.438963084,
+      "close_s": 0.06758024999999998,
+      "dropped_reported": 0,
+      "mode": "Lossless (awaits ready()), 4 exporters",
+      "label": "TS 4 exporters",
+      "delivered": 1000000
+    },
+    {
+      "lang": "TypeScript",
+      "signal": "spans",
+      "n": 1000000,
+      "workers": 1,
+      "emit_s": 1.5968234579999998,
+      "close_s": 0.055908666999999926,
+      "dropped_reported": 0,
+      "mode": "Lossless (awaits ready()), 4 exporters",
+      "label": "TS 4 exporters",
+      "delivered": 1000000
+    },
+    {
+      "lang": "TypeScript",
+      "signal": "metrics",
+      "n": 1000000,
+      "workers": 1,
+      "emit_s": 0.036618708000000014,
+      "close_s": 0.010287875000000014,
+      "dropped_reported": 0,
+      "mode": "Lossless (awaits ready()), 4 exporters",
+      "label": "TS 4 exporters",
+      "delivered": 1000000
+    },
+    {
+      "lang": "TypeScript",
+      "signal": "logs",
+      "n": 1000000,
+      "workers": 1,
+      "emit_s": 0.259194792,
+      "close_s": 0.016510625000000004,
       "mode": "official OpenTelemetry SDK alone (default batch processor)",
       "label": "TypeScript OTel SDK",
       "delivered": 2560
@@ -594,8 +594,8 @@
       "signal": "spans",
       "n": 1000000,
       "workers": 1,
-      "emit_s": 0.525033042,
-      "close_s": 0.012795624999999972,
+      "emit_s": 0.506217917,
+      "close_s": 0.011702707999999916,
       "mode": "official OpenTelemetry SDK alone (default batch processor)",
       "label": "TypeScript OTel SDK",
       "delivered": 2560
@@ -605,8 +605,8 @@
       "signal": "metrics",
       "n": 1000000,
       "workers": 1,
-      "emit_s": 0.04635675,
-      "close_s": 0.029807375000000007,
+      "emit_s": 0.03164241699999999,
+      "close_s": 0.010214875000000007,
       "mode": "official OpenTelemetry SDK alone (default batch processor)",
       "label": "TypeScript OTel SDK",
       "delivered": 1000000
@@ -720,33 +720,33 @@
       "signal": "logs",
       "n": 1000000,
       "workers": 1,
-      "emit_s": 8.143358542,
-      "close_s": 0.5755532500000008,
+      "emit_s": 7.925304540999999,
+      "close_s": 0.5590267919999996,
       "dropped_reported": 0,
       "recorded": 1000000,
-      "size": 276812690
+      "size": 276823619
     },
     {
       "lang": "ts",
       "signal": "spans",
       "n": 1000000,
       "workers": 1,
-      "emit_s": 1.9591702500000001,
-      "close_s": 0.46777779199999986,
+      "emit_s": 1.9627474160000002,
+      "close_s": 0.5884071669999998,
       "dropped_reported": 0,
       "recorded": 1000000,
-      "size": 223914037
+      "size": 223959266
     },
     {
       "lang": "ts",
       "signal": "metrics",
       "n": 1000000,
       "workers": 1,
-      "emit_s": 0.8782842499999999,
-      "close_s": 0.41157012499999995,
+      "emit_s": 0.859988292,
+      "close_s": 0.45819012499999995,
       "dropped_reported": 0,
       "recorded": 1000000,
-      "size": 118887437
+      "size": 118884087
     }
   ],
   "micro": [
@@ -1528,11 +1528,11 @@
       "sdk": "official",
       "exporters": 1,
       "delivered": 1000000,
-      "goodput": 774918.1720700422,
+      "goodput": 807145.6878950298,
       "runs": [
-        774540,
-        774918,
-        780182
+        778652,
+        807146,
+        816005
       ]
     },
     {
@@ -1542,11 +1542,25 @@
       "sdk": "ours",
       "exporters": 4,
       "delivered": 1000000,
-      "goodput": 148479.27252169437,
+      "goodput": 152819.11144841474,
       "runs": [
-        142855,
-        148479,
-        151270
+        151755,
+        152819,
+        153904
+      ]
+    },
+    {
+      "lang": "TypeScript",
+      "signal": "spans",
+      "workers": 1,
+      "sdk": "official",
+      "exporters": 1,
+      "delivered": 1000000,
+      "goodput": 584219.3728976165,
+      "runs": [
+        573962,
+        584219,
+        591228
       ]
     },
     {
@@ -1556,11 +1570,11 @@
       "sdk": "ours",
       "exporters": 4,
       "delivered": 1000000,
-      "goodput": 584148.4029017572,
+      "goodput": 599576.8035826959,
       "runs": [
-        583517,
-        584148,
-        591314
+        598743,
+        599577,
+        608482
       ]
     },
     {
@@ -1570,11 +1584,11 @@
       "sdk": "official",
       "exporters": 1,
       "delivered": 1000000,
-      "goodput": 22019399.09059881,
+      "goodput": 24130812.943922505,
       "runs": [
-        21148150,
-        22019399,
-        23597427
+        23727044,
+        24130813,
+        24174833
       ]
     },
     {
@@ -1584,11 +1598,11 @@
       "sdk": "ours",
       "exporters": 4,
       "delivered": 1000000,
-      "goodput": 20571422.693879224,
+      "goodput": 21066214.18685656,
       "runs": [
-        20454499,
-        20571423,
-        20606855
+        21047499,
+        21066214,
+        21125756
       ]
     }
   ]

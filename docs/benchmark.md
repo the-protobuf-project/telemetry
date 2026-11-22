@@ -89,7 +89,7 @@ xychart-beta
     title "Logs: calls per second vs the official SDK (x)"
     x-axis ["Go", "Rust", "Python", "C++", "TypeScript"]
     y-axis "x official" 0 --> 2.49953
-    bar [0.367814, 0.354085, 2.2723, 1.74523, 0.0319351]
+    bar [0.367814, 0.354085, 2.2723, 1.74523, 0.038909]
 ```
 
 ```mermaid
@@ -97,7 +97,7 @@ xychart-beta
     title "Spans: calls per second vs the official SDK (x)"
     x-axis ["Go", "Rust", "Python", "C++", "TypeScript"]
     y-axis "x official" 0 --> 2.05531
-    bar [0.832922, 0.501093, 1.12133, 1.86846, 0.842194]
+    bar [0.832922, 0.501093, 1.12133, 1.86846, 0.881173]
 ```
 
 ```mermaid
@@ -105,7 +105,7 @@ xychart-beta
     title "Metrics: calls per second vs the official SDK (x)"
     x-axis ["Go", "Rust", "Python", "C++", "TypeScript"]
     y-axis "x official" 0 --> 18.8505
-    bar [5.9622, 2.29042, 17.1368, 2.43313, 1.19671]
+    bar [5.9622, 2.29042, 17.1368, 2.43313, 0.885843]
 ```
 
 | Language | Signal | Official: delivered | Official: rate | This SDK, drop: delivered | rate | Lossless: delivered | rate |
@@ -114,17 +114,17 @@ xychart-beta
 | Rust | logs | 96,809 | 8,495,873/s | 65,528 | 3,008,263/s | 1,000,000 | 689,899/s |
 | Python | logs | 143,383 | 116,530/s | 192,153 | 264,790/s | 1,000,000 | 238,830/s |
 | C++ | logs | 115,003 | 3,193,300/s | 332,800 | 5,573,032/s | — | — |
-| TypeScript | logs | 2,560 | 3,606,293/s | 2,560 | 115,167/s | 1,000,000 | 132,947/s |
+| TypeScript | logs | 2,560 | 3,858,102/s | 2,560 | 150,115/s | 1,000,000 | 141,079/s |
 | Go | spans | 401,408 | 2,182,265/s | 534,016 | 1,817,657/s | 1,000,000 | 461,101/s |
 | Rust | spans | 129,558 | 9,235,110/s | 69,651 | 4,627,644/s | 1,000,000 | 845,932/s |
 | Python | spans | 287,232 | 84,713/s | 1,000,000 | 94,991/s | 1,000,000 | 90,217/s |
 | C++ | spans | 623,026 | 1,040,891/s | 897,247 | 1,944,867/s | — | — |
-| TypeScript | spans | 2,560 | 1,904,642/s | 2,560 | 1,604,078/s | 1,000,000 | 563,664/s |
+| TypeScript | spans | 2,560 | 1,975,434/s | 2,560 | 1,740,699/s | 1,000,000 | 603,650/s |
 | Go | metrics | 1,000,000 | 24,213,710/s | 1,000,000 | 144,366,974/s | 1,000,000 | 222,343,721/s |
 | Rust | metrics | 1,000,000 | 196,397,751/s | 1,000,000 | 449,834,056/s | 1,000,000 | 391,051,338/s |
 | Python | metrics | 1,000,000 | 347,474/s | 1,000,000 | 5,954,602/s | 1,000,000 | 5,905,781/s |
 | C++ | metrics | 1,000,000 | 74,466,402/s | 1,000,000 | 181,186,762/s | — | — |
-| TypeScript | metrics | 1,000,000 | 21,571,832/s | 1,000,000 | 25,815,140/s | 1,000,000 | 27,105,627/s |
+| TypeScript | metrics | 1,000,000 | 31,603,148/s | 1,000,000 | 27,995,423/s | 1,000,000 | 27,352,204/s |
 
 ## Head to head: the official SDKs tuned
 
@@ -138,9 +138,9 @@ each figure is the median of several runs.
 ```mermaid
 xychart-beta
     title "Goodput vs the tuned official SDK, 1 thread (x)"
-    x-axis ["Go logs", "Go metrics", "Go spans", "Rust logs", "Rust metrics", "Rust spans", "Python logs", "Python metrics", "Python spans", "C++ logs", "C++ metrics", "C++ spans", "TypeScript logs", "TypeScript metrics"]
+    x-axis ["Go logs", "Go metrics", "Go spans", "Rust logs", "Rust metrics", "Rust spans", "Python logs", "Python metrics", "Python spans", "C++ logs", "C++ metrics", "C++ spans", "TypeScript logs", "TypeScript metrics", "TypeScript spans"]
     y-axis "x official" 0 --> 31.345
-    bar [1.22427, 7.41918, 1.47672, 2.631, 3.18146, 2.11374, 28.4955, 9.80321, 3.29039, 3.55453, 2.69327, 1.01493, 0.191606, 0.934241]
+    bar [1.22427, 7.41918, 1.47672, 2.631, 3.18146, 2.11374, 28.4955, 9.80321, 3.29039, 3.55453, 2.69327, 1.01493, 0.189333, 0.873001, 1.02629]
 ```
 
 ```mermaid
@@ -165,8 +165,9 @@ xychart-beta
 | C++ | logs | 1 | 1,355,439/s | 4,817,942/s | 1,000,000 / 1,000,000 | **3.55x** |
 | C++ | metrics | 1 | 37,462,128/s | 100,895,447/s | 1,000,000 / 1,000,000 | **2.69x** |
 | C++ | spans | 1 | 2,517,350/s | 2,554,923/s | 1,000,000 / 1,000,000 | **1.01x** |
-| TypeScript | logs | 1 | 774,918/s | 148,479/s | 1,000,000 / 1,000,000 | **0.19x** |
-| TypeScript | metrics | 1 | 22,019,399/s | 20,571,423/s | 1,000,000 / 1,000,000 | **0.93x** |
+| TypeScript | logs | 1 | 807,146/s | 152,819/s | 1,000,000 / 1,000,000 | **0.19x** |
+| TypeScript | metrics | 1 | 24,130,813/s | 21,066,214/s | 1,000,000 / 1,000,000 | **0.87x** |
+| TypeScript | spans | 1 | 584,219/s | 599,577/s | 1,000,000 / 1,000,000 | **1.03x** |
 | Go | logs | 14 | 555,786/s | 1,088,855/s | 1,000,000 / 1,000,000 | **1.96x** |
 | Go | metrics | 14 | 9,171,626/s | 287,500,898/s | 1,000,000 / 1,000,000 | **31.35x** |
 | Go | spans | 14 | 1,011,552/s | 3,192,116/s | 1,000,000 / 1,000,000 | **3.16x** |
@@ -191,17 +192,17 @@ reference-counted pointers that all threads share, in the official SDK and this 
 ```mermaid
 xychart-beta
     title "Logs delivered of 1,000,000 (%)"
-    x-axis ["Go drop", "Go lossless", "Go lossless x14", "Go 4 exporters", "Rust drop", "Rust lossless", "Python drop", "Python lossless", "C++ drop", "TS drop", "TS lossless", "TS 4 exporters", "Go OTel SDK", "Rust OTel SDK", "Python OTel SDK", "C++ OTel SDK", "TypeScript OTel SDK"]
+    x-axis ["Go drop", "Go lossless", "Go lossless x14", "Go 4 exporters", "Rust drop", "Rust lossless", "Python drop", "Python lossless", "C++ drop", "Go OTel SDK", "Rust OTel SDK", "Python OTel SDK", "C++ OTel SDK", "TS drop", "TS lossless", "TS 4 exporters", "TypeScript OTel SDK"]
     y-axis "% delivered" 0 --> 110
-    bar [48.6812, 100, 100, 100, 6.5528, 100, 19.2153, 100, 33.28, 0.256, 100, 100, 25.8286, 9.6809, 14.3383, 11.5003, 0.256]
+    bar [48.6812, 100, 100, 100, 6.5528, 100, 19.2153, 100, 33.28, 25.8286, 9.6809, 14.3383, 11.5003, 0.256, 100, 100, 0.256]
 ```
 
 ```mermaid
 xychart-beta
     title "Logs written per second"
-    x-axis ["Go drop", "Go lossless", "Go lossless x14", "Go 4 exporters", "Rust drop", "Rust lossless", "Python drop", "Python lossless", "C++ drop", "TS drop", "TS lossless", "TS 4 exporters", "Go OTel SDK", "Rust OTel SDK", "Python OTel SDK", "C++ OTel SDK", "TypeScript OTel SDK"]
+    x-axis ["Go drop", "Go lossless", "Go lossless x14", "Go 4 exporters", "Rust drop", "Rust lossless", "Python drop", "Python lossless", "C++ drop", "Go OTel SDK", "Rust OTel SDK", "Python OTel SDK", "C++ OTel SDK", "TS drop", "TS lossless", "TS 4 exporters", "TypeScript OTel SDK"]
     y-axis "thousand / s" 0 --> 9345.46
-    bar [623.101, 312.634, 236.491, 649.714, 3008.26, 689.899, 264.79, 238.83, 5573.03, 115.167, 132.947, 147.782, 1694.07, 8495.87, 116.53, 3193.3, 3606.29]
+    bar [623.101, 312.634, 236.491, 649.714, 3008.26, 689.899, 264.79, 238.83, 5573.03, 1694.07, 8495.87, 116.53, 3193.3, 150.115, 141.079, 155.305, 3858.1]
 ```
 
 ### Spans
@@ -209,17 +210,17 @@ xychart-beta
 ```mermaid
 xychart-beta
     title "Spans delivered of 1,000,000 (%)"
-    x-axis ["Go drop", "Go lossless", "Go lossless x14", "Go 4 exporters", "Rust drop", "Rust lossless", "Python drop", "Python lossless", "C++ drop", "TS drop", "TS lossless", "TS 4 exporters", "Go OTel SDK", "Rust OTel SDK", "Python OTel SDK", "C++ OTel SDK", "TypeScript OTel SDK"]
+    x-axis ["Go drop", "Go lossless", "Go lossless x14", "Go 4 exporters", "Rust drop", "Rust lossless", "Python drop", "Python lossless", "C++ drop", "Go OTel SDK", "Rust OTel SDK", "Python OTel SDK", "C++ OTel SDK", "TS drop", "TS lossless", "TS 4 exporters", "TypeScript OTel SDK"]
     y-axis "% delivered" 0 --> 110
-    bar [53.4016, 100, 100, 100, 6.9651, 100, 100, 100, 89.7247, 0.256, 100, 100, 40.1408, 12.9558, 28.7232, 62.3026, 0.256]
+    bar [53.4016, 100, 100, 100, 6.9651, 100, 100, 100, 89.7247, 40.1408, 12.9558, 28.7232, 62.3026, 0.256, 100, 100, 0.256]
 ```
 
 ```mermaid
 xychart-beta
     title "Spans written per second"
-    x-axis ["Go drop", "Go lossless", "Go lossless x14", "Go 4 exporters", "Rust drop", "Rust lossless", "Python drop", "Python lossless", "C++ drop", "TS drop", "TS lossless", "TS 4 exporters", "Go OTel SDK", "Rust OTel SDK", "Python OTel SDK", "C++ OTel SDK", "TypeScript OTel SDK"]
+    x-axis ["Go drop", "Go lossless", "Go lossless x14", "Go 4 exporters", "Rust drop", "Rust lossless", "Python drop", "Python lossless", "C++ drop", "Go OTel SDK", "Rust OTel SDK", "Python OTel SDK", "C++ OTel SDK", "TS drop", "TS lossless", "TS 4 exporters", "TypeScript OTel SDK"]
     y-axis "thousand / s" 0 --> 10158.6
-    bar [1817.66, 461.101, 767.934, 1315.18, 4627.64, 845.932, 94.9907, 90.2171, 1944.87, 1604.08, 563.664, 573.51, 2182.26, 9235.11, 84.7128, 1040.89, 1904.64]
+    bar [1817.66, 461.101, 767.934, 1315.18, 4627.64, 845.932, 94.9907, 90.2171, 1944.87, 2182.26, 9235.11, 84.7128, 1040.89, 1740.7, 603.65, 626.243, 1975.43]
 ```
 
 ### Metrics
@@ -229,9 +230,9 @@ Every configuration delivers every increment: a counter exports its running tota
 ```mermaid
 xychart-beta
     title "Counter increments per second"
-    x-axis ["Go drop", "Go lossless", "Go lossless x14", "Go 4 exporters", "Rust drop", "Rust lossless", "Python drop", "Python lossless", "C++ drop", "TS drop", "TS lossless", "TS 4 exporters", "Go OTel SDK", "Rust OTel SDK", "Python OTel SDK", "C++ OTel SDK", "TypeScript OTel SDK"]
+    x-axis ["Go drop", "Go lossless", "Go lossless x14", "Go 4 exporters", "Rust drop", "Rust lossless", "Python drop", "Python lossless", "C++ drop", "Go OTel SDK", "Rust OTel SDK", "Python OTel SDK", "C++ OTel SDK", "TS drop", "TS lossless", "TS 4 exporters", "TypeScript OTel SDK"]
     y-axis "million / s" 0 --> 803.897
-    bar [144.367, 222.344, 730.816, 368.805, 449.834, 391.051, 5.9546, 5.90578, 181.187, 25.8151, 27.1056, 25.9362, 24.2137, 196.398, 0.347474, 74.4664, 21.5718]
+    bar [144.367, 222.344, 730.816, 368.805, 449.834, 391.051, 5.9546, 5.90578, 181.187, 24.2137, 196.398, 0.347474, 74.4664, 27.9954, 27.3522, 27.3084, 31.6031]
 ```
 
 ### Logs: speed against delivery
@@ -256,14 +257,14 @@ quadrantChart
     Python drop: [0.606, 0.192]
     Python lossless: [0.595, 0.980]
     C++ drop: [0.937, 0.333]
-    TS drop: [0.515, 0.020]
-    TS lossless: [0.531, 0.980]
-    TS 4 exporters: [0.542, 0.980]
     Go OTel SDK: [0.807, 0.258]
     Rust OTel SDK: [0.980, 0.097]
     Python OTel SDK: [0.517, 0.143]
     C++ OTel SDK: [0.876, 0.115]
-    TypeScript OTel SDK: [0.889, 0.020]
+    TS drop: [0.544, 0.020]
+    TS lossless: [0.537, 0.980]
+    TS 4 exporters: [0.548, 0.980]
+    TypeScript OTel SDK: [0.897, 0.020]
 ```
 
 ### Spans: speed against delivery
@@ -288,14 +289,14 @@ quadrantChart
     Python drop: [0.494, 0.980]
     Python lossless: [0.489, 0.980]
     C++ drop: [0.822, 0.897]
-    TS drop: [0.801, 0.020]
-    TS lossless: [0.688, 0.980]
-    TS 4 exporters: [0.690, 0.980]
     Go OTel SDK: [0.835, 0.401]
     Rust OTel SDK: [0.980, 0.130]
     Python OTel SDK: [0.482, 0.287]
     C++ OTel SDK: [0.754, 0.623]
-    TypeScript OTel SDK: [0.820, 0.020]
+    TS drop: [0.810, 0.020]
+    TS lossless: [0.695, 0.980]
+    TS 4 exporters: [0.699, 0.980]
+    TypeScript OTel SDK: [0.824, 0.020]
 ```
 
 ### Where the records went (default mode)
@@ -326,10 +327,6 @@ C++ drop logs,Delivered,332800
 C++ drop logs,Dropped,667200
 C++ drop spans,Delivered,897247
 C++ drop spans,Dropped,102753
-TS drop logs,Delivered,2560
-TS drop logs,Dropped,997440
-TS drop spans,Delivered,2560
-TS drop spans,Dropped,997440
 Go OTel SDK logs,Delivered,258286
 Go OTel SDK logs,Dropped,741714
 Go OTel SDK spans,Delivered,401408
@@ -346,6 +343,10 @@ C++ OTel SDK logs,Delivered,115003
 C++ OTel SDK logs,Dropped,884997
 C++ OTel SDK spans,Delivered,623026
 C++ OTel SDK spans,Dropped,376974
+TS drop logs,Delivered,2560
+TS drop logs,Dropped,997440
+TS drop spans,Delivered,2560
+TS drop spans,Dropped,997440
 TypeScript OTel SDK logs,Delivered,2560
 TypeScript OTel SDK logs,Dropped,997440
 TypeScript OTel SDK spans,Delivered,2560
@@ -378,15 +379,15 @@ xychart-beta
     title "MCAP records written per second"
     x-axis ["Go logs", "Go spans", "Go metrics", "Rust logs", "Rust spans", "Rust metrics", "Python logs", "Python spans", "Python metrics", "TS logs", "TS spans", "TS metrics"]
     y-axis "thousand / s" 0 --> 2557.32
-    bar [370.952, 833.3, 2324.84, 854.071, 627.361, 1871.95, 158.728, 53.54, 283.569, 122.799, 510.42, 1138.58]
+    bar [370.952, 833.3, 2324.84, 854.071, 627.361, 1871.95, 158.728, 53.54, 283.569, 126.178, 509.49, 1162.81]
 ```
 
 ```mermaid
 xychart-beta
     title "MCAP bytes per record (zstd)"
     x-axis ["Go logs", "Go spans", "Go metrics", "Rust logs", "Rust spans", "Rust metrics", "Python logs", "Python spans", "Python metrics", "TS logs", "TS spans", "TS metrics"]
-    y-axis "bytes" 0 --> 304.494
-    bar [28.5632, 58.8707, 18.8336, 28.7148, 58.3581, 18.9806, 28.9151, 58.8279, 23.7279, 276.813, 223.914, 118.887]
+    y-axis "bytes" 0 --> 304.506
+    bar [28.5632, 58.8707, 18.8336, 28.7148, 58.3581, 18.9806, 28.9151, 58.8279, 23.7279, 276.824, 223.959, 118.884]
 ```
 
 ### Go: cost of one call
@@ -430,15 +431,6 @@ xychart-beta
 | C++ | default (drop when full) | logs | 332,800 | 66.7% | 5,573,032/s | 179 ns | 0.00 s |
 | C++ | default (drop when full) | spans | 897,247 | 10.3% | 1,944,867/s | 514 ns | 0.00 s |
 | C++ | default (drop when full) | metrics | 1,000,000 | 0.0% | 181,186,762/s | 6 ns | 0.00 s |
-| TypeScript | default (drop when full) | logs | 2,560 | 99.7% | 115,167/s | 8,683 ns | 0.02 s |
-| TypeScript | default (drop when full) | spans | 2,560 | 99.7% | 1,604,078/s | 623 ns | 0.02 s |
-| TypeScript | default (drop when full) | metrics | 1,000,000 | 0.0% | 25,815,140/s | 39 ns | 0.01 s |
-| TypeScript | Lossless (awaits ready()) | logs | 1,000,000 | 0.0% | 132,947/s | 7,522 ns | 0.12 s |
-| TypeScript | Lossless (awaits ready()) | spans | 1,000,000 | 0.0% | 563,664/s | 1,774 ns | 0.07 s |
-| TypeScript | Lossless (awaits ready()) | metrics | 1,000,000 | 0.0% | 27,105,627/s | 37 ns | 0.01 s |
-| TypeScript | Lossless (awaits ready()), 4 exporters | logs | 1,000,000 | 0.0% | 147,782/s | 6,767 ns | 0.07 s |
-| TypeScript | Lossless (awaits ready()), 4 exporters | spans | 1,000,000 | 0.0% | 573,510/s | 1,744 ns | 0.06 s |
-| TypeScript | Lossless (awaits ready()), 4 exporters | metrics | 1,000,000 | 0.0% | 25,936,189/s | 39 ns | 0.01 s |
 | Go | official OpenTelemetry SDK alone (default batch processor) | logs | 258,286 | 74.2% | 1,694,065/s | 590 ns | 0.00 s |
 | Go | official OpenTelemetry SDK alone (default batch processor) | spans | 401,408 | 59.9% | 2,182,265/s | 458 ns | 0.00 s |
 | Go | official OpenTelemetry SDK alone (default batch processor) | metrics | 1,000,000 | 0.0% | 24,213,710/s | 41 ns | 0.00 s |
@@ -451,9 +443,18 @@ xychart-beta
 | C++ | official OpenTelemetry SDK alone (default batch processor) | logs | 115,003 | 88.5% | 3,193,300/s | 313 ns | 0.01 s |
 | C++ | official OpenTelemetry SDK alone (default batch processor) | spans | 623,026 | 37.7% | 1,040,891/s | 961 ns | 0.00 s |
 | C++ | official OpenTelemetry SDK alone (default batch processor) | metrics | 1,000,000 | 0.0% | 74,466,402/s | 13 ns | 0.00 s |
-| TypeScript | official OpenTelemetry SDK alone (default batch processor) | logs | 2,560 | 99.7% | 3,606,293/s | 277 ns | 0.02 s |
-| TypeScript | official OpenTelemetry SDK alone (default batch processor) | spans | 2,560 | 99.7% | 1,904,642/s | 525 ns | 0.01 s |
-| TypeScript | official OpenTelemetry SDK alone (default batch processor) | metrics | 1,000,000 | 0.0% | 21,571,832/s | 46 ns | 0.03 s |
+| TypeScript | default (drop when full) | logs | 2,560 | 99.7% | 150,115/s | 6,662 ns | 0.02 s |
+| TypeScript | default (drop when full) | spans | 2,560 | 99.7% | 1,740,699/s | 574 ns | 0.01 s |
+| TypeScript | default (drop when full) | metrics | 1,000,000 | 0.0% | 27,995,423/s | 36 ns | 0.01 s |
+| TypeScript | Lossless (awaits ready()) | logs | 1,000,000 | 0.0% | 141,079/s | 7,088 ns | 0.11 s |
+| TypeScript | Lossless (awaits ready()) | spans | 1,000,000 | 0.0% | 603,650/s | 1,657 ns | 0.06 s |
+| TypeScript | Lossless (awaits ready()) | metrics | 1,000,000 | 0.0% | 27,352,204/s | 37 ns | 0.01 s |
+| TypeScript | Lossless (awaits ready()), 4 exporters | logs | 1,000,000 | 0.0% | 155,305/s | 6,439 ns | 0.07 s |
+| TypeScript | Lossless (awaits ready()), 4 exporters | spans | 1,000,000 | 0.0% | 626,243/s | 1,597 ns | 0.06 s |
+| TypeScript | Lossless (awaits ready()), 4 exporters | metrics | 1,000,000 | 0.0% | 27,308,446/s | 37 ns | 0.01 s |
+| TypeScript | official OpenTelemetry SDK alone (default batch processor) | logs | 2,560 | 99.7% | 3,858,102/s | 259 ns | 0.02 s |
+| TypeScript | official OpenTelemetry SDK alone (default batch processor) | spans | 2,560 | 99.7% | 1,975,434/s | 506 ns | 0.01 s |
+| TypeScript | official OpenTelemetry SDK alone (default batch processor) | metrics | 1,000,000 | 0.0% | 31,603,148/s | 32 ns | 0.01 s |
 
 **Lost** is what never reached the collector. Metrics are aggregated in-process (a counter
 exports its running total), so they cannot lose increments; logs and spans are exported one by
@@ -476,9 +477,9 @@ then read back with the `mcap` library: **Recorded** is what the file holds.
 | Python | logs | 1,000,000 | 158,728/s | 6,300 ns | 27.6 MiB | 29 |
 | Python | spans | 1,000,000 | 53,540/s | 18,678 ns | 56.1 MiB | 59 |
 | Python | metrics | 1,000,000 | 283,569/s | 3,526 ns | 22.6 MiB | 24 |
-| TypeScript | logs | 1,000,000 | 122,799/s | 8,143 ns | 264.0 MiB | 277 |
-| TypeScript | spans | 1,000,000 | 510,420/s | 1,959 ns | 213.5 MiB | 224 |
-| TypeScript | metrics | 1,000,000 | 1,138,584/s | 878 ns | 113.4 MiB | 119 |
+| TypeScript | logs | 1,000,000 | 126,178/s | 7,925 ns | 264.0 MiB | 277 |
+| TypeScript | spans | 1,000,000 | 509,490/s | 1,963 ns | 213.6 MiB | 224 |
+| TypeScript | metrics | 1,000,000 | 1,162,807/s | 860 ns | 113.4 MiB | 119 |
 
 ## Go: cost per call
 

@@ -1,10 +1,7 @@
 {
   "compilerOptions": {
     "target": "es2023",
-    "lib": [
-      "es2023",
-      "dom"
-    ],
+    "lib": ["es2023", "dom"],
     "module": "nodenext",
     "moduleResolution": "nodenext",
     "strict": true,
@@ -16,26 +13,13 @@
     "rewriteRelativeImportExtensions": true,
     "isolatedModules": true,
     "skipLibCheck": true,
-    "types": [
-      "node"
-    ],
+    "types": ["node"],
     "noEmit": true,
     "paths": {
-      "@the-protobuf-project/telemetry": [
-        "./src/index.node.ts"
-      ],
-      "@the-protobuf-project/telemetry/node": [
-        "./src/index.node.ts"
-      ],
-      "@the-protobuf-project/telemetry/browser": [
-        "./src/index.browser.ts"
-      ]
+      "@the-protobuf-project/telemetry": ["./src/index.node.ts"],
+      "@the-protobuf-project/telemetry/node": ["./src/index.node.ts"],
+      "@the-protobuf-project/telemetry/browser": ["./src/index.browser.ts"]
     }
   },
-  "include": [
-    "src",
-    "test",
-    "examples",
-    "scripts"
-  ]
+  "include": ["src", "test", "examples", "scripts"]
 }

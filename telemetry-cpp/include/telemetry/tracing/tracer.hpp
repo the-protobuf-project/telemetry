@@ -20,33 +20,23 @@ class McapWriter;
 namespace otel {
 class OtelExporter;
 }
-}
+}  // namespace telemetry
 
 namespace telemetry::tracing {
 
-enum class SpanStatus {
-    Unset,
-    Ok,
-    Error
-};
+enum class SpanStatus { Unset, Ok, Error };
 
 inline const char* span_status_to_string(SpanStatus status) {
     switch (status) {
-        case SpanStatus::Ok: return "ok";
+        case SpanStatus::Ok:    return "ok";
         case SpanStatus::Error: return "error";
         case SpanStatus::Unset: return "unset";
-        default: return "unset";
+        default:                return "unset";
     }
 }
 
 /// What side of an interaction a span records, as OpenTelemetry defines it.
-enum class SpanKind {
-    Internal,
-    Server,
-    Client,
-    Producer,
-    Consumer
-};
+enum class SpanKind { Internal, Server, Client, Producer, Consumer };
 
 /// A caller's trace context, read from W3C headers by Tracer::extract: the
 /// span a request or message came from, in whatever language it was written.
@@ -67,8 +57,8 @@ struct SpanEvent {
 
 class Span {
 public:
-    Span(const std::string& name, const std::string& trace_id,
-         const std::string& span_id, std::shared_ptr<mcap::McapWriter> mcap_writer);
+    Span(const std::string& name, const std::string& trace_id, const std::string& span_id,
+         std::shared_ptr<mcap::McapWriter> mcap_writer);
     ~Span();
 
     Span(const Span&) = delete;
@@ -138,17 +128,17 @@ private:
 class Tracer {
 public:
     Tracer(const ServiceOptions& service_opts);
-    Tracer(const ServiceOptions& service_opts,
-           std::shared_ptr<mcap::McapWriter> mcap_writer
+    Tracer(const ServiceOptions& service_opts, std::shared_ptr<mcap::McapWriter> mcap_writer
 #if TELEMETRY_USE_OTEL
-           , otel::OtelExporter* otel_exporter = nullptr
+           ,
+           otel::OtelExporter* otel_exporter = nullptr
 #endif
     );
-    Tracer(const ServiceOptions& service_opts,
-           std::shared_ptr<mcap::McapWriter> mcap_writer,
+    Tracer(const ServiceOptions& service_opts, std::shared_ptr<mcap::McapWriter> mcap_writer,
            const std::string& otlp_endpoint
 #if TELEMETRY_USE_OTEL
-           , otel::OtelExporter* otel_exporter = nullptr
+           ,
+           otel::OtelExporter* otel_exporter = nullptr
 #endif
     );
     ~Tracer();
@@ -181,9 +171,8 @@ public:
     const std::string& service_name() const { return service_name_; }
 
 private:
-    Span make_span(const std::string& name, const std::string& trace_id,
-                   const std::string& parent_span_id, bool remote_parent, bool sampled,
-                   const std::map<std::string, std::string>& baggage, SpanKind kind);
+    Span make_span(const std::string& name, const std::string& trace_id, const std::string& parent_span_id,
+                   bool remote_parent, bool sampled, const std::map<std::string, std::string>& baggage, SpanKind kind);
     std::string generate_trace_id();
     std::string generate_span_id();
 
@@ -212,21 +201,13 @@ public:
 
     Span& span() { return span_; }
 
-    void set_attribute(const std::string& key, const std::string& value) {
-        span_.set_attribute(key, value);
-    }
+    void set_attribute(const std::string& key, const std::string& value) { span_.set_attribute(key, value); }
 
-    void add_event(const std::string& name) {
-        span_.add_event(name);
-    }
+    void add_event(const std::string& name) { span_.add_event(name); }
 
-    void set_ok() {
-        span_.set_status(SpanStatus::Ok);
-    }
+    void set_ok() { span_.set_status(SpanStatus::Ok); }
 
-    void set_error(const std::string& message) {
-        span_.record_error(message);
-    }
+    void set_error(const std::string& message) { span_.record_error(message); }
 
 private:
     Span span_;
@@ -243,6 +224,6 @@ private:
 #define TELEMETRY_SPAN(tracer, name) \
     ::telemetry::tracing::ScopedSpan TELEMETRY_CONCAT(_telemetry_span_, __LINE__)(tracer, name)
 
-#define TELEMETRY_SPAN_OK(tracer, name) \
+#define TELEMETRY_SPAN_OK(tracer, name)                                                          \
     ::telemetry::tracing::ScopedSpan TELEMETRY_CONCAT(_telemetry_span_, __LINE__)(tracer, name); \
     TELEMETRY_CONCAT(_telemetry_span_, __LINE__).set_ok()

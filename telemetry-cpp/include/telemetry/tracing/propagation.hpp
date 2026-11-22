@@ -59,8 +59,8 @@ class ServerScope {
 public:
     template <class Headers>
     ServerScope(Tracer& tracer, const std::string& name, const Headers& headers)
-        : span_(tracer.start_span(name, tracer.extract(detail::header_map(headers)), SpanKind::Server)),
-          current_(span_.attach()) {}
+        : span_(tracer.start_span(name, tracer.extract(detail::header_map(headers)), SpanKind::Server))
+        , current_(span_.attach()) {}
 
     ServerScope(const ServerScope&) = delete;
     ServerScope& operator=(const ServerScope&) = delete;

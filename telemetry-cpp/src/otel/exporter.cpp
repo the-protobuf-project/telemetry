@@ -23,7 +23,9 @@ void Counters::record(uint64_t n, bool ok) noexcept {
     if (total) total->record(n, ok);
 }
 
-uint64_t Counters::pending() const noexcept { return stats().pending(); }
+uint64_t Counters::pending() const noexcept {
+    return stats().pending();
+}
 
 SignalStats Counters::stats() const noexcept {
     SignalStats s;
@@ -49,10 +51,11 @@ using std::chrono::microseconds;
 class Gate {
 public:
     explicit Gate(const ExportOptions& opts)
-        : lossless_(opts.lossless),
-          // kept below the queue size by enough headroom for writers racing
-          // past the check at once
-          capacity_(std::max<uint64_t>(opts.queue_size - std::min<uint64_t>(opts.queue_size / 4, 1024), 1)) {}
+        : lossless_(opts.lossless)
+        ,
+        // kept below the queue size by enough headroom for writers racing
+        // past the check at once
+        capacity_(std::max<uint64_t>(opts.queue_size - std::min<uint64_t>(opts.queue_size / 4, 1024), 1)) {}
 
     void wait(const Counters& counters) const noexcept {
         if (!lossless_) return;
@@ -213,27 +216,29 @@ class SpanShards final : public trace_sdk::SpanProcessor, Shards<trace_sdk::Span
 public:
     using Shards::Shards;
 
-    std::unique_ptr<trace_sdk::Recordable> MakeRecordable() noexcept override {
-        return shards_[0]->MakeRecordable();
-    }
+    std::unique_ptr<trace_sdk::Recordable> MakeRecordable() noexcept override { return shards_[0]->MakeRecordable(); }
     void OnStart(trace_sdk::Recordable&, const trace_api::SpanContext&) noexcept override {}
     void OnEnd(std::unique_ptr<trace_sdk::Recordable>&& span) noexcept override { pick().OnEnd(std::move(span)); }
-    bool ForceFlush(microseconds t) noexcept override { return each([t](auto& p) { return p.ForceFlush(t); }); }
-    bool Shutdown(microseconds t) noexcept override { return each([t](auto& p) { return p.Shutdown(t); }); }
+    bool ForceFlush(microseconds t) noexcept override {
+        return each([t](auto& p) { return p.ForceFlush(t); });
+    }
+    bool Shutdown(microseconds t) noexcept override {
+        return each([t](auto& p) { return p.Shutdown(t); });
+    }
 };
 
 class LogShards final : public logs_sdk::LogRecordProcessor, Shards<logs_sdk::LogRecordProcessor> {
 public:
     using Shards::Shards;
 
-    std::unique_ptr<logs_sdk::Recordable> MakeRecordable() noexcept override {
-        return shards_[0]->MakeRecordable();
+    std::unique_ptr<logs_sdk::Recordable> MakeRecordable() noexcept override { return shards_[0]->MakeRecordable(); }
+    void OnEmit(std::unique_ptr<logs_sdk::Recordable>&& record) noexcept override { pick().OnEmit(std::move(record)); }
+    bool ForceFlush(microseconds t) noexcept override {
+        return each([t](auto& p) { return p.ForceFlush(t); });
     }
-    void OnEmit(std::unique_ptr<logs_sdk::Recordable>&& record) noexcept override {
-        pick().OnEmit(std::move(record));
+    bool Shutdown(microseconds t) noexcept override {
+        return each([t](auto& p) { return p.Shutdown(t); });
     }
-    bool ForceFlush(microseconds t) noexcept override { return each([t](auto& p) { return p.ForceFlush(t); }); }
-    bool Shutdown(microseconds t) noexcept override { return each([t](auto& p) { return p.Shutdown(t); }); }
     bool RecordableEnforcesLogRecordLimits() const noexcept override {
         return shards_[0]->RecordableEnforcesLogRecordLimits();
     }
@@ -253,7 +258,6 @@ OtelExporter::OtelExporter(const ServiceOptions& service_opts, const std::string
     , service_version_(service_opts.version)
     , endpoint_(endpoint)
     , export_options_(export_options) {
-
     auto resource_attributes = resource::ResourceAttributes{
         {"service.name", service_name_},
         {"service.version", service_version_},
@@ -311,8 +315,7 @@ void OtelExporter::init_logger(const resource::Resource& resource) {
         processor_opts.max_queue_size = ex.queue_size;
         processor_opts.max_export_batch_size = std::min(ex.batch_size, ex.queue_size);
         auto batch = std::make_unique<logs_sdk::BatchLogRecordProcessor>(
-            std::make_unique<CountingLogExporter>(std::make_unique<otlp::OtlpHttpLogRecordExporter>(opts),
-                                                  counters),
+            std::make_unique<CountingLogExporter>(std::make_unique<otlp::OtlpHttpLogRecordExporter>(opts), counters),
             processor_opts);
         shards.push_back(std::make_unique<AccountedLogProcessor>(std::move(batch), counters, ex));
     }
@@ -322,8 +325,7 @@ void OtelExporter::init_logger(const resource::Resource& resource) {
     logger_provider_ = std::make_shared<logs_sdk::LoggerProvider>(std::move(processor), resource);
     logger_ = logger_provider_->GetLogger(service_name_, service_version_);
 
-    logs_api::Provider::SetLoggerProvider(
-        opentelemetry::nostd::shared_ptr<logs_api::LoggerProvider>(logger_provider_));
+    logs_api::Provider::SetLoggerProvider(opentelemetry::nostd::shared_ptr<logs_api::LoggerProvider>(logger_provider_));
 }
 
 void OtelExporter::init_metrics(const resource::Resource& resource) {
@@ -336,29 +338,34 @@ void OtelExporter::init_metrics(const resource::Resource& resource) {
     reader_opts.export_interval_millis = std::chrono::milliseconds(1000);
     reader_opts.export_timeout_millis = std::chrono::milliseconds(500);
 
-    auto reader = std::make_unique<metrics_sdk::PeriodicExportingMetricReader>(
-        std::move(exporter), reader_opts);
+    auto reader = std::make_unique<metrics_sdk::PeriodicExportingMetricReader>(std::move(exporter), reader_opts);
 
     // With the service's resource, as the tracer and logger providers have;
     // without it every metric reached the backend as unknown_service.
-    meter_provider_ = std::make_shared<metrics_sdk::MeterProvider>(
-        std::make_unique<metrics_sdk::ViewRegistry>(), resource);
+    meter_provider_ =
+        std::make_shared<metrics_sdk::MeterProvider>(std::make_unique<metrics_sdk::ViewRegistry>(), resource);
     meter_provider_->AddMetricReader(std::move(reader));
 
     metrics_api::Provider::SetMeterProvider(
         opentelemetry::nostd::shared_ptr<metrics_api::MeterProvider>(meter_provider_));
 }
 
-opentelemetry::nostd::shared_ptr<trace_api::Tracer> OtelExporter::get_tracer() { return tracer_; }
+opentelemetry::nostd::shared_ptr<trace_api::Tracer> OtelExporter::get_tracer() {
+    return tracer_;
+}
 
-opentelemetry::nostd::shared_ptr<logs_api::Logger> OtelExporter::get_logger() { return logger_; }
+opentelemetry::nostd::shared_ptr<logs_api::Logger> OtelExporter::get_logger() {
+    return logger_;
+}
 
 opentelemetry::nostd::shared_ptr<metrics_api::Meter> OtelExporter::get_meter() {
     if (!meter_provider_) return opentelemetry::nostd::shared_ptr<metrics_api::Meter>();
     return meter_provider_->GetMeter(service_name_, service_version_);
 }
 
-Stats OtelExporter::stats() const { return Stats{logs_->stats(), spans_->stats()}; }
+Stats OtelExporter::stats() const {
+    return Stats{logs_->stats(), spans_->stats()};
+}
 
 /**
  * @brief Shuts down all initialized OpenTelemetry providers and disables the exporter.

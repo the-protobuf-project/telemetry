@@ -151,6 +151,27 @@ jobs:
         working-directory: ./telemetry-ts
         run: npm run lint
 
+  lint-cpp:
+    name: Lint C++ Code
+    runs-on: blacksmith-4vcpu-ubuntu-2404
+    steps:
+      - name: Check out code
+        uses: actions/checkout@v6
+
+      - name: Set up Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: '3.13'
+
+      # The same clang-format `just fmt` runs (uvx clang-format@23.1.5), so
+      # local and CI formatting agree; telemetry-cpp/.clang-format is the style.
+      - name: Install clang-format
+        run: pip install clang-format==23.1.5
+
+      - name: Check formatting
+        working-directory: ./telemetry-cpp
+        run: git ls-files '*.cpp' '*.hpp' '*.h' '*.cc' | xargs clang-format --dry-run --Werror
+
   check-links:
     name: Check Markdown Links
     runs-on: blacksmith-4vcpu-ubuntu-2404

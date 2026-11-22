@@ -25,7 +25,9 @@ inline thread_local TraceContext current_trace_context;
 }  // namespace detail
 
 /// The trace context of the span in scope on this thread; not valid() when none is.
-inline const TraceContext& current_trace_context() { return detail::current_trace_context; }
+inline const TraceContext& current_trace_context() {
+    return detail::current_trace_context;
+}
 
 /// Makes a trace context current on this thread until destroyed, then
 /// restores the one before it, so scopes nest.

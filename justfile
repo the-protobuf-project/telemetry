@@ -53,6 +53,7 @@ lint:
     cd telemetry-rs && cargo fmt --check
     cd telemetry-py && uv run ruff check . && uv run ruff format --check .
     cd telemetry-ts && npm run lint
+    cd telemetry-cpp && git ls-files '*.cpp' '*.hpp' '*.h' '*.cc' | xargs uvx clang-format@23.1.5 --dry-run --Werror
 
 # Format every SDK in place.
 fmt:
@@ -60,6 +61,7 @@ fmt:
     cd telemetry-rs && cargo fmt
     cd telemetry-py && uv run ruff format .
     cd telemetry-ts && npm run fmt
+    cd telemetry-cpp && git ls-files '*.cpp' '*.hpp' '*.h' '*.cc' | xargs uvx clang-format@23.1.5 -i
 
 # Tracing across languages
 

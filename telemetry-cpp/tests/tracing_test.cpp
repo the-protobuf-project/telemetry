@@ -18,7 +18,9 @@ namespace {
 // The W3C specification's example: what telemetry-go's Inject sends.
 const std::string kTraceparent = "00-4bf92f3577b34da6a3ce929d0e0e4736-00f067aa0ba902b7-01";
 
-ServiceOptions service() { return ServiceOptions("tracing-test", "1.0.0"); }
+ServiceOptions service() {
+    return ServiceOptions("tracing-test", "1.0.0");
+}
 }  // namespace
 
 TEST_CASE("a span under extracted headers continues the caller's trace") {
@@ -120,8 +122,7 @@ TEST_CASE("a server scope continues the caller's trace and a client scope hands 
             tracer, "billing.Billing/Charge",
             [&](const std::string& k, const std::string& v) { outgoing.emplace(k, v); });
         CHECK(client.span().parent_span_id() == server_span);
-        CHECK(outgoing.at("traceparent") ==
-              "00-4bf92f3577b34da6a3ce929d0e0e4736-" + client.span().span_id() + "-01");
+        CHECK(outgoing.at("traceparent") == "00-4bf92f3577b34da6a3ce929d0e0e4736-" + client.span().span_id() + "-01");
     }
     CHECK_FALSE(telemetry::current_trace_context().valid());
 }

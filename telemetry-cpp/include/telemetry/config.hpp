@@ -6,18 +6,14 @@
 
 namespace telemetry {
 
-enum class Environment {
-    Development,
-    Staging,
-    Production
-};
+enum class Environment { Development, Staging, Production };
 
 inline const char* environment_to_string(Environment env) {
     switch (env) {
         case Environment::Development: return "development";
-        case Environment::Staging: return "staging";
-        case Environment::Production: return "production";
-        default: return "unknown";
+        case Environment::Staging:     return "staging";
+        case Environment::Production:  return "production";
+        default:                       return "unknown";
     }
 }
 
@@ -27,8 +23,7 @@ struct ServiceOptions {
     std::string description;
     Environment environment = Environment::Development;
 
-    ServiceOptions(const std::string& n, const std::string& v)
-        : name(n), version(v) {}
+    ServiceOptions(const std::string& n, const std::string& v) : name(n), version(v) {}
 
     ServiceOptions& with_description(const std::string& desc) {
         description = desc;
@@ -47,9 +42,9 @@ struct ServiceOptions {
 /// (Telemetry::stats) and reported by Telemetry::close. With lossless, the
 /// writer waits for room instead, and nothing is dropped.
 struct ExportOptions {
-    bool lossless = false;    ///< wait for room when a queue is full instead of dropping
-    size_t queue_size = 2048; ///< records each exporter may hold awaiting export
-    size_t batch_size = 512;  ///< records sent per export request
+    bool lossless = false;     ///< wait for room when a queue is full instead of dropping
+    size_t queue_size = 2048;  ///< records each exporter may hold awaiting export
+    size_t batch_size = 512;   ///< records sent per export request
     /// Exporters sharing each signal's records, each with its own queue and
     /// connection: one sends one batch at a time, n send n at once. Records
     /// from different exporters may reach the collector out of order; each
@@ -66,9 +61,9 @@ struct OtlpOptions {
 
 /// What happened to one signal's records.
 struct SignalStats {
-    uint64_t emitted = 0;  ///< handed to the pipeline by the program
-    uint64_t exported = 0; ///< accepted by the collector
-    uint64_t failed = 0;   ///< in an export request that failed
+    uint64_t emitted = 0;   ///< handed to the pipeline by the program
+    uint64_t exported = 0;  ///< accepted by the collector
+    uint64_t failed = 0;    ///< in an export request that failed
     /// Not yet exported: still queued while running, dropped once closed.
     uint64_t pending() const { return emitted > exported + failed ? emitted - exported - failed : 0; }
 };

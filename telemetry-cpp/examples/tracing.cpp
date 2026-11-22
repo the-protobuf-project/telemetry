@@ -19,8 +19,7 @@ std::pair<std::string, uint16_t> get_otel_endpoint() {
         std::string endpoint(env);
         auto pos = endpoint.find(':');
         if (pos != std::string::npos) {
-            return {endpoint.substr(0, pos),
-                    static_cast<uint16_t>(std::stoi(endpoint.substr(pos + 1)))};
+            return {endpoint.substr(0, pos), static_cast<uint16_t>(std::stoi(endpoint.substr(pos + 1)))};
         }
         return {endpoint, 4317};
     }
@@ -47,9 +46,9 @@ int main() {
     auto [otel_host, otel_port] = get_otel_endpoint();
 
     auto telemetry = telemetry::Telemetry::builder("simple-trace-test", "1.0.0")
-        .environment(telemetry::Environment::Development)
-        .with_otlp(otel_host, otel_port)
-        .build();
+                         .environment(telemetry::Environment::Development)
+                         .with_otlp(otel_host, otel_port)
+                         .build();
 
     TELEMETRY_LOG_INFO("=== SIMPLE TRACE TEST ===");
     TELEMETRY_LOG_INFO("Service: simple-trace-test");

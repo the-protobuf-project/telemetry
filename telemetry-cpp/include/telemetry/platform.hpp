@@ -1,102 +1,97 @@
 #pragma once
 
 #if defined(TELEMETRY_FREERTOS)
-    #define TELEMETRY_PLATFORM_FREERTOS 1
-    #define TELEMETRY_PLATFORM_POSIX 0
+#define TELEMETRY_PLATFORM_FREERTOS 1
+#define TELEMETRY_PLATFORM_POSIX 0
 #elif defined(__unix__) || defined(__APPLE__) || defined(__linux__)
-    #define TELEMETRY_PLATFORM_FREERTOS 0
-    #define TELEMETRY_PLATFORM_POSIX 1
+#define TELEMETRY_PLATFORM_FREERTOS 0
+#define TELEMETRY_PLATFORM_POSIX 1
 #elif defined(_WIN32)
-    #define TELEMETRY_PLATFORM_FREERTOS 0
-    #define TELEMETRY_PLATFORM_POSIX 0
-    #define TELEMETRY_PLATFORM_WINDOWS 1
+#define TELEMETRY_PLATFORM_FREERTOS 0
+#define TELEMETRY_PLATFORM_POSIX 0
+#define TELEMETRY_PLATFORM_WINDOWS 1
 #else
-    #define TELEMETRY_PLATFORM_FREERTOS 0
-    #define TELEMETRY_PLATFORM_POSIX 0
+#define TELEMETRY_PLATFORM_FREERTOS 0
+#define TELEMETRY_PLATFORM_POSIX 0
 #endif
 
 #if TELEMETRY_PLATFORM_FREERTOS
-    #include <FreeRTOS.h>
-    #include <semphr.h>
-    #include <task.h>
+#include <FreeRTOS.h>
+#include <semphr.h>
+#include <task.h>
 
-    namespace telemetry::platform {
-        using Mutex = SemaphoreHandle_t;
+namespace telemetry::platform {
+using Mutex = SemaphoreHandle_t;
 
-        /**
-         * @brief Creates a mutex.
-         *
-         * @return Mutex handle for the newly created mutex.
-         */
-        inline Mutex create_mutex() {
-            return xSemaphoreCreateMutex();
-        }
+/**
+ * @brief Creates a mutex.
+ *
+ * @return Mutex handle for the newly created mutex.
+ */
+inline Mutex create_mutex() {
+    return xSemaphoreCreateMutex();
+}
 
-        inline void lock_mutex(Mutex& m) {
-            xSemaphoreTake(m, portMAX_DELAY);
-        }
+inline void lock_mutex(Mutex& m) {
+    xSemaphoreTake(m, portMAX_DELAY);
+}
 
-        inline void unlock_mutex(Mutex& m) {
-            xSemaphoreGive(m);
-        }
+inline void unlock_mutex(Mutex& m) {
+    xSemaphoreGive(m);
+}
 
-        inline void destroy_mutex(Mutex& m) {
-            vSemaphoreDelete(m);
-        }
+inline void destroy_mutex(Mutex& m) {
+    vSemaphoreDelete(m);
+}
 
-        inline uint64_t get_timestamp_ns() {
-            return static_cast<uint64_t>(xTaskGetTickCount()) *
-                   (1000000000ULL / configTICK_RATE_HZ);
-        }
-    }
+inline uint64_t get_timestamp_ns() {
+    return static_cast<uint64_t>(xTaskGetTickCount()) * (1000000000ULL / configTICK_RATE_HZ);
+}
+}  // namespace telemetry::platform
 #else
-    #include <mutex>
-    #include <chrono>
+#include <mutex>
+#include <chrono>
 
-    namespace telemetry::platform {
-        using Mutex = std::mutex*;
+namespace telemetry::platform {
+using Mutex = std::mutex*;
 
-        /**
-         * @brief Creates a mutex.
-         *
-         * @return Mutex Pointer to the newly allocated mutex.
-         */
-        inline Mutex create_mutex() {
-            return new std::mutex();
-        }
+/**
+ * @brief Creates a mutex.
+ *
+ * @return Mutex Pointer to the newly allocated mutex.
+ */
+inline Mutex create_mutex() {
+    return new std::mutex();
+}
 
-        inline void lock_mutex(Mutex& m) {
-            if (m) m->lock();
-        }
+inline void lock_mutex(Mutex& m) {
+    if (m) m->lock();
+}
 
-        inline void unlock_mutex(Mutex& m) {
-            if (m) m->unlock();
-        }
+inline void unlock_mutex(Mutex& m) {
+    if (m) m->unlock();
+}
 
-        inline void destroy_mutex(Mutex& m) {
-            delete m;
-            m = nullptr;
-        }
+inline void destroy_mutex(Mutex& m) {
+    delete m;
+    m = nullptr;
+}
 
-        inline uint64_t get_timestamp_ns() {
-            auto now = std::chrono::system_clock::now();
-            auto duration = now.time_since_epoch();
-            return std::chrono::duration_cast<std::chrono::nanoseconds>(duration).count();
-        }
-    }
+inline uint64_t get_timestamp_ns() {
+    auto now = std::chrono::system_clock::now();
+    auto duration = now.time_since_epoch();
+    return std::chrono::duration_cast<std::chrono::nanoseconds>(duration).count();
+}
+}  // namespace telemetry::platform
 #endif
 
 namespace telemetry::platform {
 
 class ScopedLock {
 public:
-    explicit ScopedLock(Mutex& m) : mutex_(m) {
-        lock_mutex(mutex_);
-    }
+    explicit ScopedLock(Mutex& m) : mutex_(m) { lock_mutex(mutex_); }
 
-    ~ScopedLock() {
-        unlock_mutex(mutex_);
-    }
+    ~ScopedLock() { unlock_mutex(mutex_); }
 
     ScopedLock(const ScopedLock&) = delete;
     ScopedLock& operator=(const ScopedLock&) = delete;

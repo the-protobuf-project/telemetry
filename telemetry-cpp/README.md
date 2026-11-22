@@ -475,6 +475,11 @@ ctest --test-dir build --output-on-failure
 
 From the repository root, `just test-cpp` runs the Bazel build and tests.
 
+The code is formatted with clang-format 23.1.5 in the style in
+`.clang-format`, and CI checks it. `just fmt` formats it and `just lint`
+checks it, both through `uvx clang-format@23.1.5`, so no local install is
+needed.
+
 ## Project structure
 
 ```text

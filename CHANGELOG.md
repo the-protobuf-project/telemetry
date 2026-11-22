@@ -18,8 +18,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `close()` reports drops; lossless mode keeps every record, and `ready()`
   waits for queue room. It is a hop in `just crosslang`. Releases attach the
   npm tarball.
+- TypeScript: automatic trace propagation. HTTP and HTTPS clients and
+  servers, `fetch` and gRPC (grpc-js) in Node, and `fetch` and XHR in the
+  browser, carry the W3C trace on every request and continue it on every
+  incoming one, with no `inject` or `extract` in the program. It works in ESM
+  programs, where the official HTTP and gRPC instrumentations do not patch.
+  On by default; `withAutoInstrumentation(false)` or
+  `[tracing] auto_instrument = false` turns it off. `withInstrumentations()`
+  adds other OpenTelemetry instrumentations, and `withPropagateTo()` (or
+  `[tracing] propagate_to`) lists the other origins a browser sends trace
+  headers to.
 
 ### Changed
+
+- TypeScript: with `[tracing] enabled = false`, a service still passes a
+  caller's sampled trace on to the services it calls, rather than starting
+  an unsampled one, so a hop without tracing no longer breaks the trace. It
+  records and exports nothing itself.
+- TypeScript: the SDK's own export requests are never traced.
 
 - The Go SDK needs Go 1.26.4, as its `go.mod` already said; the README said
   1.25.

@@ -6,6 +6,8 @@
  * `TELEMETRY_*` environment variables, then the builder.
  */
 
+import type { Instrumentation } from "@opentelemetry/instrumentation";
+
 /** Deployment environment; sets the default log level. */
 export const Environment = {
   Development: "development",
@@ -90,6 +92,20 @@ export interface MetricsOptions {
 
 export interface TracingOptions {
   enabled: boolean;
+  /**
+   * Hooks the HTTP, fetch and gRPC clients and servers, so every request
+   * carries the trace on (W3C `traceparent`) and every incoming one
+   * continues it: one trace end to end, across services and languages.
+   */
+  autoInstrument: boolean;
+  /**
+   * Browser only: the other origins (URL prefixes) that `fetch` and XHR
+   * send the trace headers to. Same-origin requests always carry them;
+   * another origin must allow the headers (CORS), so it is opt-in.
+   */
+  propagateTo: string[];
+  /** Instrumentations the program adds to the automatic ones (set in code). */
+  instrumentations: Instrumentation[];
 }
 
 export interface FoxgloveOptions {
@@ -144,7 +160,7 @@ export function defaultOptions(): TelemetryOptions {
       reportCaller: true,
     },
     metrics: { enabled: true, exportIntervalSeconds: 10 },
-    tracing: { enabled: true },
+    tracing: { enabled: true, autoInstrument: true, propagateTo: [], instrumentations: [] },
     foxglove: { enabled: false, filePath: "" },
     profiling: {
       enabled: false,
@@ -237,7 +253,11 @@ export function applyConfig(opts: TelemetryOptions, tree: ConfigTree): Telemetry
     }
   }
 
-  setBool(section(tree, "tracing"), "enabled", (v) => (opts.tracing.enabled = v));
+  const tracing = section(tree, "tracing");
+  setBool(tracing, "enabled", (v) => (opts.tracing.enabled = v));
+  setBool(tracing, "auto_instrument", (v) => (opts.tracing.autoInstrument = v));
+  const propagateTo = strings(tracing.propagate_to);
+  if (propagateTo) opts.tracing.propagateTo = propagateTo;
 
   const foxglove = section(tree, "foxglove");
   setBool(foxglove, "enabled", (v) => (opts.foxglove.enabled = v));
@@ -282,6 +302,8 @@ const knownKeys = [
   "logging.console",
   "logging.log.report_caller",
   "tracing.enabled",
+  "tracing.auto_instrument",
+  "tracing.propagate_to",
   "foxglove.enabled",
   "foxglove.file_path",
   "profiling.enabled",
@@ -409,6 +431,12 @@ function setDuration(tree: ConfigTree, key: string, set: (v: number) => void): v
 function stringMap(v: unknown): Record<string, string> {
   if (!isTree(v)) return {};
   return Object.fromEntries(Object.entries(v).map(([k, x]) => [k, String(x)]));
+}
+
+/** A list of strings, or one comma-separated string as an environment variable gives it. */
+function strings(v: unknown): string[] | undefined {
+  const items = Array.isArray(v) ? v : typeof v === "string" ? v.split(",") : undefined;
+  return items?.map((x) => String(x).trim()).filter((x) => x !== "");
 }
 
 function logLevel(n: number): LogLevel {

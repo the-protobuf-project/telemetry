@@ -6,7 +6,7 @@
  * so the browser bundle carries no Node code.
  */
 
-import type { ContextManager } from "@opentelemetry/api";
+import type { ContextManager, MeterProvider, TracerProvider } from "@opentelemetry/api";
 import type { LogRecordExporter } from "@opentelemetry/sdk-logs";
 import type { PushMetricExporter } from "@opentelemetry/sdk-metrics";
 import type { SpanExporter } from "@opentelemetry/sdk-trace";
@@ -16,6 +16,7 @@ import type {
   ProfilingOptions,
   ServiceOptions,
   TelemetryOptions,
+  TracingOptions,
 } from "./options.ts";
 
 export type LevelName = "DEBUG" | "INFO" | "WARN" | "ERROR" | "FATAL";
@@ -63,6 +64,15 @@ export interface Exporters {
   metric(): PushMetricExporter;
 }
 
+/** What automatic instrumentation needs to trace and measure requests. */
+export interface InstrumentArgs {
+  tracerProvider: TracerProvider;
+  meterProvider: MeterProvider | undefined;
+  tracing: TracingOptions;
+  /** The OTLP endpoint, when exporting: its own requests are never traced. */
+  otlp: OtlpOptions | undefined;
+}
+
 export interface Platform {
   readonly name: "node" | "browser";
   contextManager(): ContextManager;
@@ -78,6 +88,11 @@ export interface Platform {
   /** Starts continuous profiling; resolves the function that stops it. */
   startProfiling(service: ServiceOptions, opts: ProfilingOptions): () => Promise<void>;
   warn(message: string): void;
+  /**
+   * Hooks the runtime's HTTP, fetch and gRPC clients and servers so a
+   * trace crosses every request; returns the unhook.
+   */
+  instrument(args: InstrumentArgs): () => void;
   /** Hooks into the runtime's lifecycle, e.g. flushing when a page is hidden; returns the unhook. */
   attach?(flush: () => Promise<void>, opts: TelemetryOptions): () => void;
 }

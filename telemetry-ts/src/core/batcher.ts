@@ -10,8 +10,8 @@
  * exporter.
  */
 
-import { type Context, TraceFlags } from "@opentelemetry/api";
-import { type ExportResult, ExportResultCode } from "@opentelemetry/core";
+import { type Context, context, TraceFlags } from "@opentelemetry/api";
+import { type ExportResult, ExportResultCode, suppressTracing } from "@opentelemetry/core";
 import type { LogRecordProcessor, ReadWriteLogRecord } from "@opentelemetry/sdk-logs";
 import type { ReadableSpan, SpanProcessor } from "@opentelemetry/sdk-trace";
 import type { Counters, ExportErrors } from "./accounting.ts";
@@ -167,7 +167,8 @@ export class Batcher<T> {
       this.#pump();
     };
     try {
-      exporter.export(batch, done);
+      // The export's own HTTP or gRPC request is not traced.
+      context.with(suppressTracing(context.active()), () => exporter.export(batch, done));
     } catch (error) {
       done({ code: ExportResultCode.FAILED, error: error as Error });
     }

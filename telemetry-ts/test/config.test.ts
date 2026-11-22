@@ -124,6 +124,24 @@ describe("environment variables", () => {
     expect(opts.logging.modules.vision).toBe(LogLevel.Level3);
   });
 
+  it("set automatic instrumentation, with a comma-separated origin list", () => {
+    const opts = applyConfig(
+      defaultOptions(),
+      envConfig({
+        TELEMETRY_TRACING_AUTO_INSTRUMENT: "false",
+        TELEMETRY_TRACING__PROPAGATE_TO: "https://api.example.com, https://cdn.example.com",
+      }),
+    );
+    expect(opts.tracing.autoInstrument).toBe(false);
+    expect(opts.tracing.propagateTo).toEqual([
+      "https://api.example.com",
+      "https://cdn.example.com",
+    ]);
+    expect(
+      applyConfig(defaultOptions(), { tracing: { propagate_to: ["a"] } }).tracing.propagateTo,
+    ).toEqual(["a"]);
+  });
+
   it("override the file", () => {
     const opts = defaultOptions();
     applyConfig(opts, { service: { name: "file" } });

@@ -2,7 +2,10 @@ load("@rules_cc//cc:defs.bzl", "cc_library")
 
 cc_library(
     name = "tracing",
-    hdrs = ["tracer.hpp"],
+    hdrs = [
+        "propagation.hpp",
+        "tracer.hpp",
+    ],
     strip_include_prefix = "/include",
     visibility = ["//visibility:public"],
     deps = ["//include/telemetry:core"],

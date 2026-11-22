@@ -3,7 +3,6 @@ bomb
 credentials
 .DS_Store
 *.config.json
-telemetry-rs/target
 coverage
 __pycache__
 .env
@@ -11,4 +10,6 @@ __pycache__
 build
 .terraform*
 telemetry.toml
+telemetry-rs/target
 target/
+telemetry-go/bin/

@@ -1,11 +1,12 @@
 # Every task in the repository, one place: `just` lists them.
 #
-#   just test                 test all four SDKs
-#   just crosslang            one trace through Go, Rust, Python and C++
+#   just test                 test all five SDKs
+#   just crosslang            one trace through Go, Rust, Python, C++ and TypeScript
 #   just bench                every SDK, 1M records per signal, OTLP and MCAP
 #   just set-version 1.3.0    stamp one version into every SDK
 #
-# Needs: go, cargo, uv, bazel (C++), docker (image and stack recipes).
+# Needs: go, cargo, uv, bazel (C++), node and npm (TypeScript), docker (image
+# and stack recipes).
 
 set shell := ["bash", "-euo", "pipefail", "-c"]
 
@@ -19,7 +20,7 @@ default:
 # Test and lint
 
 # Test every SDK.
-test: test-go test-rust test-py test-cpp
+test: test-go test-rust test-py test-cpp test-ts
 
 # Go: vet, race-test the SDK and build the isolated example module.
 test-go:
@@ -38,6 +39,10 @@ test-py:
 test-cpp:
     cd telemetry-cpp && bazel build //... && bazel test //tests/...
 
+# TypeScript: typecheck, test, build, and check the browser bundle has no Node code.
+test-ts:
+    cd telemetry-ts && npm ci && npm run typecheck && npm test && npm run build && npm run check:browser
+
 # C++: the smoke test against the tpp_telemetry.cpp the BCR serves.
 test-cpp-bcr:
     cd telemetry-cpp/examples/bazel && bazel test //...
@@ -47,20 +52,22 @@ lint:
     cd telemetry-go && golangci-lint run ./...
     cd telemetry-rs && cargo fmt --check
     cd telemetry-py && uv run ruff check . && uv run ruff format --check .
+    cd telemetry-ts && npm run lint
 
 # Format every SDK in place.
 fmt:
     cd telemetry-go && gofmt -w .
     cd telemetry-rs && cargo fmt
     cd telemetry-py && uv run ruff format .
+    cd telemetry-ts && npm run fmt
 
 # Tracing across languages
 
-# One trace through four services, one per SDK, handed on in W3C headers:
-# orders (Go) → inventory (Rust) → billing (Python) → shipping (C++). Fails if
-# any hop starts a new trace. The Python and C++ hops run when uv / bazel are
-# installed.
-[doc('One trace through Go, Rust, Python and C++; fails if a hop starts a new trace')]
+# One trace through five services, one per SDK, handed on in W3C headers:
+# orders (Go) → inventory (Rust) → billing (Python) → shipping (C++) →
+# notify (TypeScript). Fails if any hop starts a new trace. The Python, C++
+# and TypeScript hops run when uv / bazel / npm are installed.
+[doc('One trace through Go, Rust, Python, C++ and TypeScript; fails if a hop starts a new trace')]
 crosslang:
     #!/usr/bin/env bash
     set -euo pipefail
@@ -96,6 +103,12 @@ crosslang:
       cpp_out="$(cd telemetry-cpp && bazel build --noshow_progress --ui_event_filters=-info //examples:crosslang >/dev/null 2>&1 \
         && printf '{"traceparent":"%s"}' "$next" | bazel-bin/examples/crosslang 2>/dev/null | grep '"received_traceparent"' | tail -1)"
       hop "c++    (shipping-cpp)" "$cpp_out"
+    fi
+
+    if command -v npm >/dev/null; then
+      ts_out="$(cd telemetry-ts && { [[ -d node_modules ]] || npm ci --silent >/dev/null 2>&1; } && npm run -s build >/dev/null 2>&1 \
+        && printf '{"traceparent":"%s"}' "$next" | node examples/crosslang.ts 2>/dev/null | grep '"received_traceparent"' | tail -1)"
+      hop "ts     (notify-ts)" "$ts_out"
     fi
 
     if [[ -n "$trace" && "$broken" == 0 ]]; then
@@ -246,6 +259,10 @@ set-version version:
     set_line telemetry-py/pyproject.toml '^version = "[^"]*"' "version = \"$version\""
     set_line telemetry-cpp/MODULE.bazel '^(    version = )"[^"]*"' "\${1}\"$version\""
     set_line telemetry-cpp/CMakeLists.txt '^(project\(telemetry-cpp VERSION )[0-9.]+' "\${1}${version%%-*}"
+    # package.json, and package-lock.json's two copies (its root, then packages[""]).
+    set_line telemetry-ts/package.json '^(  "version": )"[^"]*"' "\${1}\"$version\""
+    set_line telemetry-ts/package-lock.json '^(  "version": )"[^"]*"' "\${1}\"$version\""
+    set_line telemetry-ts/package-lock.json '^(      "version": )"[^"]*"' "\${1}\"$version\""
     echo "set all SDKs to $version"
 
 # Release every SDK at one version: stamps it, commits, tags and pushes; the

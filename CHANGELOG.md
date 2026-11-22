@@ -7,6 +7,28 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- TypeScript SDK (`telemetry-ts`, package `@the-protobuf-project/telemetry`),
+  for Node.js 22.15+ and the browser from one package. It reads the same
+  `telemetry.toml` and `TELEMETRY_*` variables and has the same builder as the
+  other SDKs. Logs, metrics and traces go over OTLP (gRPC or HTTP in Node,
+  HTTP in the browser), with W3C trace context and baggage, MCAP recording and
+  Pyroscope profiling in Node. Every log record and span is counted, and
+  `close()` reports drops; lossless mode keeps every record, and `ready()`
+  waits for queue room. It is a hop in `just crosslang`. Releases attach the
+  npm tarball.
+
+### Changed
+
+- The Go SDK needs Go 1.26.4, as its `go.mod` already said; the README said
+  1.25.
+- `telemetry-go/bin/protoc-gen-telemetry`, a prebuilt macOS binary, is no
+  longer in the repository; build it with
+  `go build -o telemetry-go/bin/protoc-gen-telemetry ./telemetry-go/plugin/cmd/protoc-gen-telemetry`.
+- CI no longer checks out `runtime-go`: `runtime-go/telemetry` comes from the
+  Go module proxy.
+
 ## [1.3.3] - 2026-11-16
 
 ### Fixed

@@ -28,8 +28,6 @@ deps:
 lint:
   use:
     - STANDARD
-  except:
-    - PACKAGE_VERSION_SUFFIX  # orm.v1 is intentionally version-suffixed
 
 breaking:
   use:

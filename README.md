@@ -3,7 +3,7 @@
 
 <p align="center">
   <strong>One framework, every signal.</strong> Telemetry is a unified,
-  config-first observability framework for Go, Python, Rust, and C++ — structured
+  config-first observability framework for Go, Python, Rust, C++ and TypeScript — structured
   logging, metrics, distributed tracing, and continuous profiling, built on
   OpenTelemetry standards and shipped with a batteries-included Grafana stack.
 </p>
@@ -12,10 +12,11 @@
   <a href="https://github.com/the-protobuf-project/telemetry/actions/workflows/ci.yaml"><img src="https://github.com/the-protobuf-project/telemetry/actions/workflows/ci.yaml/badge.svg" alt="CI"></a>
   <a href="https://github.com/the-protobuf-project/telemetry/actions/workflows/linter.yaml"><img src="https://github.com/the-protobuf-project/telemetry/actions/workflows/linter.yaml/badge.svg" alt="Lint"></a>
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-Apache%202.0-blue.svg" alt="License: Apache 2.0"></a>
-  <img src="https://img.shields.io/badge/Go-1.25%2B-00ADD8?logo=go&logoColor=white" alt="Go">
+  <img src="https://img.shields.io/badge/Go-1.26%2B-00ADD8?logo=go&logoColor=white" alt="Go">
   <img src="https://img.shields.io/badge/Python-3.12%2B-3776AB?logo=python&logoColor=white" alt="Python">
   <img src="https://img.shields.io/badge/Rust-1.91%2B-000000?logo=rust&logoColor=white" alt="Rust">
   <img src="https://img.shields.io/badge/C%2B%2B-17-00599C?logo=cplusplus&logoColor=white" alt="C++">
+  <img src="https://img.shields.io/badge/Node.js-22.15%2B-5FA04E?logo=nodedotjs&logoColor=white" alt="Node.js">
 </p>
 
 > The Protobuf Project is not affiliated with, endorsed by, or sponsored by
@@ -52,7 +53,7 @@ offline analysis in Foxglove Studio.
 
 Every SDK shares the same mental model: build an `Telemetry` instance from a
 config file or code, then use the logger, metrics, and tracer it exposes. The same
-`telemetry.toml` drives all four languages.
+`telemetry.toml` drives all five languages.
 
 Why not the official OpenTelemetry SDK alone? Given a burst of 1,000,000 log
 records, the official Go, Rust, Python and C++ SDKs delivered between 11% and
@@ -133,15 +134,16 @@ graph TB
 
 ## Language support
 
-Four first-class SDKs share one configuration format and one API shape. Expand a
+Five first-class SDKs share one configuration format and one API shape. Expand a
 language for installation and a quick start.
 
 | Language | Status | Minimum version | Documentation |
 | -------- | ------ | --------------- | ------------- |
-| Go       | Stable | 1.25            | [telemetry-go](telemetry-go/README.md) |
+| Go       | Stable | 1.26            | [telemetry-go](telemetry-go/README.md) |
 | Python   | Stable | 3.12            | [telemetry-py](telemetry-py/README.md) |
 | Rust     | Stable | 1.91            | [telemetry-rs](telemetry-rs/README.md) |
 | C++      | Beta   | C++17           | [telemetry-cpp](telemetry-cpp) |
+| TypeScript | Beta | Node.js 22.15, or a browser | [telemetry-ts](telemetry-ts/README.md) |
 
 <details>
 <summary><strong>Go</strong></summary>
@@ -253,6 +255,28 @@ See the [C++ SDK sources and examples](telemetry-cpp).
 
 </details>
 
+<details>
+<summary><strong>TypeScript</strong></summary>
+
+```bash
+npm install https://github.com/the-protobuf-project/telemetry/releases/download/v<version>/the-protobuf-project-telemetry-<version>.tgz
+```
+
+```ts
+import { Telemetry } from "@the-protobuf-project/telemetry";
+
+// Node auto-discovers telemetry.toml; the browser is configured in code.
+const tel = Telemetry.builder("my-service", "1.0.0").build();
+
+tel.logger.info("Service started");
+await tel.close();
+```
+
+The same package runs in Node and the browser (OTLP over HTTP there). See the
+[TypeScript SDK documentation](telemetry-ts/README.md).
+
+</details>
+
 ## Configuration — `telemetry.toml`
 
 All SDKs auto-discover `telemetry.toml` from your project root:
@@ -286,12 +310,13 @@ See the full [Configuration Guide](docs/configuration.md).
 ## Environment variables
 
 Every config key can be overridden with an `TELEMETRY_`-prefixed environment
-variable. Nesting is expressed with a single underscore in Go, Rust, and C++, and a
-double underscore in Python.
+variable. Nesting is expressed with a single underscore in Go, Rust, and C++, a
+double underscore in Python, and either in TypeScript.
 
 | Language        | Prefix            | Nesting            | Example |
 | --------------- | ----------------- | ------------------ | ------- |
 | Go / Rust / C++ | `TELEMETRY_` | `_` (single)       | `TELEMETRY_TELEMETRY_OTLP_ENDPOINT` |
+| TypeScript (Node) | `TELEMETRY_` | `_` or `__`    | either of the above |
 | Python          | `TELEMETRY_` | `__` (double)      | `TELEMETRY_TELEMETRY__OTLP__ENDPOINT` |
 
 ```bash
@@ -357,22 +382,30 @@ C++,Trace propagation,1
 C++,Baggage,1
 C++,Distributed logging,1
 C++,MCAP,1
+TypeScript,Traces,1
+TypeScript,Metrics,1
+TypeScript,Logs,1
+TypeScript,Trace propagation,1
+TypeScript,Baggage,1
+TypeScript,Distributed logging,1
+TypeScript,Profiles,1
+TypeScript,MCAP,1
 ```
 
-| Signal | Go | Rust | Python | C++ |
-| ------ | -- | ---- | ------ | --- |
-| Traces over OTLP | Yes | Yes | Yes | Yes (OTLP export added; was MCAP-only) |
-| Metrics over OTLP | Yes | Yes | Yes | Yes |
-| Logs over OTLP | Yes | Yes | Yes | Yes |
-| Trace context across services (W3C `traceparent`) | Yes: `Inject` / `Extract` | Yes: `inject` / `extract` | Yes: `inject` / `extract` | Yes: `inject` / `extract` |
-| Baggage | Yes: `SetBaggage` / `Baggage` | Yes: `set_baggage` / `baggage` | Yes: `set_baggage` / `get_baggage` | Yes: carried from `extract` to `inject` |
-| Distributed logging (logs carry the trace id) | Yes: `InfoContext(ctx, …)`, `Logger.WithContext` | Yes: inside `span.attach()` | Yes: inside `start_span` | Yes: inside `span.attach()` / `TELEMETRY_SPAN` |
-| Profiles to Pyroscope | Yes: `WithProfiling` | Yes: `with_profiling` (`profiling` feature) | Yes: `with_profiling` (`[profiling]` extra) | Through an eBPF profiler (no Pyroscope C++ client exists; see below) |
-| MCAP recording | logs, metrics, spans | logs, metrics, spans | logs, metrics, spans | logs, metrics, spans |
-| Drops counted and reported, lossless mode | Yes: `WithExport`, `Stats()`, `Close` error | Yes: `with_export`, `stats()`, `close` error | Yes: `with_export`, `stats()`, warning on `close` | Yes: `with_export`, `stats()`, warning on `close` |
+| Signal | Go | Rust | Python | C++ | TypeScript |
+| ------ | -- | ---- | ------ | --- | ---------- |
+| Traces over OTLP | Yes | Yes | Yes | Yes (OTLP export added; was MCAP-only) | Yes (gRPC or HTTP in Node, HTTP in the browser) |
+| Metrics over OTLP | Yes | Yes | Yes | Yes | Yes |
+| Logs over OTLP | Yes | Yes | Yes | Yes | Yes |
+| Trace context across services (W3C `traceparent`) | Yes: `Inject` / `Extract` | Yes: `inject` / `extract` | Yes: `inject` / `extract` | Yes: `inject` / `extract` | Yes: `inject` / `extract` |
+| Baggage | Yes: `SetBaggage` / `Baggage` | Yes: `set_baggage` / `baggage` | Yes: `set_baggage` / `get_baggage` | Yes: carried from `extract` to `inject` | Yes: `setBaggage` / `baggage` |
+| Distributed logging (logs carry the trace id) | Yes: `InfoContext(ctx, …)`, `Logger.WithContext` | Yes: inside `span.attach()` | Yes: inside `start_span` | Yes: inside `span.attach()` / `TELEMETRY_SPAN` | Yes: inside `withSpan`, `logger.withContext` |
+| Profiles to Pyroscope | Yes: `WithProfiling` | Yes: `with_profiling` (`profiling` feature) | Yes: `with_profiling` (`[profiling]` extra) | Through an eBPF profiler (no Pyroscope C++ client exists; see below) | Node: `withProfiling` (`@pyroscope/nodejs`) |
+| MCAP recording | logs, metrics, spans | logs, metrics, spans | logs, metrics, spans | logs, metrics, spans | Node: logs, metrics, spans |
+| Drops counted and reported, lossless mode | Yes: `WithExport`, `Stats()`, `Close` error | Yes: `with_export`, `stats()`, `close` error | Yes: `with_export`, `stats()`, warning on `close` | Yes: `with_export`, `stats()`, warning on `close` | Yes: `withExport`, `stats()`, warning on `close`; lossless grows the queue, `ready()` waits for room |
 
-`just crosslang` checks one trace across all four, passed from Go to Rust to
-Python to C++, and CI runs it on every change.
+`just crosslang` checks one trace across all five, passed from Go to Rust to
+Python to C++ to TypeScript, and CI runs it on every change.
 
 C++ profiles come from outside the process: Pyroscope has no C++ client
 library, so the supported route is an eBPF profiler — Grafana Alloy's
@@ -453,7 +486,7 @@ Things that break the chain:
 - **A proxy strips unknown headers.** Allow `traceparent`, `tracestate` and
   `baggage` through gateways and load balancers.
 
-Try it locally. One trace through four services, each written with a
+Try it locally. One trace through five services, each written with a
 different SDK:
 
 ```bash
@@ -462,6 +495,7 @@ just crosslang
 # rust   (inventory-rs)    trace cd3b5eda…  span 70f84c9e…  parent ef132842…
 # python (billing-py)      trace cd3b5eda…  span 0585d24b…  parent 70f84c9e…
 # c++    (shipping-cpp)    trace cd3b5eda…  span 4c7cf38d…  parent 0585d24b…
+# ts     (notify-ts)       trace cd3b5eda…  span 9a1e6b20…  parent 4c7cf38d…
 # OK: one trace across every service
 ```
 
@@ -539,6 +573,8 @@ it runs at this fraction of the official SDK's call rate:
 | Spans | 0.88x | 0.56x | 0.87x | 1.0x |
 | Metrics | 0.43x | 0.25x | 0.70x | 0.04x |
 
+The TypeScript SDK is not in these benchmarks yet.
+
 Spans cost about the same as upstream. The gaps in logs and metrics are where
 the next improvements go. Rust's log macro formats every message even when
 console output is discarded. C++ counters are looked up by name under a lock
@@ -548,7 +584,7 @@ count only records that were delivered or reported.
 
 ### Configuring it
 
-Go, Rust and Python take the same export options:
+Go, Rust, Python and TypeScript take the same export options:
 
 ```go
 tel, err := telemetry.New().
@@ -571,9 +607,13 @@ let telemetry = Telemetry::builder("ingest", "1.0.0")
 t = Telemetry.new().with_service("ingest", "1.0.0").with_export(lossless=True).build()
 ```
 
+```ts
+const tel = Telemetry.builder("ingest", "1.0.0").withExport({ lossless: true, exporters: 4 }).build();
+```
+
 Either way nothing is lost silently. Every drop is counted, and reported when
 the program closes telemetry (an error from `Close` in Go and `close` in Rust,
-a warning in Python):
+a warning in Python and TypeScript):
 
 ```text
 telemetry: 935442 of 1000000 log records dropped (export queue full);
@@ -631,6 +671,7 @@ Read more: [Observability stack](telemetry-core/README.md) ·
 | [`telemetry-py`](telemetry-py)     | Python SDK |
 | [`telemetry-rs`](telemetry-rs)     | Rust SDK (workspace: `telemetry`, `telemetry-derive`, `telemetry-examples`) |
 | [`telemetry-cpp`](telemetry-cpp)   | C++ SDK (CMake and Bazel) |
+| [`telemetry-ts`](telemetry-ts)     | TypeScript SDK (Node.js and the browser) |
 | [`telemetry-core`](telemetry-core) | Observability stack and production deployment |
 | [`docs`](docs)                               | Configuration and usage guides |
 
@@ -650,9 +691,12 @@ cd telemetry-py && pip install . && ruff check .
 
 # C++ (Bazel)
 cd telemetry-cpp && bazel build //...
+
+# TypeScript
+cd telemetry-ts && npm ci && npm test && npm run build
 ```
 
-Continuous integration builds and tests all four SDKs and validates the
+Continuous integration builds and tests all five SDKs and validates the
 observability stack. See [`.github/workflows`](.github/workflows) for the CI and
 release pipelines.
 
@@ -673,6 +717,7 @@ tags `v1.3.0` and pushes; the release workflow does the rest.
 | Rust   | `.crate` files on the GitHub release, and the git tag | `telemetry-rs = { git = "https://github.com/the-protobuf-project/telemetry", tag = "v1.3.0" }` |
 | Python | wheel and sdist on the GitHub release | `pip install https://github.com/the-protobuf-project/telemetry/releases/download/v1.3.0/telemetry_py-1.3.0-py3-none-any.whl` |
 | C++    | source archive on the GitHub release, and the Bazel Central Registry | `bazel_dep(name = "tpp_telemetry.cpp", version = "1.3.0")`, or CMake `FetchContent` |
+| TypeScript | npm tarball on the GitHub release (not on the npm registry yet) | `npm install https://github.com/the-protobuf-project/telemetry/releases/download/v1.3.0/the-protobuf-project-telemetry-1.3.0.tgz` |
 
 The Go module lives in a subdirectory, so Go resolves its versions from tags
 prefixed with that directory (`telemetry-go/v1.3.0`), not from the repository's

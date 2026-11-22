@@ -140,6 +140,46 @@ jobs:
           name: python-dist
           path: telemetry-py/dist/*
 
+  # The npm tarball, attached to the GitHub release: install it with
+  # `npm install <release asset URL>`. Publishing to the npm registry needs
+  # an NPM_TOKEN secret and is not done here yet.
+  package-ts:
+    name: Package TypeScript SDK
+    runs-on: blacksmith-4vcpu-ubuntu-2404
+    needs: version
+    steps:
+      - name: Check out code
+        uses: actions/checkout@v6
+
+      - name: Set up Node
+        uses: actions/setup-node@v6
+        with:
+          node-version: '24'
+          cache: npm
+          cache-dependency-path: telemetry-ts/package-lock.json
+
+      - name: Set up just
+        uses: extractions/setup-just@v3
+
+      - name: Stamp the release version
+        run: just set-version "${{ needs.version.outputs.version }}"
+
+      - name: Build, test and pack
+        working-directory: ./telemetry-ts
+        run: |
+          npm ci
+          npm test
+          npm run build
+          npm run check:browser
+          mkdir -p dist-pack
+          npm pack --pack-destination dist-pack
+
+      - name: Upload package artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ts-dist
+          path: telemetry-ts/dist-pack/*.tgz
+
 
   # The BCR accepts a source archive's attestation only from this workflow:
   # it runs the tests, then .github/workflows/release_prep.sh, attests what
@@ -242,9 +282,9 @@ jobs:
           cache-to: type=gha,mode=max
 
   release:
-    name: Attach Python, Rust and the C++ provenance to the release
+    name: Attach Python, Rust, TypeScript and the C++ provenance to the release
     runs-on: blacksmith-4vcpu-ubuntu-2404
-    needs: [version, release-go, release-cpp, build-python, package-rust]
+    needs: [version, release-go, release-cpp, build-python, package-rust, package-ts]
     steps:
       - name: Download distributions
         uses: actions/download-artifact@v4
@@ -266,7 +306,8 @@ jobs:
           TAG: ${{ needs.version.outputs.tag }}
         run: |
           gh release upload "$TAG" --repo "${{ github.repository }}" --clobber \
-            artifacts/python-dist/* artifacts/rust-dist/* artifacts/attestations/*
+            artifacts/python-dist/* artifacts/rust-dist/* artifacts/ts-dist/* \
+            artifacts/attestations/*
 
   # The C++ module to the Bazel Central Registry: a pull request from a fork
   # of bazelbuild/bazel-central-registry, made with the BCR_PUBLISH_TOKEN

@@ -6,9 +6,8 @@ go 1.26.4
 // dependency graph — the full SDK, its OTel/MCAP/Pyroscope stack — never
 // pollutes the plugin's or runtime-go/telemetry's own go.mod.
 //
-// Both replaces are local-only, pending a real publish of the changes each
-// points at (telemetry-go's Meter() adapter, runtime-go/telemetry
-// itself — neither is on a registry yet).
+// The replace builds against this checkout's telemetry-go (its Meter()
+// adapter) rather than a published version.
 replace github.com/the-protobuf-project/telemetry/telemetry-go => ../..
 
 require (

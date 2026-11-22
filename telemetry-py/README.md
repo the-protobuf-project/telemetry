@@ -286,7 +286,8 @@ async def charge():
         await client.post("http://ledger:8080/entries")
 
 
-app = tel.asgi_middleware(api)  # serve this: each request continues the caller's trace
+# Serve this: each request continues the caller's trace.
+app = tel.asgi_middleware(api)
 ```
 
 - Each library is instrumented only when it is installed. The patches go where

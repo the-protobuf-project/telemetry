@@ -10,7 +10,7 @@ upstream OpenTelemetry SDK for that language alone, for comparison.
     just bench                                # 1,000,000 per signal, all SDKs
     just bench 100000 --langs go,rust
 
-Needs go, cargo, uv and bazel (C++) on PATH. Standard library only.
+Needs go, cargo, uv, bazel (C++) and node/npm (TypeScript) on PATH. Standard library only.
 """
 
 import argparse
@@ -41,7 +41,8 @@ TUNED = {
     "OTEL_BSP_MAX_EXPORT_BATCH_SIZE": "8192",
 }
 # Exporters this SDK runs per signal in the head-to-head.
-EXPORTERS = {"Go": 4, "Rust": 8, "Python": 4, "C++": 8}
+EXPORTERS = {"Go": 4, "Rust": 8, "Python": 4, "C++": 8, "TypeScript": 4}
+TS = ROOT / "telemetry-ts"
 
 
 def sh(cmd, cwd, **kw):
@@ -59,6 +60,10 @@ def build(langs, scratch):
         sh(["uv", "sync", "-q"], ROOT / "telemetry-py")
     if "cpp" in langs:
         sh(["bazel", "build", "-c", "opt", "//examples:loadgen", "//examples:otel_baseline"], ROOT / "telemetry-cpp")
+    if "ts" in langs:
+        if not (TS / "node_modules").exists():
+            sh(["npm", "ci", "--silent"], TS)
+        sh(["npm", "run", "-s", "build"], TS)
     return loadgen
 
 
@@ -121,6 +126,15 @@ def variants(langs, loadgen, workers):
         cpp = ROOT / "telemetry-cpp" / "bazel-bin" / "examples"
         out.append(("C++", "default (drop when full)", "C++ drop",
                     lambda sig, n: [str(cpp / "loadgen"), sig, str(n), OTLP_HTTP], {}))
+    if "ts" in langs:
+        # One thread: JavaScript runs the burst and the exporters on the same one.
+        cmd = lambda sig, n: ["node", str(TS / "examples" / "loadgen.ts"), sig, str(n), OTLP]
+        out += [
+            ("TypeScript", "default (drop when full)", "TS drop", cmd, {}),
+            ("TypeScript", "Lossless (awaits ready())", "TS lossless", cmd, {"LOADGEN_LOSSLESS": "1"}),
+            ("TypeScript", "Lossless (awaits ready()), 4 exporters", "TS 4 exporters", cmd,
+             {"LOADGEN_LOSSLESS": "1", "LOADGEN_EXPORTERS": "4"}),
+        ]
 
     # The same load through each language's upstream OpenTelemetry SDK alone.
     scratch = loadgen.parent
@@ -132,6 +146,7 @@ def variants(langs, loadgen, workers):
                                              OTLP_HTTP]),
         "cpp": ("C++", lambda sig, n: [str(ROOT / "telemetry-cpp" / "bazel-bin" / "examples" / "otel_baseline"),
                                        sig, str(n), OTLP_HTTP]),
+        "ts": ("TypeScript", lambda sig, n: ["node", str(TS / "examples" / "otel_baseline.ts"), sig, str(n), OTLP]),
     }
     for key, (lang, cmd) in official.items():
         if key in langs:
@@ -161,7 +176,7 @@ def mcap_runs(langs, loadgen, args, scratch):
     the file is then read back, so "recorded" is what Foxglove would see."""
     topic = {"logs": "logs", "spans": "traces", "metrics": "metrics"}
     rows = []
-    for lang in [l for l in ("go", "rust", "python") if l in langs]:
+    for lang in [l for l in ("go", "rust", "python", "ts") if l in langs]:
         for sig in args.signals.split(","):
             path = scratch / f"{lang}-{sig}.mcap"
             path.unlink(missing_ok=True)
@@ -171,6 +186,8 @@ def mcap_runs(langs, loadgen, args, scratch):
                        "-otlp=false", "-mcap", str(path)]
             elif lang == "rust":
                 cmd = [str(ROOT / "telemetry-rs" / "target" / "release" / "loadgen"), sig, str(args.n), "none"]
+            elif lang == "ts":
+                cmd = ["node", str(TS / "examples" / "loadgen.ts"), sig, str(args.n), "none"]
             else:
                 cmd = ["uv", "run", "-q", "--project", str(ROOT / "telemetry-py"), "python",
                        str(ROOT / "telemetry-py" / "examples" / "loadgen.py"), sig, str(args.n), ":none"]
@@ -206,7 +223,7 @@ DATA = ROOT / "docs" / "benchmarks.json"
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--n", type=int, default=1_000_000)
-    ap.add_argument("--langs", default="go,rust,python,cpp")
+    ap.add_argument("--langs", default="go,rust,python,cpp,ts")
     ap.add_argument("--signals", default="logs,spans,metrics")
     ap.add_argument("--timeout", type=int, default=1800, help="seconds per run")
     ap.add_argument("--out", default=str(ROOT / "docs" / "benchmark.md"))
@@ -317,12 +334,16 @@ def head_to_head(langs, loadgen, n, rounds, workers):
                                    dict(ours_env("Python", w), LOADGEN_HTTP="1"))),
         "cpp": ("C++", lambda sig, w: ([str(cpp / "otel_baseline"), sig, str(n), OTLP_HTTP], off_env(w)),
                 lambda sig, w: ([str(cpp / "loadgen"), sig, str(n), OTLP_HTTP], ours_env("C++", w))),
+        "ts": ("TypeScript", lambda sig, w: (["node", str(TS / "examples" / "otel_baseline.ts"), sig, str(n), OTLP], TUNED),
+               lambda sig, w: (["node", str(TS / "examples" / "loadgen.ts"), sig, str(n), OTLP],
+                               ours_env("TypeScript", w))),
     }
     out = []
     for key, (lang, official, ours) in sdks.items():
         if key not in langs:
             continue
-        for w in (1, workers):
+        # JavaScript has one thread to write on, so TypeScript runs once.
+        for w in ((1,) if key == "ts" else (1, workers)):
             for sig in ("logs", "spans", "metrics"):
                 for sdk, cmd in (("official", official), ("ours", ours)):
                     argv, env = cmd(sig, w)
@@ -449,7 +470,7 @@ def charts(data):
 
     mcap = ok(data.get("mcap", []))
     if mcap:
-        name = {"go": "Go", "rust": "Rust", "python": "Python"}
+        name = {"go": "Go", "rust": "Rust", "python": "Python", "ts": "TS"}
         recorded = [r for r in mcap if r["recorded"]]
         labels = [f"{name[r['lang']]} {r['signal']}" for r in recorded]
         out += ["### MCAP recording", ""]
@@ -477,7 +498,7 @@ def tuned(data):
     for (lang, sig, w, sdk), r in by.items():
         if sdk == "ours" and (lang, sig, w, "official") in by:
             pairs.append((lang, sig, w, by[(lang, sig, w, "official")], r))
-    order = {"Go": 0, "Rust": 1, "Python": 2, "C++": 3}
+    order = {"Go": 0, "Rust": 1, "Python": 2, "C++": 3, "TypeScript": 4}
     pairs.sort(key=lambda p: (p[2], order.get(p[0], 9), p[1]))
     most = max(p[2] for p in pairs)
     out = ["## Head to head: the official SDKs tuned", "",
@@ -573,7 +594,7 @@ def versus_official(data):
              "| -------- | ------ | ------------------: | -------------: | ------------------------: | ---: | ------------------: | ---: |"]
     for sig in ("logs", "spans", "metrics"):
         labels, ratios = [], []
-        for lang in ("Go", "Rust", "Python", "C++"):
+        for lang in ("Go", "Rust", "Python", "C++", "TypeScript"):
             off = official.get((lang, sig))
             if not off:
                 continue
@@ -647,7 +668,7 @@ def write(data, out_path):
             "| --- | ------ | -------: | ---------: | -------: | --------: | -------------: |",
         ]
         for r in mcap:
-            lang = {"go": "Go", "rust": "Rust", "python": "Python"}[r["lang"]]
+            lang = {"go": "Go", "rust": "Rust", "python": "Python", "ts": "TypeScript"}[r["lang"]]
             if "error" in r:
                 lines.append(f"| {lang} | {r['signal']} | — | — | — | — | {r['error']} |")
                 continue

@@ -31,19 +31,6 @@ jobs:
         with:
           path: telemetry
 
-      # telemetry-go/go.mod has a local `replace` for
-      # runtime-go/telemetry (the Meter contract protoc-gen-telemetry's
-      # generated code, and this SDK's Meter() adapter, bind to — not
-      # published yet), pointing at ../../runtime-go/telemetry relative to
-      # telemetry-go. CI checks it out as a true sibling of the
-      # `telemetry` repo to match local development. Drop this checkout
-      # (and the go.mod replace) once runtime-go/telemetry is published.
-      - name: Check out runtime-go (for the runtime-go/telemetry replace)
-        uses: actions/checkout@v6
-        with:
-          repository: the-protobuf-project/runtime-go
-          path: runtime-go
-
       - name: Set up Go
         uses: actions/setup-go@v6
         with:
@@ -163,7 +150,7 @@ jobs:
         run: cargo test --all-features --verbose
 
   cross-language-trace:
-    name: One trace across Go, Rust, Python and C++
+    name: One trace across Go, Rust, Python, C++ and TypeScript
     runs-on: blacksmith-4vcpu-ubuntu-2404
     steps:
       - name: Check out code
@@ -196,11 +183,63 @@ jobs:
           disk-cache: ${{ github.workflow }}-crosslang
           repository-cache: true
 
+      - name: Set up Node (TypeScript hop)
+        uses: actions/setup-node@v6
+        with:
+          node-version: '24'
+          cache: npm
+          cache-dependency-path: telemetry-ts/package-lock.json
+
       - name: Set up just
         uses: extractions/setup-just@v3
 
-      - name: One trace through Go, Rust, Python and C++
+      - name: One trace through Go, Rust, Python, C++ and TypeScript
         run: just crosslang
+
+  test-ts:
+    name: Test TypeScript SDK
+    runs-on: blacksmith-4vcpu-ubuntu-2404
+    strategy:
+      fail-fast: false
+      matrix:
+        # 22 is the oldest line the OpenTelemetry JS packages support.
+        node-version: ['22', '24', '26']
+
+    steps:
+      - name: Check out code
+        uses: actions/checkout@v6
+
+      - name: Set up Node
+        uses: actions/setup-node@v6
+        with:
+          node-version: ${{ matrix.node-version }}
+          cache: npm
+          cache-dependency-path: telemetry-ts/package-lock.json
+
+      - name: Install dependencies
+        working-directory: ./telemetry-ts
+        run: npm ci
+
+      - name: Typecheck
+        working-directory: ./telemetry-ts
+        run: npm run typecheck
+
+      - name: Run tests
+        working-directory: ./telemetry-ts
+        run: npm test
+
+      - name: Build
+        working-directory: ./telemetry-ts
+        run: npm run build
+
+      # The browser entry must bundle without Node built-ins, gRPC or MCAP.
+      - name: Browser bundle has no Node code
+        working-directory: ./telemetry-ts
+        run: npm run check:browser
+
+      - name: Package
+        working-directory: ./telemetry-ts
+        run: npm pack --dry-run
 
   build-python:
     name: Build Python SDK

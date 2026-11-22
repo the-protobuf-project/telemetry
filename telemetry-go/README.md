@@ -30,7 +30,7 @@ go get github.com/the-protobuf-project/telemetry/telemetry-go
 
 **Requirements:**
 
-- Go 1.25.0 or higher
+- Go 1.26.4 or higher
 - OpenTelemetry Collector (optional, for production deployments)
 - Foxglove Studio (optional, for MCAP visualization)
 

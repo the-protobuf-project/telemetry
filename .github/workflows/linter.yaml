@@ -128,6 +128,29 @@ jobs:
         working-directory: ./telemetry-py
         run: ruff format --check .
 
+  lint-ts:
+    name: Lint TypeScript Code
+    runs-on: blacksmith-4vcpu-ubuntu-2404
+    steps:
+      - name: Check out code
+        uses: actions/checkout@v6
+
+      - name: Set up Node
+        uses: actions/setup-node@v6
+        with:
+          node-version: '24'
+          cache: npm
+          cache-dependency-path: telemetry-ts/package-lock.json
+
+      # Biome is pinned in package-lock.json, so local `npm run lint` and CI agree.
+      - name: Install dependencies
+        working-directory: ./telemetry-ts
+        run: npm ci
+
+      - name: Run Biome (lint and format check)
+        working-directory: ./telemetry-ts
+        run: npm run lint
+
   check-links:
     name: Check Markdown Links
     runs-on: blacksmith-4vcpu-ubuntu-2404

@@ -345,6 +345,13 @@ jobs:
       # attestations to the draft release, and adds attestations.json to the
       # entry, which the registry shows on the version's Attestations tab.
       attest: true
+      # Open the pull request ready for review, not as a draft (the action's
+      # default). The BCR's reviewer, which runs every 20 minutes, skips
+      # drafts only; on a ready PR whose author maintains the module it
+      # counts the author's approval, then approves and merges once
+      # presubmit passes. Opened as a draft, each release waited for
+      # someone to mark it ready.
+      draft: false
       # Google's CLA check on BCR pull requests covers the committer as well as
       # the author, and the default committer (the Actions bot) cannot sign it.
       committer_name: oh-tarnished
